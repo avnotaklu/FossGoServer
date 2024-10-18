@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BadukServer", "BadukServer.csproj", "{24E9C543-6B10-4ABE-9DF0-7ED68359AF68}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{24E9C543-6B10-4ABE-9DF0-7ED68359AF68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24E9C543-6B10-4ABE-9DF0-7ED68359AF68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24E9C543-6B10-4ABE-9DF0-7ED68359AF68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24E9C543-6B10-4ABE-9DF0-7ED68359AF68}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CC887953-E7A2-4B97-B0C9-6B00A9874836}
+	EndGlobalSection
+EndGlobal
