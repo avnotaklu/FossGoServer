@@ -63,6 +63,10 @@
               "target": "Package",
               "version": "[8.0.8, )"
             },
+            "Microsoft.Orleans.Server": {
+              "target": "Package",
+              "version": "[8.2.0, )"
+            },
             "MongoDB.Driver": {
               "target": "Package",
               "version": "[3.0.0, )"
@@ -70,6 +74,10 @@
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.4.0, )"
+            },
+            "System.Runtime.Caching": {
+              "target": "Package",
+              "version": "[8.0.1, )"
             }
           },
           "imports": [

@@ -1,4 +1,13 @@
 is_global = true
+build_property.Orleans_DesignTimeBuild = true
+build_property.Orleans_AttachDebugger = 
+build_property.Orleans_GenerateFieldIds = 
+build_property.Orleans_ImmutableAttributes = 
+build_property.Orleans_IdAttributes = 
+build_property.Orleans_AliasAttributes = 
+build_property.Orleans_GenerateSerializerAttributes = 
+build_property.Orleans_ConstructorAttributes = 
+build_property.OrleansGenerateCompatibilityInvokers = 
 build_property.TargetFramework = net8.0
 build_property.TargetPlatformMinVersion = 
 build_property.UsingMicrosoftNETSdkWeb = true

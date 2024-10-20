@@ -22,10 +22,10 @@ public class AuthenticationController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpGet("GoogleSignIn")]
-    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn()
+    [HttpPost("GoogleSignIn")]
+    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn([FromBody] GoogleSignInTokenBody tokenBody)
     {
-        string token = Request.Headers["Authorization"].ToString().Remove(0, 7); //remove Bearer 
+        string token = tokenBody.Token; //remove Bearer 
         try
         {
             var payload = await _authenticationService.VerifyGoogleTokenId(token);
