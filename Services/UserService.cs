@@ -31,11 +31,11 @@ public class UsersService
     public async Task<User?> GetByEmail(string email) =>
         await _usersCollection.Find(user => user.Email == email).FirstOrDefaultAsync();
 
-    public async Task<User?> CreateUser(UserDetailsDto dto)
+    public async Task<User?> CreateUser(string email, bool googleSignIn, string? password = null)
     {
         try
         {
-            var user = new User(dto.Email);
+            var user = new User(email, googleSignIn, password);
             await _usersCollection.InsertOneAsync(user);
             return user;
         }

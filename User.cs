@@ -11,9 +11,12 @@ public class User
     public string? Id { get; set; }
     [BsonElement("email")]
     public string Email { get; set; }
-    public User(string email)
+    public string? PasswordHash { get; set; }
+    public bool GoogleSignIn { get; set; }
+    public User(string email,  bool googleSignIn, string? passwordHash = null)
     {
         Email = email;
-        // Id = id;
+        PasswordHash = passwordHash;
+        GoogleSignIn = googleSignIn;
     }
 }

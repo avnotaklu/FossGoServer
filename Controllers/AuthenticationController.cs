@@ -3,6 +3,7 @@ using Google.Apis.Auth;
 using Microsoft.AspNetCore.Mvc;
 using BadukServer.Dto;
 using BadukServer.Services;
+using System.ComponentModel.DataAnnotations;
 
 [ApiController]
 [Route("[controller]")]
@@ -19,8 +20,9 @@ public class AuthenticationController : ControllerBase
         _authenticationService = authenticationService;
         _usersService = usersService;
     }
+
     [AllowAnonymous]
-    [HttpPost("GoogleSignIn")]
+    [HttpGet("GoogleSignIn")]
     public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn()
     {
         string token = Request.Headers["Authorization"].ToString().Remove(0, 7); //remove Bearer 
@@ -34,13 +36,43 @@ public class AuthenticationController : ControllerBase
 
             if (user == null)
             {
-                return await SignUp(new UserDetailsDto(email));
+                return await SignUp(new UserDetailsDto(email, true));
             }
-            else {
-                return await Login(new UserDetailsDto(email));
+            else
+            {
+                return await Login(new UserDetailsDto(email, true));
             }
         }
         catch (System.Exception e)
+        {
+            return BadRequest(e.ToString());
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("PasswordLogIn")]
+    public async Task<ActionResult<UserAuthenticationModel>> PasswordLogIn([FromBody] UserDetailsDto userDetails)
+    {
+        try
+        {
+            return await Login(userDetails);
+        }
+        catch (System.Exception e)
+        {
+            return BadRequest(e.ToString());
+        }
+    }
+
+
+    [AllowAnonymous]
+    [HttpPost("PasswordSignUp")]
+    public async Task<ActionResult<UserAuthenticationModel>> PasswordSignUp([FromBody] UserDetailsDto userDetails)
+    {
+        try
+        {
+            return await SignUp(userDetails);
+        }
+        catch (Exception e)
         {
             return BadRequest(e.ToString());
         }
@@ -55,14 +87,18 @@ public class AuthenticationController : ControllerBase
             return Unauthorized("User credentials don't match");
         }
 
-        // bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.Password);
+        if (!request.GoogleSignIn)
+        {
+            bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
-        // if (!validPassword)
-        // {
+            if (!validPassword)
+            {
+                _logger.LogInformation("Incorrect password provided {password}", request.Password);
+                return Unauthorized("User credentials don't match");
+            }
+        }
 
-        //     _logger.LogInformation("Incorrect password provided {password}", request.Password);
-        //     return Unauthorized("User credentials don't match");
-        // }
+        _logger.LogInformation("Signup successful {email}", request.Email);
         return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebToken(user.Id!)));
     }
 
@@ -71,62 +107,33 @@ public class AuthenticationController : ControllerBase
         var user = await _usersService.GetByEmail(request.Email);
         if (user != null)
         {
+
+            _logger.LogInformation("User already exists {email}", request.Email);
             return BadRequest("User already exists");
         }
 
-        // string salt = BCrypt.Net.BCrypt.GenerateSalt();
-        // string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, salt);
-        var newUser = await _usersService.CreateUser(new UserDetailsDto(request.Email));
+        string? password = null;
+        if (!request.GoogleSignIn)
+        {
+            if (request.Password == null)
+            {
+
+                _logger.LogInformation("No password provided");
+                return BadRequest("Please provide a password");
+            }
+            string salt = BCrypt.Net.BCrypt.GenerateSalt();
+            password = BCrypt.Net.BCrypt.HashPassword(request.Password, salt);
+        }
+        var newUser = await _usersService.CreateUser(request.Email, request.GoogleSignIn, password);
 
         if (newUser == null)
         {
+
+            _logger.LogInformation("Couldn't create user");
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create user");
         }
+
+        _logger.LogInformation("Signup successful {email}", newUser.Email);
         return Ok(new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebToken(newUser.Id!)));
     }
-
-
-    
-//     private async Task<UserAuthenticationModel> Login(UserDetailsDto request)
-//     {
-//         var user = await _usersService.GetByEmail(request.Email);
-//         if (user == null)
-//         {
-//             _logger.LogInformation("Incorrect email provided {email}", request.Email);
-//             throw new BadukServerException(
-//  "User credentials don't match", ""
-//             );
-//         }
-
-//         // bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.Password);
-
-//         // if (!validPassword)
-//         // {
-
-//         //     _logger.LogInformation("Incorrect password provided {password}", request.Password);
-//         //     return Unauthorized("User credentials don't match");
-//         // }
-//         return new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebToken(user.Id!));
-//     }
-
-//     private async Task<UserAuthenticationModel> SignUp(UserDetailsDto request)
-//     {
-//         var user = await _usersService.GetByEmail(request.Email);
-//         if (user != null)
-//         {
-//             throw new BadukServerException(
-// "User already exists", ""
-//             );
-//         }
-
-//         // string salt = BCrypt.Net.BCrypt.GenerateSalt();
-//         // string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, salt);
-//         var newUser = await _usersService.CreateUser(new UserDetailsDto(request.Email));
-
-//         if (newUser == null)
-//         {
-//             throw new BadukServerException("Failed to create user", "");
-//         }
-//         return new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebToken(newUser.Id!));
-//     }
 }
