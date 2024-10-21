@@ -1,14 +1,19 @@
 
+namespace BadukServer.Orleans.Grains;
+
 public class PlayerGrain : Grain, IPlayerGrain
 {
-    private Guid? _activeGameId;
-    async public Task<Guid> CreateGame()
+    private string? _activeGameId;
+    async public Task<string> CreateGame(int rows, int columns, int timeInSeconds, string userId)
     {
-        var gameId = Guid.NewGuid();
+        var gameId = Guid.NewGuid().ToString();
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);  // create new game
+        
+        var game = await gameGrain.AddPlayerToGame(userId);
 
         // add ourselves to the game
-        var playerId = this.GetPrimaryKey();  // our player id
+        var playerId = this.GetPrimaryKeyString();  // our player id
+        await gameGrain.CreateGame(rows, columns, timeInSeconds);
         await gameGrain.AddPlayerToGame(playerId);
         _activeGameId = gameId;
 
@@ -24,21 +29,21 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return (await grain.GetGames()).Where(x => _activeGameId != x.GameId).ToArray();
     // }
 
-    async public Task<GameState> JoinGame(Guid gameId)
+    async public Task<string> JoinGame(string gameId)
     {
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
 
-        var state = await gameGrain.AddPlayerToGame(this.GetPrimaryKey());
+        var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString());
         _activeGameId = gameId;
 
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
         // await pairingGrain.RemoveGame(gameId);
 
-        return state;
+        return game.GameId;
 
     }
 
-    public Task LeaveGame(Guid gameId)
+    public Task LeaveGame(string gameId)
     {
         // manage game list
         _activeGameId = null;

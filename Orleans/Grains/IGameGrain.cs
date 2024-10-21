@@ -1,5 +1,10 @@
-public interface IGameGrain : IGrainWithGuidKey {
-    Task<GameState> AddPlayerToGame(Guid player);
+using BadukServer;
+
+public interface IGameGrain : IGrainWithStringKey {
+    Task CreateGame(int rows, int columns, int timeInSeconds);
+    Task<Game> AddPlayerToGame(String player);
+    Task<Game> GetGame();
+    Task<List<string>> GetPlayers();
     Task<GameState> GetState();
     Task<List<GameMove>> GetMoves();
     Task<GameState> MakeMove(GameMove move);
@@ -12,12 +17,4 @@ public enum GameState {
     WaitingForStart,
     Started,
     Ended
-}
-
-[GenerateSerializer]
-public struct GameMove
-{
-    [Id(0)] public Guid PlayerId { get; set; }
-    [Id(1)] public int X { get; set; }
-    [Id(2)] public int Y { get; set; }
 }
