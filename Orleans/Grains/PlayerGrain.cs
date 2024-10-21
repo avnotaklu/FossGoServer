@@ -4,17 +4,19 @@ namespace BadukServer.Orleans.Grains;
 public class PlayerGrain : Grain, IPlayerGrain
 {
     private string? _activeGameId;
-    async public Task<string> CreateGame(int rows, int columns, int timeInSeconds, string userId)
+    async public Task<string> CreateGame(int rows, int columns, int timeInSeconds)
     {
         var gameId = Guid.NewGuid().ToString();
+        var userId = this.GetPrimaryKeyString();  // our player id
+        
+        Console.WriteLine("Creating new game: " + gameId + " By player " + userId);
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);  // create new game
         
         var game = await gameGrain.AddPlayerToGame(userId);
 
         // add ourselves to the game
-        var playerId = this.GetPrimaryKeyString();  // our player id
         await gameGrain.CreateGame(rows, columns, timeInSeconds);
-        await gameGrain.AddPlayerToGame(playerId);
+        await gameGrain.AddPlayerToGame(userId);
         _activeGameId = gameId;
 
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
@@ -31,7 +33,10 @@ public class PlayerGrain : Grain, IPlayerGrain
 
     async public Task<string> JoinGame(string gameId)
     {
+        var userId = this.GetPrimaryKeyString();  // our player id
+        
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
+        Console.WriteLine("Joining game: " + gameId + " By player " + userId);
 
         var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString());
         _activeGameId = gameId;

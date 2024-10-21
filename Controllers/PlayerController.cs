@@ -41,7 +41,20 @@ public class PlayerController : ControllerBase
         if (userId == null) return Unauthorized();
         
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
-        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds, userId);
+        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds);
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
+
+        return Ok(gameGrain.GetGame());
+    }
+    
+    [HttpPost("JoinGame")]
+    public async Task<ActionResult<Game>> JoinGame([FromBody] GameJoinDto gameParams)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+        
+        var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
+        var gameId = await player.JoinGame(gameParams.GameId);
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         return Ok(gameGrain.GetGame());
