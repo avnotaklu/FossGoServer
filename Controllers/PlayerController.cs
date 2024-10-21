@@ -31,6 +31,8 @@ public class PlayerController : ControllerBase
         // _grainFactory.GetGrain<IPlayerGrain>(userId);
         var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         await playerPoolGrain.AddActivePlayer(userId);
-        return Ok(new RegisterPlayerResult(await playerPoolGrain.GetActivePlayers()));
+        var playerIds = await playerPoolGrain.GetActivePlayers();
+        var users = await _usersService.GetByIds(playerIds.ToList());
+        return Ok(new RegisterPlayerResult(users));
     }
 }

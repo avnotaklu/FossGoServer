@@ -1,10 +1,11 @@
+using BadukServer;
 using Google.Apis.Http;
 
 public class RegisterPlayerResult
 {
-    public HashSet<string> OtherActivePlayers { get; set; }
+    public List<User> OtherActivePlayers { get; set; }
 
-    public RegisterPlayerResult(HashSet<string> otherActivePlayers)
+    public RegisterPlayerResult(List<User> otherActivePlayers)
     {
         OtherActivePlayers = otherActivePlayers;
     }

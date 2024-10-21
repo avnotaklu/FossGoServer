@@ -4,6 +4,7 @@ using BadukServer.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 namespace BadukServer.Services;
 
 public class UsersService
@@ -27,6 +28,11 @@ public class UsersService
 
     public async Task<List<User>> Get() =>
         await _usersCollection.Find(_ => true).ToListAsync();
+
+    public async Task<List<User>> GetByIds(List<string> ids) =>
+        await (from user in _usersCollection.AsQueryable()
+               where ids.Contains(user.Id!)
+               select user).ToListAsync();
 
     public async Task<User?> GetByEmail(string email) =>
         await _usersCollection.Find(user => user.Email == email).FirstOrDefaultAsync();

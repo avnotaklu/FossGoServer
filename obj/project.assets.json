@@ -5177,7 +5177,7 @@
     ]
   },
   "packageFolders": {
-    "/home/ssp/.cache/NuGetPackages": {}
+    "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/dev/.cache/NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
@@ -5185,9 +5185,10 @@
       "projectUniqueName": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/projects/dotnet/BadukServer/BadukServer.csproj",
       "projectName": "BadukServer",
       "projectPath": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/projects/dotnet/BadukServer/BadukServer.csproj",
-      "packagesPath": "/home/ssp/.cache/NuGetPackages",
+      "packagesPath": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/dev/.cache/NuGetPackages",
       "outputPath": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/projects/dotnet/BadukServer/obj/",
       "projectStyle": "PackageReference",
+      "UsingMicrosoftNETSdk": false,
       "configFilePaths": [
         "/home/ssp/.local/share/dotnet/.nuget/NuGet/NuGet.Config"
       ],
