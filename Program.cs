@@ -15,14 +15,6 @@ await Host.CreateDefaultBuilder(args)
     })
     .ConfigureWebHostDefaults(webBuilder =>
     {
-    //     webBuilder.UseContentRoot(Directory.GetCurrentDirectory());
-    //     webBuilder.ConfigureAppConfiguration((builderContext, config) =>
-    // {
-    //     var env = builderContext.HostingEnvironment;
-
-    //     config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    //         .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: true);
-    // });
         webBuilder.UseStartup<Startup>();
         webBuilder.ConfigureKestrel((ctx, kestrelOptions) =>
         {

@@ -1,3 +1,4 @@
+using BadukServer.Dto;
 using BadukServer.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,12 +22,13 @@ public class PlayerController : ControllerBase
 
 
     [HttpPost("RegisterPlayer")]
-    public async Task<ActionResult<RegisterPlayerResult>> RegisterPlayer()
+    public async Task<ActionResult<RegisterPlayerResult>> RegisterPlayer([FromBody] RegisterPlayerDto data)
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
         // _grainFactory.GetGrain<IPlayerGrain>(userId);
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
+        await player.InitializePlayer(data.ConnectionId);
         var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         await playerPoolGrain.AddActivePlayer(userId);
         var playerIds = await playerPoolGrain.GetActivePlayers();
@@ -39,6 +41,9 @@ public class PlayerController : ControllerBase
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
+        if (gameParams.Rows == 0) return BadRequest("Rows can't be 0");
+        if (gameParams.Columns == 0) return BadRequest("Columns can't be 0");
+        if (gameParams.TimeInSeconds == 0) return BadRequest("TimeInSeconds can't be 0");
         
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
         var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds);

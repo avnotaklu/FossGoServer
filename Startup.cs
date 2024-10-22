@@ -1,6 +1,7 @@
 
 using System.Text;
 using BadukServer;
+using BadukServer.Hubs;
 using BadukServer.Models;
 using BadukServer.Services;
 using Microsoft.AspNet.Identity.EntityFramework;
@@ -27,6 +28,7 @@ public class Startup
         services.AddControllers();
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
+        services.AddSingleton<HubReference>();
         services.AddEndpointsApiExplorer();
 
         services.Configure<DatabaseSettings>(
@@ -56,6 +58,9 @@ public class Startup
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true
             });
+        services.AddHostedService<HubReference>();
+        services.AddSignalR().AddJsonProtocol();
+
     }
 
     // Add services to the container.
@@ -114,6 +119,7 @@ public class Startup
         app.UseEndpoints(e =>
         {
             e.MapControllers();
+            e.MapHub<GameHub>("/gameHub");
             // e.MapGet("/weatherforecast", () =>
             // {
             //     Console.WriteLine("hello");

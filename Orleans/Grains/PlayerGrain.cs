@@ -1,18 +1,26 @@
+using BadukServer.Hubs;
+using Microsoft.AspNetCore.SignalR;
+using Orleans.Concurrency;
 
 namespace BadukServer.Orleans.Grains;
 
 public class PlayerGrain : Grain, IPlayerGrain
 {
     private string? _activeGameId;
-    async public Task<string> CreateGame(int rows, int columns, int timeInSeconds)
+
+    public async Task InitializePlayer(string connectionId)
+    {
+        var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(this.GetPrimaryKeyString());
+        await notifierGrain.InitializeNotifier(connectionId);
+    }
+
+    public async Task<string> CreateGame(int rows, int columns, int timeInSeconds)
     {
         var gameId = Guid.NewGuid().ToString();
-        var userId = this.GetPrimaryKeyString();  // our player id
-        
+        var userId = this.GetPrimaryKeyString(); // our player id
+
         Console.WriteLine("Creating new game: " + gameId + " By player " + userId);
-        var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);  // create new game
-        
-        var game = await gameGrain.AddPlayerToGame(userId);
+        var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId); // create new game
 
         // add ourselves to the game
         await gameGrain.CreateGame(rows, columns, timeInSeconds);
@@ -31,21 +39,24 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return (await grain.GetGames()).Where(x => _activeGameId != x.GameId).ToArray();
     // }
 
-    async public Task<string> JoinGame(string gameId)
+    public async Task<string> JoinGame(string gameId)
     {
-        var userId = this.GetPrimaryKeyString();  // our player id
-        
+        var userId = this.GetPrimaryKeyString(); // our player id
+
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
         Console.WriteLine("Joining game: " + gameId + " By player " + userId);
 
         var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString());
+
         _activeGameId = gameId;
+
+        var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(game.PlayerIds[0]);
+        await notifierGrain.SendMessage(new JoinMessage(gameId));
 
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
         // await pairingGrain.RemoveGame(gameId);
 
         return game.GameId;
-
     }
 
     public Task LeaveGame(string gameId)

@@ -5188,7 +5188,6 @@
       "packagesPath": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/dev/.cache/NuGetPackages",
       "outputPath": "/mnt/50124c32-fd8f-4afd-9dc4-6e93361c2dc0/projects/dotnet/BadukServer/obj/",
       "projectStyle": "PackageReference",
-      "UsingMicrosoftNETSdk": false,
       "configFilePaths": [
         "/home/ssp/.local/share/dotnet/.nuget/NuGet/NuGet.Config"
       ],

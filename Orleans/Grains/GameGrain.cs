@@ -1,10 +1,11 @@
 using System.Diagnostics;
+using Orleans.Concurrency;
 
 namespace BadukServer.Orleans.Grains;
 
 public class GameGrain : Grain, IGameGrain
 {
-    private List<string> _playerIds = [];
+    private List<string> _playerIds;
     private int _currentMove;
     private GameState _gameState;
     private string? _winner;
@@ -14,14 +15,15 @@ public class GameGrain : Grain, IGameGrain
     private int _rows;
     private int _columns;
     private int _timeInSeconds;
-    private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
+    private Dictionary<string, int> _timeLeftForPlayers { get; set; }
     private int?[,] _board;
     private bool _initialized = false;
 
 
     public Task CreateGame(int rows, int columns, int timeInSeconds)
     {
-        Debug.Assert(_playerIds.Count == 1, $"Game can be created by only the first player");
+        _playerIds = [];
+        _timeLeftForPlayers = [];
         _rows = rows;
         _columns = columns;
         _timeInSeconds = timeInSeconds;
@@ -31,7 +33,7 @@ public class GameGrain : Grain, IGameGrain
         _winner = null;
         _loser = null;
         _initialized = true;
-        
+
         return Task.CompletedTask;
     }
 
@@ -44,7 +46,8 @@ public class GameGrain : Grain, IGameGrain
             timeInSeconds: _timeInSeconds,
             timeLeftForPlayers: _timeLeftForPlayers,
             moves: _moves,
-            playgroundMap: new Dictionary<string, string>()
+            playgroundMap: new Dictionary<string, string>(),
+            playerIds: _playerIds
         );
     }
 
@@ -55,7 +58,8 @@ public class GameGrain : Grain, IGameGrain
         if (_playerIds.Contains(player))
         {
             // TODO: this condition should never happen, Check whether i can throw here?? 
-            return Task.FromResult(InitializeGame());
+            var premature_game = InitializeGame();
+            return Task.FromResult(premature_game);
         }
 
         if (_playerIds.Count == 1)
@@ -75,7 +79,8 @@ public class GameGrain : Grain, IGameGrain
         }
         _timeLeftForPlayers[player] = _timeInSeconds;
 
-        return Task.FromResult(InitializeGame());
+        var game = InitializeGame();
+        return Task.FromResult(game);
     }
 
     public Task<List<string>> GetPlayers()
@@ -99,7 +104,7 @@ public class GameGrain : Grain, IGameGrain
         _moves.Add(move);
         return Task.FromResult(_gameState);
     }
-    
+
     public Task<Game> GetGame()
     {
         return Task.FromResult(InitializeGame());
