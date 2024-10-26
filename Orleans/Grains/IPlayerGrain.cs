@@ -7,9 +7,9 @@ public interface IPlayerGrain : IGrainWithStringKey
     // Task<List<GameSummary>> GetGameSummaries();
 
     Task InitializePlayer(string connectionId);
-    Task<string> CreateGame(int rows, int columns, int timeInSeconds, Stone stone);
+    Task<string> CreateGame(int rows, int columns, int timeInSeconds, StoneType stone, string time);
     // join an existing game
-    Task<string> JoinGame(string gameId);
+    Task<string> JoinGame(string gameId, string time);
     Task LeaveGame(string gameId);
 
 }

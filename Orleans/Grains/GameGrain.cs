@@ -6,7 +6,7 @@ namespace BadukServer.Orleans.Grains;
 public class GameGrain : Grain, IGameGrain
 {
     // Player id with player's stone; 0 for black, 1 for white
-    private Dictionary<string, Stone> _players = [];
+    private Dictionary<string, StoneType> _players = [];
     private int _currentMove;
     private GameState _gameState;
     private string? _winner;
@@ -20,6 +20,7 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<string, string> _board = [];
     private Dictionary<string, int> _playerScores = [];
     private bool _initialized = false;
+    private string? _startTime;
 
 
     public Task CreateGame(int rows, int columns, int timeInSeconds)
@@ -51,11 +52,12 @@ public class GameGrain : Grain, IGameGrain
             moves: _moves,
             playgroundMap: _board,
             players: _players,
-            playerScores: _playerScores
+            playerScores: _playerScores,
+            startTime: _startTime
         );
     }
 
-    public Task<Game> AddPlayerToGame(string player, Stone stone)
+    public Task<Game> AddPlayerToGame(string player, StoneType stone, string time)
     {
         Debug.Assert(_players.Keys.Count < 3, $"Maximum of two players can be added, Added were {_players.Keys.Count}");
 
@@ -76,6 +78,7 @@ public class GameGrain : Grain, IGameGrain
         if (_players.Keys.Count == 2)
         {
             _gameState = GameState.Started;
+            _startTime = time;
         }
         else
         {
@@ -87,7 +90,7 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(game);
     }
 
-    public Task<Dictionary<string, Stone>> GetPlayers()
+    public Task<Dictionary<string, StoneType>> GetPlayers()
     {
         return Task.FromResult(_players);
     }

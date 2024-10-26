@@ -2,7 +2,7 @@ namespace BadukServer;
 
 public class GameCreationDto
 {
-    public GameCreationDto(int rows, int columns, int timeInSeconds, Stone firstPlayerStone)
+    public GameCreationDto(int rows, int columns, int timeInSeconds, StoneType firstPlayerStone)
     {
         Rows = rows;
         Columns = columns;
@@ -12,7 +12,7 @@ public class GameCreationDto
 
     public int Rows { get; set; }
     public int Columns { get; set; }
-    public Stone FirstPlayerStone { get; set; }
+    public StoneType FirstPlayerStone { get; set; }
     public int TimeInSeconds { get; set; }
 }
 

@@ -7,7 +7,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, string> playgroundMap, List<GameMove> moves, Dictionary<string, Stone> players, Dictionary<string, int> playerScores)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, string> playgroundMap, List<GameMove> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime)
     {
         GameId = gameId;
         Rows = rows;
@@ -18,6 +18,7 @@ public class Game
         Moves = moves;
         Players = players;
         PlayerScores = playerScores;
+        StartTime = startTime;
     }
 
     [BsonId]
@@ -38,14 +39,16 @@ public class Game
     [BsonElement("moves")]
     public List<GameMove> Moves { get; set; }
     [BsonElement("players")]
-    public Dictionary<string, Stone> Players { get; set; }
+    public Dictionary<string, StoneType> Players { get; set; }
     [BsonElement("playerScores")]
     public Dictionary<string, int> PlayerScores { get; set; }
+    [BsonElement("startTime")]
+    public string? StartTime { get; set; }
 }
 
 
 [GenerateSerializer]
-public enum Stone
+public enum StoneType
 {
     /// <summary>
     /// Black stone

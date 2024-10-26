@@ -2,9 +2,9 @@ using BadukServer;
 
 public interface IGameGrain : IGrainWithStringKey {
     Task CreateGame(int rows, int columns, int timeInSeconds);
-    Task<Game> AddPlayerToGame(String player, Stone stone);
+    Task<Game> AddPlayerToGame(String player, StoneType stone, string time);
     Task<Game> GetGame();
-    Task<Dictionary<string, Stone>> GetPlayers();
+    Task<Dictionary<string, StoneType>> GetPlayers();
     Task<GameState> GetState();
     Task<List<GameMove>> GetMoves();
     Task<GameState> MakeMove(GameMove move);

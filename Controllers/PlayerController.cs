@@ -48,9 +48,10 @@ public class PlayerController : ControllerBase
         if (gameParams.Rows == 0) return BadRequest("Rows can't be 0");
         if (gameParams.Columns == 0) return BadRequest("Columns can't be 0");
         if (gameParams.TimeInSeconds == 0) return BadRequest("TimeInSeconds can't be 0");
+        var time = DateTime.Now.ToString("o");
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
-        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds, gameParams.FirstPlayerStone);
+        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds, gameParams.FirstPlayerStone, time);
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         var game = await gameGrain.GetGame();
@@ -64,6 +65,13 @@ public class PlayerController : ControllerBase
         return Ok(game);
     }
 
+    async Task<List<PublicUserInfo>> getPlayerInfos(Game game)
+    {
+        var players = await _usersService.GetByIds([.. game.Players.Keys]);
+        var playerInfos = players.Select(p => new PublicUserInfo(id: p.Id!, email: p.Email)).ToList();
+        return playerInfos;
+    }
+
     [HttpPost("JoinGame")]
     public async Task<ActionResult<GameJoinResult>> JoinGame([FromBody] GameJoinDto gameParams)
     {
@@ -71,20 +79,30 @@ public class PlayerController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var gameId = gameParams.GameId;
-        var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
-
-        await player.JoinGame(gameId);
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
         var game = await gameGrain.GetGame();
-        var players = await _usersService.GetByIds([.. game.Players.Keys]);
-        var playerInfos = players.Select(p => new PublicUserInfo(id: p.Id!, email: p.Email)).ToList();
-        var time = DateTime.Now;
+
+        if (game.Players.Keys.Contains(userId))
+        {
+            return new GameJoinResult(
+            game: game,
+            players: await getPlayerInfos(game),
+            time: game.StartTime!
+        );
+        }
+
+
+        var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
+
+        var time = DateTime.Now.ToString("o");
+
+        await player.JoinGame(gameId, time);
 
         var joinRes = new GameJoinResult(
             game: game,
-            players: playerInfos,
-            time: time.ToString("o")
+            players: await getPlayerInfos(game),
+            time: time
         );
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
