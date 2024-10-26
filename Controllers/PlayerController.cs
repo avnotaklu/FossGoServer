@@ -1,6 +1,7 @@
 using BadukServer.Dto;
 using BadukServer.Orleans.Grains;
 using BadukServer.Services;
+using Google.Apis.Util;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -50,10 +51,17 @@ public class PlayerController : ControllerBase
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
         var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds, gameParams.FirstPlayerStone);
-
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
-        return Ok(await gameGrain.GetGame());
+        var game = await gameGrain.GetGame();
+
+
+        var newGame = new NewGameCreatedMessage(game);
+
+        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
+        await notifierGrain.SendMessage(new SignalRMessage(type: "NewGame", data: newGame), gameId, toMe: true);
+
+        return Ok(game);
     }
 
     [HttpPost("JoinGame")]
@@ -80,8 +88,20 @@ public class PlayerController : ControllerBase
         );
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
-        await notifierGrain.SendMessage(new SignalRMessage(type: "GameJoin", data: joinRes), gameId);
+        await notifierGrain.SendMessage(new SignalRMessage(type: "GameJoin", data: joinRes), gameId, toMe: true);
 
         return Ok(joinRes);
+    }
+
+    [HttpGet("AvailableGames")]
+    public async Task<ActionResult<AvailableGamesResult>> AvailableGames()
+    {
+        var playerPool = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
+        var players = await playerPool.GetActivePlayers();
+        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetAvailableGames()))).SelectMany(x => x) ?? [];
+
+        var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
+
+        return Ok(new AvailableGamesResult(games: [.. (games ?? [])]));
     }
 }

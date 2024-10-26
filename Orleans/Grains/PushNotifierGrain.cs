@@ -71,11 +71,11 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return new ValueTask();
     }
 
-    public ValueTask SendMessage(SignalRMessage message, string gameGroup)
+    public ValueTask SendMessage(SignalRMessage message, string gameGroup, bool toMe = true)
     {
         // Add a message to the send queue
         // _messageQueue.Enqueue(message);
-        return BroadcastUpdates(message, gameGroup);
+        return SendUpdate(message, gameGroup, toMe ? ConnectionId : null);
         // return new(Flush());
     }
 
@@ -129,11 +129,18 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     //     }
     // }
 
-    private ValueTask BroadcastUpdates(SignalRMessage message, string gameGroup)
+    private ValueTask SendUpdate(SignalRMessage message, string gameGroup, string? connectionId = null)
     {
         try
         {
-            return _BroadcastUpdates(message, gameGroup);
+            if (connectionId == null)
+            {
+                return _SendUpdate(message, gameGroup);
+            }
+            else
+            {
+                return _SendUpdatesAll(message, gameGroup);
+            }
             // return ValueTask.CompletedTask;
         }
         catch (Exception ex)
@@ -145,7 +152,11 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
 
     // TODO: This was done with GrainObserver [IRemoteGameHub], idk why
-    public ValueTask _BroadcastUpdates(SignalRMessage messages, string gameGroup) =>
+    public ValueTask _SendUpdate(SignalRMessage messages, string gameGroup) =>
         new(_hubContext.Clients.Client(ConnectionId).SendAsync(
+            "gameUpdate", messages, CancellationToken.None));
+
+    public ValueTask _SendUpdatesAll(SignalRMessage messages, string gameGroup) =>
+        new(_hubContext.Clients.All.SendAsync(
             "gameUpdate", messages, CancellationToken.None));
 }

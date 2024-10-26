@@ -9,6 +9,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 {
     private readonly IHubContext<GameHub> _hubContext;
     private string _connectionId;
+    public List<string> games = [];
 
     public PlayerGrain(IHubContext<GameHub> hubContext)
     {
@@ -23,6 +24,11 @@ public class PlayerGrain : Grain, IPlayerGrain
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(this.GetPrimaryKeyString());
         await notifierGrain.InitializeNotifier(connectionId);
     }
+
+    public Task<List<string>> GetAvailableGames() {
+        return Task.FromResult(games);
+     }
+
 
     public async Task<string> CreateGame(int rows, int columns, int timeInSeconds, Stone stone)
     {
@@ -39,6 +45,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
 
         _activeGameId = gameId;
+        games.Add(gameId);
 
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
         // await pairingGrain.AddGame(gameId);
