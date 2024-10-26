@@ -5,31 +5,34 @@ namespace BadukServer.Orleans.Grains;
 
 public class GameGrain : Grain, IGameGrain
 {
-    private List<string> _playerIds;
+    // Player id with player's stone; 0 for black, 1 for white
+    private Dictionary<string, Stone> _players = [];
     private int _currentMove;
     private GameState _gameState;
     private string? _winner;
     private string? _loser;
 
-    private List<GameMove> _moves;
+    private List<GameMove> _moves = [];
     private int _rows;
     private int _columns;
     private int _timeInSeconds;
-    private Dictionary<string, int> _timeLeftForPlayers { get; set; }
-    private int?[,] _board;
+    private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
+    private Dictionary<string, string> _board = [];
+    private Dictionary<string, int> _playerScores = [];
     private bool _initialized = false;
 
 
     public Task CreateGame(int rows, int columns, int timeInSeconds)
     {
-        _playerIds = [];
+        _players = [];
         _timeLeftForPlayers = [];
         _rows = rows;
         _columns = columns;
         _timeInSeconds = timeInSeconds;
-        _board = new int?[_rows, _columns];
+        _board = [];
         _gameState = GameState.WaitingForStart;
         _moves = [];
+        _playerScores = [];
         _winner = null;
         _loser = null;
         _initialized = true;
@@ -46,30 +49,31 @@ public class GameGrain : Grain, IGameGrain
             timeInSeconds: _timeInSeconds,
             timeLeftForPlayers: _timeLeftForPlayers,
             moves: _moves,
-            playgroundMap: new Dictionary<string, string>(),
-            playerIds: _playerIds
+            playgroundMap: _board,
+            players: _players,
+            playerScores: _playerScores
         );
     }
 
-    public Task<Game> AddPlayerToGame(string player)
+    public Task<Game> AddPlayerToGame(string player, Stone stone)
     {
-        Debug.Assert(_playerIds.Count < 3, $"Maximum of two players can be added, Added were {_playerIds.Count}");
+        Debug.Assert(_players.Keys.Count < 3, $"Maximum of two players can be added, Added were {_players.Keys.Count}");
 
-        if (_playerIds.Contains(player))
+        if (_players.Keys.Contains(player))
         {
             // TODO: this condition should never happen, Check whether i can throw here?? 
             var premature_game = InitializeGame();
             return Task.FromResult(premature_game);
         }
 
-        if (_playerIds.Count == 1)
+        if (_players.Keys.Count == 1)
         {
             Debug.Assert(_initialized, $"Game must be initialized before calling AddPlayerToGame() for second player");
         }
 
-        _playerIds.Add(player);
+        _players[player] = stone;
 
-        if (_playerIds.Count == 2)
+        if (_players.Keys.Count == 2)
         {
             _gameState = GameState.Started;
         }
@@ -83,9 +87,9 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(game);
     }
 
-    public Task<List<string>> GetPlayers()
+    public Task<Dictionary<string, Stone>> GetPlayers()
     {
-        return Task.FromResult(_playerIds);
+        return Task.FromResult(_players);
     }
 
 

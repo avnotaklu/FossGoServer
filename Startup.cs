@@ -28,7 +28,7 @@ public class Startup
         services.AddControllers();
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
-        services.AddSingleton<HubReference>();
+        // services.AddSingleton<HubReference>();
         services.AddEndpointsApiExplorer();
 
         services.Configure<DatabaseSettings>(
@@ -58,7 +58,7 @@ public class Startup
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true
             });
-        services.AddHostedService<HubReference>();
+        // services.AddHostedService<HubReference>();
         services.AddSignalR().AddJsonProtocol();
 
     }
@@ -109,6 +109,7 @@ public class Startup
 
         app.UseAuthentication();
         app.UseRouting();
+        app.UseAuthorization();
         //         app.MapControllers();
 
         var summaries = new[]

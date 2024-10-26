@@ -7,19 +7,19 @@ namespace BadukServer.Orleans.Grains;
 // [StatelessWorker(maxLocalWorkers: 12)]
 public class PushNotifierGrain : Grain, IPushNotifierGrain
 {
-    private readonly Queue<JoinMessage> _messageQueue = new();
+    private readonly Queue<SignalRMessage> _messageQueue = new();
     private readonly ILogger<PushNotifierGrain> _logger;
     private string? _connectionId;
     private string ConnectionId => _connectionId ?? throw new NullReferenceException("_connectionId is not set");
-    private readonly HubReference _hub;
+    // private readonly HubReference _hub;
     private readonly IHubContext<GameHub> _hubContext;
 
     // private List<(SiloAddress Host, IRemoteLocationHub Hub)> _hubs = new();
-    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, HubReference hubReference, IHubContext<GameHub> hubContext)
+    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, IHubContext<GameHub> hubContext)
 
     {
         _logger = logger;
-        _hub = hubReference;
+        // _hub = hubReference;
         _hubContext = hubContext;
     }
 
@@ -28,15 +28,15 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         // Set up a timer to regularly flush the message queue
-        RegisterTimer(
-            _ =>
-            {
-                Flush();
-                return Task.CompletedTask;
-            },
-            null,
-            TimeSpan.FromMilliseconds(15),
-            TimeSpan.FromMilliseconds(15));
+        // RegisterTimer(
+        //     _ =>
+        //     {
+        //         Flush();
+        //         return Task.CompletedTask;
+        //     },
+        //     null,
+        //     TimeSpan.FromMilliseconds(15),
+        //     TimeSpan.FromMilliseconds(15));
 
 
         // Set up a timer to regularly refresh the hubs, to respond to azure infrastructure changes
@@ -53,7 +53,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     public override async Task OnDeactivateAsync(DeactivationReason deactivationReason,
         CancellationToken cancellationToken)
     {
-        await Flush();
+        // await Flush();
         await base.OnDeactivateAsync(deactivationReason, cancellationToken);
     }
 
@@ -71,49 +71,50 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return new ValueTask();
     }
 
-    public ValueTask SendMessage(JoinMessage message)
+    public ValueTask SendMessage(SignalRMessage message, string gameGroup)
     {
         // Add a message to the send queue
-        _messageQueue.Enqueue(message);
-        return new(Flush());
+        // _messageQueue.Enqueue(message);
+        return BroadcastUpdates(message, gameGroup);
+        // return new(Flush());
     }
 
-    private Task Flush()
-    {
-        if (_flushTask.IsCompleted)
-        {
-            _flushTask = FlushInternal();
-        }
+    // private Task Flush()
+    // {
+    //     if (_flushTask.IsCompleted)
+    //     {
+    //         _flushTask = FlushInternal();
+    //     }
 
-        return _flushTask;
+    //     return _flushTask;
 
-        async Task FlushInternal()
-        {
-            const int maxMessagesPerBatch = 100;
-            if (_messageQueue.Count == 0) return;
+    //     async Task FlushInternal()
+    //     {
+    //         const int maxMessagesPerBatch = 100;
+    //         if (_messageQueue.Count == 0) return;
 
-            while (_messageQueue.Count > 0)
-            {
-                // Send all messages to all SignalR hubs
-                var messagesToSend = new List<JoinMessage>(Math.Min(_messageQueue.Count, maxMessagesPerBatch));
-                while (messagesToSend.Count < maxMessagesPerBatch && _messageQueue.TryDequeue(out JoinMessage? msg))
-                    messagesToSend.Add(msg);
+    //         while (_messageQueue.Count > 0)
+    //         {
+    //             // Send all messages to all SignalR hubs
+    //             var messagesToSend = new List<SignalRMessage>(Math.Min(_messageQueue.Count, maxMessagesPerBatch));
+    //             while (messagesToSend.Count < maxMessagesPerBatch && _messageQueue.TryDequeue(out SignalRMessage? msg))
+    //                 messagesToSend.Add(msg);
 
-                // var tasks = new List<Task>(_hubs.Count);
-                // var batch = new JoinMessagesBatch(messagesToSend);
-                //
-                // foreach ((SiloAddress Host, IRemoteGameHub Hub) hub in _hubs)
-                // {
-                //     tasks.Add(BroadcastUpdates(hub.Host, hub.Hub, batch, connectionId, _logger));
-                // }
+    //             // var tasks = new List<Task>(_hubs.Count);
+    //             // var batch = new JoinMessagesBatch(messagesToSend);
+    //             //
+    //             // foreach ((SiloAddress Host, IRemoteGameHub Hub) hub in _hubs)
+    //             // {
+    //             //     tasks.Add(BroadcastUpdates(hub.Host, hub.Hub, batch, connectionId, _logger));
+    //             // }
 
-                var batch = new JoinMessagesBatch(messagesToSend);
+    //             var batch = new SignalRMessagesBatch(messagesToSend);
 
-                // await BroadcastUpdates(_hub.RemoteGameHub, batch, ConnectionId, _logger);
-                await BroadcastUpdates(batch, ConnectionId, _logger);
-            }
-        }
-    }
+    //             // await BroadcastUpdates(_hub.RemoteGameHub, batch, ConnectionId, _logger);
+    //             await BroadcastUpdates(batch, ConnectionId, _logger);
+    //         }
+    //     }
+    // }
 
     // private static async Task BroadcastUpdates(IRemoteGameHub hub, JoinMessagesBatch message,
     //     string connectionId, ILogger logger)
@@ -128,22 +129,23 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     //     }
     // }
 
-    private async Task BroadcastUpdates(JoinMessagesBatch message,
-        string connectionId, ILogger logger)
+    private ValueTask BroadcastUpdates(SignalRMessage message, string gameGroup)
     {
         try
         {
-            await BroadcastUpdates(message, connectionId);
+            return _BroadcastUpdates(message, gameGroup);
+            // return ValueTask.CompletedTask;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error broadcasting to host");
+            _logger.LogError(ex, "Error broadcasting to host");
+            return ValueTask.CompletedTask;
         }
     }
 
 
     // TODO: This was done with GrainObserver [IRemoteGameHub], idk why
-    public ValueTask BroadcastUpdates(JoinMessagesBatch messages, string connectionId) =>
-        new(_hubContext.Clients.Client(connectionId).SendAsync(
+    public ValueTask _BroadcastUpdates(SignalRMessage messages, string gameGroup) =>
+        new(_hubContext.Clients.Client(ConnectionId).SendAsync(
             "gameUpdate", messages, CancellationToken.None));
 }

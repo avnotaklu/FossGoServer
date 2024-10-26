@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BadukServer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+91789bfc2b9aca5d511ca9bf15173978196e9cc6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+98c70dcee1c24a714d7849dacb1d7ae870fbef60")]
 [assembly: System.Reflection.AssemblyProductAttribute("BadukServer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BadukServer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

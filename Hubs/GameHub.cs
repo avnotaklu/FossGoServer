@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
@@ -18,7 +19,7 @@ public sealed class GameHub : Hub
     }
     public override Task OnConnectedAsync()
     {
-        _logger.LogInformation("User connected");
+        _logger.LogInformation("User connected : {id}", Context.ConnectionId);
         return base.OnConnectedAsync();
     }
 }

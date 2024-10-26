@@ -1,20 +1,30 @@
 using BadukServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using MongoDB.Driver.Core.Clusters.ServerSelectors;
 using Orleans.Concurrency;
 
 namespace BadukServer.Orleans.Grains;
 
 public class PlayerGrain : Grain, IPlayerGrain
 {
+    private readonly IHubContext<GameHub> _hubContext;
+    private string _connectionId;
+
+    public PlayerGrain(IHubContext<GameHub> hubContext)
+    {
+        _hubContext = hubContext;
+    }
+
     private string? _activeGameId;
 
     public async Task InitializePlayer(string connectionId)
     {
+        _connectionId = connectionId;
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(this.GetPrimaryKeyString());
         await notifierGrain.InitializeNotifier(connectionId);
     }
 
-    public async Task<string> CreateGame(int rows, int columns, int timeInSeconds)
+    public async Task<string> CreateGame(int rows, int columns, int timeInSeconds, Stone stone)
     {
         var gameId = Guid.NewGuid().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id
@@ -24,7 +34,10 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         // add ourselves to the game
         await gameGrain.CreateGame(rows, columns, timeInSeconds);
-        await gameGrain.AddPlayerToGame(userId);
+        await gameGrain.AddPlayerToGame(userId, stone);
+
+        // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
+
         _activeGameId = gameId;
 
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
@@ -44,15 +57,20 @@ public class PlayerGrain : Grain, IPlayerGrain
         var userId = this.GetPrimaryKeyString(); // our player id
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
-        Console.WriteLine("Joining game: " + gameId + " By player " + userId);
 
-        var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString());
+        var players = await gameGrain.GetPlayers();
+
+        if (players.Any(player => player.Key == userId)) return gameId;
+
+        Console.WriteLine("Joining game: " + gameId + " By player " + userId);
+        var firstPlayerStone = players.Values.First();
+        var myStone = 1 - firstPlayerStone;
+
+        var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString(), myStone);
+
+        // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
 
         _activeGameId = gameId;
-
-        var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(game.PlayerIds[0]);
-        await notifierGrain.SendMessage(new JoinMessage(gameId));
-
         // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
         // await pairingGrain.RemoveGame(gameId);
 

@@ -3,5 +3,5 @@
 public interface IRemoteGameHub : IGrainObserver
 {
     // TODO: this message used to be batch of messages, what's gonna happen with one message?
-    ValueTask BroadcastUpdates(JoinMessagesBatch message, string connectionId);
+    ValueTask BroadcastUpdates(SignalRMessagesBatch message, string connectionId);
 }

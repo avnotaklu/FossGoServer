@@ -13,7 +13,7 @@ internal sealed class RemoteGameHub : IRemoteGameHub
     public RemoteGameHub(IHubContext<GameHub> hub) => _hub = hub;
 
     // Send a message to every client which is connected to the hub
-    public ValueTask BroadcastUpdates(JoinMessagesBatch messages, string connectionId) =>
+    public ValueTask BroadcastUpdates(SignalRMessagesBatch messages, string connectionId) =>
         new(_hub.Clients.Client(connectionId).SendAsync(
             "gameUpdate", messages, CancellationToken.None));
 }

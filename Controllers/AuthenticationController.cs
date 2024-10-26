@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using BadukServer.Dto;
 using BadukServer.Services;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.ConstrainedExecution;
 
 [ApiController]
+[Authorize]
 [Route("[controller]")]
 public class AuthenticationController : ControllerBase
 {
@@ -135,5 +137,26 @@ public class AuthenticationController : ControllerBase
 
         _logger.LogInformation("Signup successful {email}", newUser.Email);
         return Ok(new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebToken(newUser.Id!)));
+    }
+
+
+    [HttpGet("GetUser")]
+    public async Task<ActionResult<UserAuthenticationModel>> GetUser()
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+
+        var users = await _usersService.GetByIds([userId]);
+
+        if (users.Count == 0)
+        {
+            _logger.LogInformation("User doesn't exist");
+            return Unauthorized("You don't exist");
+        }
+
+        var user = users.First();
+
+        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebToken(user.Id!)));
     }
 }
