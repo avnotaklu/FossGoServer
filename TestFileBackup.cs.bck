@@ -1,0 +1,86 @@
+// using BadukServer;
+
+using BadukServer;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Tests;
+
+[TestClass]
+public class StoneLogicTest
+{
+    [TestMethod]
+    public void TestMethod1()
+    {
+
+        // int[,] freedoms_up = {
+        //     { 0, 0, 0, 0, 0, },
+        //     { 0, 0, 2, 0, 2, },
+        //     { 0, 0, 0, 1, 0, },
+        //     { 0, 0, 0, 0, 0, },
+        //     { 0, 0, 0, 0, 0, },
+        // };
+        int[,] actualFreedoms = {
+            { 0, 0, 0, 2, 0, },
+            { 0, 0, 3, 0, 2, },
+            { 0, 0, 0, 3, 0, },
+            { 0, 0, 0, 0, 0, },
+            { 0, 0, 0, 0, 0, },
+        };
+
+        int[,] board = {
+            { 0, 0, 0, 1, 0, },
+            { 0, 0, 1, 1, 1, },
+            { 0, 0, 0, 1, 0, },
+            { 0, 0, 0, 0, 0, },
+            { 0, 0, 0, 0, 0, },
+        };
+        Assert.IsTrue(_2DArrayEqual(actualFreedoms, StoneLogic.getFreedomsFromBoard(board)));
+    }
+    private bool _2DArrayEqual<T>(T[,] array1, T[,] array2)
+    {
+        if (array1.GetLength(0) != array2.GetLength(0) || array1.GetLength(1) != array2.GetLength(1))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < array1.GetLength(0); i++)
+        {
+            for (int j = 0; j < array1.GetLength(1); j++)
+            {
+                if (!Equals(array1[i, j], array2[i, j]))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public BoardState ConstructBoard(int[,] board, int turn)
+    {
+        return new BoardState(
+            rows: board.GetLength(0),
+            cols: board.GetLength(1),
+            null,
+            playgroundMap:
+            Enumerable.Range(0, board.GetLength(0))
+            .SelectMany(row => Enumerable.Range(0, board.GetLength(1))
+            .Select(col => (new Position(row, col), board[row, col] - 1))).ToDictionary(e => e.Item1, e => e.Item2 == -1 ? null : new Stone(e.Item1, e.Item2, new Cluster(
+               [], 4, e.Item2
+            ))),
+            prisoners: [0, 0]
+        );
+    }
+}
+
+// namespace Tests;
+
+// [TestClass]
+// public class UnitTest1
+// {
+//     [TestMethod]
+//     public void TestMethod1()
+//     {
+//     }
+// }

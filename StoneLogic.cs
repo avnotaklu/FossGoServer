@@ -1,19 +1,21 @@
 using System.Diagnostics;
-using Tests;
+using ZstdSharp.Unsafe;
 
 namespace BadukServer
 {
     public class Cluster
     {
         public HashSet<Position> data;
+        public HashSet<Position> FreedomPositions;
         public int freedoms;
         public int player;
 
-        public Cluster(HashSet<Position> data, int freedoms, int player)
+        public Cluster(HashSet<Position> data, HashSet<Position> freedomPositions, int freedoms, int player)
         {
             this.data = data;
             this.freedoms = freedoms;
             this.player = player;
+            this.FreedomPositions = freedomPositions;
         }
     }
     public class Stone
@@ -40,16 +42,37 @@ namespace BadukServer
             this.x = x;
             this.y = y;
         }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is Position pos)
+            {
+                return x == pos.x && y == pos.y;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return x ^ y;
+        }
+        
+
+        public override string ToString()
+        {
+            return $"{x}, {y}";
+        }
     }
     public class BoardState
     {
         public int rows;
         public int cols;
+        // koDelete assumes that this position was deleted in the last move by the opposing player
         public Position? koDelete;
         public List<int> prisoners = [0, 0];
-        public Dictionary<Position, Stone?> playgroundMap;
+        public Dictionary<Position, Stone> playgroundMap;
 
-        public BoardState(int rows, int cols, Position? koDelete, Dictionary<Position, Stone?> playgroundMap, List<int> prisoners)
+        public BoardState(int rows, int cols, Position? koDelete, Dictionary<Position, Stone> playgroundMap, List<int> prisoners)
         {
             this.rows = rows;
             this.cols = cols;
@@ -70,10 +93,10 @@ namespace BadukServer
 
         Stone? stoneAt(Position pos)
         {
-            // if (pos == null)
-            // {
-            //     return null;
-            // }
+            if (!board.playgroundMap.ContainsKey(pos))
+            {
+                return null;
+            }
             return board.playgroundMap[pos];
         }
 
@@ -100,7 +123,7 @@ namespace BadukServer
             {
                 var neighborCluster = getClusterFromPosition(neighbor);
                 var curPosCluster = getClusterFromPosition(curpos);
-                if (neighborCluster != null && curPosCluster != null && (traversed[curpos]?.Contains(neighborCluster) ?? false) == false)
+                if (neighborCluster != null && curPosCluster != null && (!traversed.ContainsKey(curpos) || !traversed[curpos].Contains(neighborCluster)))
                 {
                     // if( _playgroundMap[neighbor] == null && checkOutofBounds(neighbor))
                     // {
@@ -111,7 +134,7 @@ namespace BadukServer
                     {
                         neighborCluster.freedoms -= 1;
 
-                        if (traversed[curpos] == null)
+                        if (!traversed.ContainsKey(curpos))
                         {
                             traversed[curpos] = [neighborCluster];
                         }
@@ -127,7 +150,7 @@ namespace BadukServer
         // Hack
         bool checkInsertable(Position position)
         {
-            if (board.koDelete == position)
+            if (board.koDelete?.Equals(position) ?? false)
             {
                 return false;
             }
@@ -140,13 +163,15 @@ namespace BadukServer
                     {
                         if (!insertable)
                         {
-                            if (stoneAt(neighbor)?.player ==
-                            stoneAt(curpos)?.player)
-                                insertable =
-                                    !(getClusterFromPosition(neighbor)?.freedoms == 1);
+                            if (stoneAt(neighbor)!.player == stoneAt(curpos)!.player)
+                            {
+                                insertable = !(getClusterFromPosition(neighbor)?.freedoms == 1);
+                            }
                             else
-                                insertable =
-                                    getClusterFromPosition(neighbor)?.freedoms == 1;
+                            {
+                                insertable = getClusterFromPosition(neighbor)?.freedoms == 1;
+                            }
+
                         }
                     }
                     else if (checkIfInsideBounds(neighbor))
@@ -154,7 +179,6 @@ namespace BadukServer
                         insertable = true;
                     }
                 });
-
             return insertable;
         }
 
@@ -169,9 +193,7 @@ namespace BadukServer
                 if (stoneAt(neighbor) == null &&
                     checkIfInsideBounds(neighbor) &&
                     stoneAt(curpos) != null &&
-                    ((traversed[neighbor]?.Contains(getClusterFromPosition(curpos)!) ??
-                            false) ==
-                        false))
+                    (!traversed.ContainsKey(neighbor) || !traversed[neighbor].Contains(getClusterFromPosition(curpos)!)))
                 //  && (traversed[neighbor]?.contains(getClusterFromPosition(curpos)) == false) )
                 // neighbor are the possible free position here unlike recalculateFreedomsForNeighborsOfDeleted where deletedStonePosition is the free position and neighbors are possible clusters for which we will increment freedoms
                 {
@@ -242,6 +264,7 @@ namespace BadukServer
 
                     if (getClusterFromPosition(i)!.data.Count == 1)
                     {
+                        Console.WriteLine("Setting ko delete" + neighbor);
                         board.koDelete = neighbor;
                     }
 
@@ -287,15 +310,15 @@ namespace BadukServer
 
         // Deletion ---
 
-        bool handleStoneUpdate(Position? position, int player)
+        public (bool result, BoardState board) HandleStoneUpdate(Position? position, int player)
         {
             if (position == null)
             {
-                return true;
+                return (true, board);
             }
             Position? thisCurrentCell = position;
 
-            var current_cluster = new Cluster([position], 0, player);
+            var current_cluster = new Cluster([position], [], 0, player);
 
             board.playgroundMap[thisCurrentCell] = new Stone(
               position: position,
@@ -315,11 +338,11 @@ namespace BadukServer
                 DoActionOnNeighbors(position, (a, b) => deleteStonesInDeletableCluster(a, b, traversed));
                 CalculateFreedomForCluster(current_cluster, traversed);
                 UpdateFreedomsFromNewlyInsertedStone(position, traversed);
-                return true;
+                return (true, board);
             }
 
             board.playgroundMap.Remove(thisCurrentCell);
-            return false;
+            return (false, board);
         }
 
         static void DoActionOnNeighbors(Position thisCell,
@@ -353,4 +376,154 @@ namespace BadukServer
     //         owner = null;
     // }
 
+    public class BoardConstructor(int rows, int cols)
+    {
+
+        // public int[,] GetFreedomsFromBoard(int[,] board)
+        // {
+        //     int[,] freedoms = new int[board.GetLength(0), board.GetLength(1)];
+        //     for (int i = 0; i < board.GetLength(1); i++)
+        //     {
+        //         for (int j = 0; j < board.GetLength(0); j++)
+        //         {
+        //             if (board[i, j] != 0)
+        //             {
+        //                 List<Position> neighbors = [
+        //                     new Position(i - 1, j),
+        //                 new Position(i , j - 1),
+        //                 new Position(i , j + 1),
+        //                 new Position(i + 1, j),
+        //             ];
+        //                 int freedomsForMe = 0;
+
+        //                 foreach (var neighbor in neighbors)
+        //                 {
+        //                     if (checkIfInsideBounds(neighbor) && board[neighbor.x, neighbor.y] == 0)
+        //                     {
+        //                         freedomsForMe += 1;
+        //                     }
+        //                 }
+        //                 freedoms[i, j] = freedomsForMe;
+        //             }
+        //         }
+        //     }
+        //     return freedoms;
+        // }
+
+        public List<Cluster> GetClusters(int[,] board)
+        {
+            Dictionary<Position, Cluster> clusters = [];
+
+            void MergeClusters(Cluster a, Cluster b)
+            {
+                a.data.UnionWith(b.data);
+                a.FreedomPositions.UnionWith(b.FreedomPositions);
+                a.freedoms = a.FreedomPositions.Count;
+                // b.data = a.data;
+                foreach (var pos in a.data)
+                {
+                    clusters[pos] = a;
+                }
+            }
+            for (int i = 0; i < board.GetLength(1); i++)
+            {
+                for (int j = 0; j < board.GetLength(0); j++)
+                {
+                    var curpos = new Position(i, j);
+
+                    List<Position> neighbors = [
+                        new Position(i - 1, j),
+                        new Position(i , j - 1),
+                        new Position(i , j + 1),
+                        new Position(i + 1, j),
+                    ];
+
+                    neighbors.RemoveAll(p => !checkIfInsideBounds(p));
+
+                    if (board[i, j] != 0)
+                    {
+                        foreach (var n in neighbors)
+                        {
+                            if (!clusters.ContainsKey(curpos))
+                            {
+                                clusters[curpos] = new Cluster([new Position(i, j)], [], 0, board[i, j] - 1);
+                            }
+                            if (board[n.x, n.y] == 0)
+                            {
+                                clusters[curpos].FreedomPositions.Add(n);
+                                clusters[curpos].freedoms = clusters[curpos].FreedomPositions.Count;
+                            }
+
+                            if (board[i, j] == board[n.x, n.y] && clusters.ContainsKey(n))
+                            {
+                                MergeClusters(clusters[curpos], clusters[n]);
+                            }
+
+                        }
+                    }
+                }
+            }
+
+            List<Cluster> clustersList = [];
+            List<Position> traversed = [];
+
+            foreach (var position in clusters.Keys)
+            {
+                var cluster = clusters[position];
+                if (!traversed.Contains(position))
+                {
+                    traversed.AddRange(cluster.data);
+                    clustersList.Add(cluster);
+                }
+            }
+
+
+            // foreach (var cluster in clustersList)
+            // {
+            //     HashSet<Position> freedomPositions = [];
+            //     foreach (var pos in cluster.data)
+            //     {
+            //         if ()
+
+
+            //     }
+            // }
+            return clustersList;
+        }
+
+        public List<Stone> GetStones(List<Cluster> clusters)
+        {
+            List<Stone> stones = [];
+            foreach (var cluster in clusters)
+            {
+                foreach (var position in cluster.data)
+                {
+                    stones.Add(new Stone(position, cluster.player, cluster));
+                }
+            }
+            return stones;
+        }
+
+        public BoardState ConstructBoard(int rows, int cols, List<Stone> stones)
+        {
+            return new BoardState(
+                rows: rows,
+                cols: cols,
+                null,
+                playgroundMap: stones.ToDictionary(e => e.position, e => e),
+                prisoners: [0, 0]
+                );
+        }
+
+
+
+        bool checkIfInsideBounds(Position pos)
+        {
+            return pos.x > -1 && pos.x < rows && pos.y < cols && pos.y > -1;
+        }
+
+    }
+
 }
+// 
+
