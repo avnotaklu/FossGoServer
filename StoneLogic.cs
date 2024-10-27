@@ -425,12 +425,15 @@ namespace BadukServer
         //     }
         //     return freedoms;
         // }
-        public BoardState BoardStateFromHighLevelBoardRepresentation(Dictionary<string, StoneType> map)
+        public BoardState BoardStateFromGame(Game game)
         {
+            var map = game.PlaygroundMap;
+
             var simpleB = SimpleBoardRepresentation(map);
             var clusters = GetClusters(simpleB);
             var stones = GetStones(clusters);
-            var board = ConstructBoard(rows, cols, stones);
+            var board = ConstructBoard(rows, cols, stones, game.KoPositionInLastMove == null ? null : new Position(game.KoPositionInLastMove!));
+
             return board;
         }
         public int[,] SimpleBoardRepresentation(Dictionary<string, StoneType> map)
@@ -540,12 +543,12 @@ namespace BadukServer
             return stones;
         }
 
-        public BoardState ConstructBoard(int rows, int cols, List<Stone> stones)
+        public BoardState ConstructBoard(int rows, int cols, List<Stone> stones, Position? koDelete = null)
         {
             return new BoardState(
                 rows: rows,
                 cols: cols,
-                null,
+                koDelete,
                 playgroundMap: stones.ToDictionary(e => e.position, e => e),
                 prisoners: [0, 0]
                 );

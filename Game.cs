@@ -7,7 +7,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MovePosition?> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime, string? koPositionInLastMove)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MoveData> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime, string? koPositionInLastMove, GameState gameState)
     {
         GameId = gameId;
         Rows = rows;
@@ -20,6 +20,7 @@ public class Game
         PlayerScores = playerScores;
         StartTime = startTime;
         KoPositionInLastMove = koPositionInLastMove;
+        GameState = gameState;
     }
 
     [BsonId]
@@ -40,7 +41,7 @@ public class Game
     [BsonElement("playgroundMap")]
     public Dictionary<string, StoneType> PlaygroundMap { get; set; }
     [BsonElement("moves")]
-    public List<MovePosition?> Moves { get; set; }
+    public List<MoveData> Moves { get; set; }
     [BsonElement("players")]
     public Dictionary<string, StoneType> Players { get; set; }
     [BsonElement("playerScores")]
@@ -48,8 +49,11 @@ public class Game
     [BsonElement("startTime")]
     public string? StartTime { get; set; }
 
-    [BsonElement("startTime")]
+    [BsonElement("koPositionInLastMove")]
     public string? KoPositionInLastMove { get; set; }
+
+    [BsonElement("gameState")]
+    public GameState GameState { get; set; }
 }
 
 
@@ -66,4 +70,13 @@ public enum StoneType
     /// </summary>
     // [BsonRepresentation(BsonType.String)]
     White
+}
+
+[Serializable]
+public enum GameState {
+    WaitingForStart = 0,
+    // Started,
+    Playing = 1,
+    ScoreCalculation = 2,
+    Ended = 3
 }

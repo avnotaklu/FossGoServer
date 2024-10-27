@@ -12,7 +12,7 @@ public class GameGrain : Grain, IGameGrain
     private string? _winner;
     private string? _loser;
 
-    private List<MovePosition?> _moves = [];
+    private List<MoveData> _moves = [];
     private int _rows;
     private int _columns;
     private int _timeInSeconds;
@@ -43,10 +43,12 @@ public class GameGrain : Grain, IGameGrain
         return Task.CompletedTask;
     }
 
-    public Game InitializeGame()
+    private string gameId => this.GetPrimaryKeyString();
+
+    private Game _GetGame()
     {
         return new Game(
-            gameId: this.GetPrimaryKeyString(),
+            gameId: gameId,
             rows: _rows,
             columns: _columns,
             timeInSeconds: _timeInSeconds,
@@ -56,6 +58,7 @@ public class GameGrain : Grain, IGameGrain
             players: _players,
             playerScores: _playerScores,
             startTime: _startTime,
+            gameState: _gameState,
             koPositionInLastMove: koPositionInLastMove
         );
     }
@@ -67,7 +70,7 @@ public class GameGrain : Grain, IGameGrain
         if (_players.Keys.Contains(player))
         {
             // TODO: this condition should never happen, Check whether i can throw here?? 
-            var premature_game = InitializeGame();
+            var premature_game = _GetGame();
             return Task.FromResult(premature_game);
         }
 
@@ -80,7 +83,7 @@ public class GameGrain : Grain, IGameGrain
 
         if (_players.Keys.Count == 2)
         {
-            _gameState = GameState.Started;
+            _gameState = GameState.Playing;
             _startTime = time;
         }
         else
@@ -89,7 +92,7 @@ public class GameGrain : Grain, IGameGrain
         }
         _timeLeftForPlayers[player] = _timeInSeconds;
 
-        var game = InitializeGame();
+        var game = _GetGame();
         return Task.FromResult(game);
     }
 
@@ -99,7 +102,7 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    public Task<List<MovePosition?>> GetMoves()
+    public Task<List<MoveData>> GetMoves()
     {
         return Task.FromResult(_moves);
     }
@@ -109,30 +112,103 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(_gameState);
     }
 
-    public async Task<Game> MakeMove(MovePosition? move, string playerId)
+    public async Task<Game> MakeMove(MovePosition move, string playerId)
     {
         Debug.Assert(_players.ContainsKey(playerId));
         var player = _players[playerId];
         Debug.Assert((turn % 2) == (int)player);
 
-        _moves.Add(move);
-        if (move == null)
+        // if (move.X == null || move.Y == null)
+        // {
+        //     // Move was passed
+        //     if(_moves.Last().IsPass()) {
+        //         // Two passes
+        //         _gameState = GameState.ScoreCalculation;
+        //     }
+        //     return await GetGame();
+        // }
+        if (!move.IsPass())
         {
-            // Move was passed
-            return await GetGame();
+            var x = (int)move.X!;
+            var y = (int)move.Y!;
+
+            var position = new Position(x, y);
+            var utils = new BoardStateUtilities(_rows, _columns);
+            var board = utils.BoardStateFromGame(_GetGame());
+            var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
+            var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
+            _board = map;
         }
-        var movePos = move.GetValueOrDefault();
-        var position = new Position(movePos.X, movePos.Y);
-        var utils = new BoardStateUtilities(_rows, _columns);
-        var board = utils.BoardStateFromHighLevelBoardRepresentation(_board);
-        var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
-        var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
-        _board = map;
+        var lastMove = new MoveData(
+            move.X,
+            move.Y,
+            DateTime.Now.ToString("o")
+        );
+        _moves.Add(lastMove);
+
+        if (HasPassedTwice())
+        {
+            SetScoreCalculationState(lastMove);
+        }
         return await GetGame();
+    }
+
+    private void SetScoreCalculationState(MoveData lastMove)
+    {
+        Debug.Assert(HasPassedTwice());
+        Debug.Assert(lastMove.IsPass());
+
+        var playerWithTurn = GetPlayerIdWithTurn();
+
+        _gameState = GameState.ScoreCalculation;
+        var pushNotifier = GrainFactory.GetGrain<IPushNotifierGrain>(playerWithTurn);
+        pushNotifier.SendMessage(new SignalRMessage(
+            SignalRMessageType.scoreCaculationStarted,
+            null
+        ), gameId);
+    }
+
+    private string GetPlayerIdWithTurn()
+    {
+        Debug.Assert(_players.Count == 2);
+        foreach (var item in _players)
+        {
+            if ((int)item.Value == (turn % 2))
+            {
+                return item.Key;
+            }
+        }
+        throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn");
+    }
+
+    private bool HasPassedTwice()
+    {
+        MoveData? prev = null;
+        bool hasPassedTwice = false;
+        var reversedMoves = _moves.AsEnumerable().Reverse();
+
+        foreach (var i in reversedMoves)
+        {
+            if (prev == null)
+            {
+                prev = i;
+                continue;
+            }
+
+            if (i.IsPass() && prev.IsPass())
+            {
+                hasPassedTwice = !hasPassedTwice;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return hasPassedTwice;
     }
 
     public Task<Game> GetGame()
     {
-        return Task.FromResult(InitializeGame());
+        return Task.FromResult(_GetGame());
     }
 }

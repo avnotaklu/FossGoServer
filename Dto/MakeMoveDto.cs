@@ -1,6 +1,6 @@
-using BadukServer;
+// using BadukServer;
 
-class MakeMoveDto {
-    public MovePosition move;
+// class MakeMoveDto {
+//     public MovePosition move;
 
-}
+// }

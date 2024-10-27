@@ -1,4 +1,5 @@
 using System.CodeDom;
+using System.Diagnostics;
 
 namespace BadukServer;
 //
@@ -30,10 +31,43 @@ namespace BadukServer;
 //     public int? Y { get; set; }
 // }
 
+
 [GenerateSerializer]
-public struct MovePosition
+public class MoveData
 {
     // [Id(0)] public string PlayerId { get; set; }
-    [Id(1)] public int X { get; set; }
-    [Id(2)] public int Y { get; set; }
+    public int? X { get; set; }
+    public int? Y { get; set; }
+    public string Time { get; set; }
+
+    public MoveData(int? x, int? y, string time)
+    {
+        Debug.Assert((x == null && y == null) || (x != null && y != null));
+        Time = time;
+        X = x;
+        Y = y;
+    }
+
+    public bool IsPass()
+    {
+        return X == null;
+    }
+};
+
+[GenerateSerializer]
+public class MovePosition
+{
+    // [Id(0)] public string PlayerId { get; set; }
+    public int? X { get; set; }
+    public int? Y { get; set; }
+
+    public MovePosition(int? x, int? y)
+    {
+        Debug.Assert((x == null && y == null) || (x != null && y != null));
+    }
+
+    public bool IsPass()
+    {
+        return X == null;
+    }
 };

@@ -60,7 +60,7 @@ public class PlayerController : ControllerBase
         var newGame = new NewGameCreatedMessage(game);
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
-        await notifierGrain.SendMessage(new SignalRMessage(type: "NewGame", data: newGame), gameId, toMe: true);
+        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGame), gameId, toMe: true);
 
         return Ok(game);
     }
@@ -106,7 +106,7 @@ public class PlayerController : ControllerBase
         );
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
-        await notifierGrain.SendMessage(new SignalRMessage(type: "GameJoin", data: joinRes), gameId, toMe: true);
+        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
 
         return Ok(joinRes);
     }
