@@ -12,15 +12,17 @@ public class GameGrain : Grain, IGameGrain
     private string? _winner;
     private string? _loser;
 
-    private List<GameMove> _moves = [];
+    private List<MovePosition?> _moves = [];
     private int _rows;
     private int _columns;
     private int _timeInSeconds;
     private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
-    private Dictionary<string, string> _board = [];
+    private Dictionary<string, StoneType> _board = [];
     private Dictionary<string, int> _playerScores = [];
     private bool _initialized = false;
     private string? _startTime;
+    private string? koPositionInLastMove;
+    private int turn => _moves.Count;
 
 
     public Task CreateGame(int rows, int columns, int timeInSeconds)
@@ -53,7 +55,8 @@ public class GameGrain : Grain, IGameGrain
             playgroundMap: _board,
             players: _players,
             playerScores: _playerScores,
-            startTime: _startTime
+            startTime: _startTime,
+            koPositionInLastMove: koPositionInLastMove
         );
     }
 
@@ -96,7 +99,7 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    public Task<List<GameMove>> GetMoves()
+    public Task<List<MovePosition?>> GetMoves()
     {
         return Task.FromResult(_moves);
     }
@@ -106,10 +109,26 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(_gameState);
     }
 
-    public Task<GameState> MakeMove(GameMove move)
+    public async Task<Game> MakeMove(MovePosition? move, string playerId)
     {
+        Debug.Assert(_players.ContainsKey(playerId));
+        var player = _players[playerId];
+        Debug.Assert((turn % 2) == (int)player);
+
         _moves.Add(move);
-        return Task.FromResult(_gameState);
+        if (move == null)
+        {
+            // Move was passed
+            return await GetGame();
+        }
+        var movePos = move.GetValueOrDefault();
+        var position = new Position(movePos.X, movePos.Y);
+        var utils = new BoardStateUtilities(_rows, _columns);
+        var board = utils.BoardStateFromHighLevelBoardRepresentation(_board);
+        var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
+        var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
+        _board = map;
+        return await GetGame();
     }
 
     public Task<Game> GetGame()

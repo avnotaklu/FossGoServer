@@ -7,7 +7,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, string> playgroundMap, List<GameMove> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MovePosition?> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime, string? koPositionInLastMove)
     {
         GameId = gameId;
         Rows = rows;
@@ -19,6 +19,7 @@ public class Game
         Players = players;
         PlayerScores = playerScores;
         StartTime = startTime;
+        KoPositionInLastMove = koPositionInLastMove;
     }
 
     [BsonId]
@@ -34,16 +35,21 @@ public class Game
     public int TimeInSeconds { get; set; }
     [BsonElement("timeLeftForPlayers")]
     public Dictionary<string, int> TimeLeftForPlayers { get; set; }
+    // [BsonElement("playgroundMap")]
+    // public Dictionary<string, string> PlaygroundMap { get; set; }
     [BsonElement("playgroundMap")]
-    public Dictionary<string, string> PlaygroundMap { get; set; }
+    public Dictionary<string, StoneType> PlaygroundMap { get; set; }
     [BsonElement("moves")]
-    public List<GameMove> Moves { get; set; }
+    public List<MovePosition?> Moves { get; set; }
     [BsonElement("players")]
     public Dictionary<string, StoneType> Players { get; set; }
     [BsonElement("playerScores")]
     public Dictionary<string, int> PlayerScores { get; set; }
     [BsonElement("startTime")]
     public string? StartTime { get; set; }
+
+    [BsonElement("startTime")]
+    public string? KoPositionInLastMove { get; set; }
 }
 
 
@@ -53,11 +59,11 @@ public enum StoneType
     /// <summary>
     /// Black stone
     /// </summary>
-    [BsonRepresentation(BsonType.String)]
+    // [BsonRepresentation(BsonType.String)]
     Black,
     /// <summary>
     /// White stone
     /// </summary>
-    [BsonRepresentation(BsonType.String)]
+    // [BsonRepresentation(BsonType.String)]
     White
 }

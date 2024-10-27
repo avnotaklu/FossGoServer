@@ -1,6 +1,6 @@
 using BadukServer;
 
 class MakeMoveDto {
-    public GameMove move;
+    public MovePosition move;
 
 }

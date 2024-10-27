@@ -23,9 +23,15 @@ public class GameController : ControllerBase
         _grainFactory = grainFactory;
     }
 
-    // [HttpPost("MakeMove")]
-    // async Task<ActionResult<Game>> MakeMove([FromBody] GameMove move, [FromQuery] string GameId) {
-    //     var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-    //     await gameGrain.MakeMove(move);
-    // }
+    [HttpPost("{gameId}/MakeMove")]
+    public async Task<ActionResult<Game>> MakeMove(string GameId, [FromBody] MovePosition move)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
+        await gameGrain.MakeMove(move, userId);
+
+        return Ok(await gameGrain.GetGame());
+    }
 }

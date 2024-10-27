@@ -1,3 +1,5 @@
+using System.CodeDom;
+
 namespace BadukServer;
 //
 // public class Move
@@ -29,9 +31,9 @@ namespace BadukServer;
 // }
 
 [GenerateSerializer]
-public struct GameMove
+public struct MovePosition
 {
     // [Id(0)] public string PlayerId { get; set; }
     [Id(1)] public int X { get; set; }
     [Id(2)] public int Y { get; set; }
-}
+};

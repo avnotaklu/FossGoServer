@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using ZstdSharp.Unsafe;
 
+using HighLevelBoardRepresentation = System.Collections.Generic.Dictionary<string, BadukServer.StoneType>;
+
 namespace BadukServer
 {
     public class Cluster
@@ -43,6 +45,16 @@ namespace BadukServer
             this.y = y;
         }
 
+        public Position(string repr)
+        {
+            var x = repr.Split(" ")[0];
+            var y = repr.Split(" ")[1];
+
+            this.x = int.Parse(x);
+            this.y = int.Parse(y);
+        }
+
+
         public override bool Equals(object? obj)
         {
             if (obj is Position pos)
@@ -56,11 +68,15 @@ namespace BadukServer
         {
             return x ^ y;
         }
-        
 
         public override string ToString()
         {
             return $"{x}, {y}";
+        }
+
+        public string ToHighLevelRepr()
+        {
+            return $"{x} {y}";
         }
     }
     public class BoardState
@@ -376,7 +392,7 @@ namespace BadukServer
     //         owner = null;
     // }
 
-    public class BoardConstructor(int rows, int cols)
+    public class BoardStateUtilities(int rows, int cols)
     {
 
         // public int[,] GetFreedomsFromBoard(int[,] board)
@@ -409,6 +425,26 @@ namespace BadukServer
         //     }
         //     return freedoms;
         // }
+        public BoardState BoardStateFromHighLevelBoardRepresentation(Dictionary<string, StoneType> map)
+        {
+            var simpleB = SimpleBoardRepresentation(map);
+            var clusters = GetClusters(simpleB);
+            var stones = GetStones(clusters);
+            var board = ConstructBoard(rows, cols, stones);
+            return board;
+        }
+        public int[,] SimpleBoardRepresentation(Dictionary<string, StoneType> map)
+        {
+            var board = new int[rows, cols];
+
+            foreach (var item in map)
+            {
+                var position = new Position(item.Key);
+                board[position.x, position.y] = (int)item.Value + 1;
+            }
+
+            return board;
+        }
 
         public List<Cluster> GetClusters(int[,] board)
         {
@@ -515,7 +551,10 @@ namespace BadukServer
                 );
         }
 
-
+        public HighLevelBoardRepresentation MakeHighLevelBoardRepresentationFromBoardState(BoardState boardState)
+        {
+            return boardState.playgroundMap.ToDictionary(e => e.Key.ToHighLevelRepr(), e => (StoneType)e.Value.player);
+        }
 
         bool checkIfInsideBounds(Position pos)
         {
