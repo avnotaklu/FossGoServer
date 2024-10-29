@@ -1674,7 +1674,7 @@
         "runtime": {
           "Microsoft.VisualStudio.TestPlatform.TestFramework.Extensions.dll": {
             "assemblyVersion": "14.0.0.0",
-            "fileVersion": "3.600.124.50305"
+            "fileVersion": "3.100.123.36306"
           }
         }
       }

@@ -8,6 +8,7 @@ using System.ComponentModel.DataAnnotations;
 using BadukServer;
 
 [ApiController]
+[Authorize]
 [Route("[controller]")]
 public class GameController : ControllerBase
 {
@@ -24,14 +25,17 @@ public class GameController : ControllerBase
     }
 
     [HttpPost("{gameId}/MakeMove")]
-    public async Task<ActionResult<Game>> MakeMove(string GameId, [FromBody] MovePosition move)
+    public async Task<ActionResult<NewMoveResult>> MakeMove([FromBody] MovePosition move, string GameId)
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        await gameGrain.MakeMove(move, userId);
+        var res = await gameGrain.MakeMove(move, userId);
 
-        return Ok(await gameGrain.GetGame());
+        return Ok(new NewMoveResult(
+            game: res.game,
+            result: res.moveSuccess
+        ));
     }
 }

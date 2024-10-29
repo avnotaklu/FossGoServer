@@ -1,5 +1,6 @@
 using System.CodeDom;
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 
 namespace BadukServer;
 //
@@ -32,7 +33,7 @@ namespace BadukServer;
 // }
 
 
-[GenerateSerializer]
+[Immutable, GenerateSerializer]
 public class MoveData
 {
     // [Id(0)] public string PlayerId { get; set; }
@@ -54,7 +55,7 @@ public class MoveData
     }
 };
 
-[GenerateSerializer]
+[Immutable, GenerateSerializer]
 public class MovePosition
 {
     // [Id(0)] public string PlayerId { get; set; }
@@ -64,6 +65,8 @@ public class MovePosition
     public MovePosition(int? x, int? y)
     {
         Debug.Assert((x == null && y == null) || (x != null && y != null));
+        X = x;
+        Y = y;
     }
 
     public bool IsPass()

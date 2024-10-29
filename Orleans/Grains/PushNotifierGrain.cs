@@ -75,6 +75,8 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     {
         // Add a message to the send queue
         // _messageQueue.Enqueue(message);
+
+        _logger.LogInformation("Notification sent to <users>{users}<users>, <message>{message}<message>", toMe ? ConnectionId : "All", message);
         return SendUpdate(message, gameGroup, toMe ? ConnectionId : null);
         // return new(Flush());
     }

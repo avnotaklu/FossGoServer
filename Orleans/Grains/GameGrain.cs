@@ -25,6 +25,16 @@ public class GameGrain : Grain, IGameGrain
     private int turn => _moves.Count;
 
 
+    private readonly ILogger<GameGrain> _logger;
+
+    public GameGrain(ILogger<GameGrain> logger)
+
+    {
+        _logger = logger;
+    }
+
+
+
     public Task CreateGame(int rows, int columns, int timeInSeconds)
     {
         _players = [];
@@ -112,7 +122,7 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(_gameState);
     }
 
-    public async Task<Game> MakeMove(MovePosition move, string playerId)
+    public async Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId)
     {
         Debug.Assert(_players.ContainsKey(playerId));
         var player = _players[playerId];
@@ -135,22 +145,53 @@ public class GameGrain : Grain, IGameGrain
             var position = new Position(x, y);
             var utils = new BoardStateUtilities(_rows, _columns);
             var board = utils.BoardStateFromGame(_GetGame());
+
             var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
-            var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
-            _board = map;
+            koPositionInLastMove = updateResult.board.koDelete?.ToHighLevelRepr();
+
+            if (updateResult.result)
+            {
+                var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
+                _board = map;
+            }
+            else
+            {
+                return (false, await GetGame());
+            }
         }
+
         var lastMove = new MoveData(
             move.X,
             move.Y,
             DateTime.Now.ToString("o")
         );
+
+        _logger.LogInformation("Move played <id>{gameId}<id>, <move>{move}<move>", gameId, lastMove);
+
         _moves.Add(lastMove);
 
         if (HasPassedTwice())
         {
+            _logger.LogInformation("Game reached score calculation {gameId}", gameId);
             SetScoreCalculationState(lastMove);
         }
-        return await GetGame();
+
+        var game = await GetGame();
+
+        {
+            // Send message to player with current turn
+            var currentTurnPlayer = GetPlayerIdWithTurn();
+            var pushNotifier = GrainFactory.GetGrain<IPushNotifierGrain>(currentTurnPlayer);
+            await pushNotifier.SendMessage(
+                new SignalRMessage(
+                    type: SignalRMessageType.newMove,
+                    data: new NewMoveMessage(game: game)
+                ), game.GameId, toMe: true
+            );
+
+        }
+
+        return (true, game);
     }
 
     private void SetScoreCalculationState(MoveData lastMove)

@@ -15,6 +15,7 @@ public record class SignalRMessage
 static class SignalRMessageType
 {
     public const string newGame = "NewGame";
+    public const string newMove = "NewMove";
     public const string gameJoin = "GameJoin";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";
 }

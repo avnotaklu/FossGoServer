@@ -81,14 +81,14 @@ public class PlayerController : ControllerBase
         var gameId = gameParams.GameId;
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
-        var game = await gameGrain.GetGame();
+        var oldGame = await gameGrain.GetGame();
 
-        if (game.Players.Keys.Contains(userId))
+        if (oldGame.Players.Keys.Contains(userId))
         {
             return new GameJoinResult(
-            game: game,
-            players: await getPlayerInfos(game),
-            time: game.StartTime!
+            game: oldGame,
+            players: await getPlayerInfos(oldGame),
+            time: oldGame.StartTime!
         );
         }
 
@@ -98,14 +98,15 @@ public class PlayerController : ControllerBase
         var time = DateTime.Now.ToString("o");
 
         await player.JoinGame(gameId, time);
+        var newGame = await gameGrain.GetGame();
 
         var joinRes = new GameJoinResult(
-            game: game,
-            players: await getPlayerInfos(game),
+            game: newGame,
+            players: await getPlayerInfos(newGame),
             time: time
         );
 
-        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
+        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(newGame.Players.First().Key);
         await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
 
         return Ok(joinRes);

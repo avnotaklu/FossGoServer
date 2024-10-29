@@ -54,7 +54,6 @@ namespace BadukServer
             this.y = int.Parse(y);
         }
 
-
         public override bool Equals(object? obj)
         {
             if (obj is Position pos)
