@@ -6,6 +6,8 @@ using BadukServer.Dto;
 using BadukServer.Services;
 using System.ComponentModel.DataAnnotations;
 using BadukServer;
+using BadukServer.Orleans.Grains;
+using Microsoft.CodeAnalysis.Differencing;
 
 [ApiController]
 [Authorize]
@@ -37,5 +39,47 @@ public class GameController : ControllerBase
             game: res.game,
             result: res.moveSuccess
         ));
+    }
+
+    [HttpPost("{gameId}/ContinueGame")]
+    public async Task<ActionResult<Game>> ContinueGame(string GameId)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
+        var game = await gameGrain.ContinueGame(userId);
+
+        // var res = await gameGrain.MakeMove(move, userId);
+        return Ok(game);
+    }
+
+    [HttpPost("{gameId}/EditDeadStoneCluster")]
+    public async Task<ActionResult<Game>> EditDeadStoneCluster(string GameId, [FromBody] EditDeadStoneClusterDto data)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var position = new Position(data.Position.X, data.Position.Y);        
+
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
+        var game = await gameGrain.EditDeadStone(position, data.State);
+
+        var otherPlayerStone = await gameGrain.GetOtherStoneFromPlayerId(userId);
+        var otherPlayerId = await gameGrain.GetPlayerIdFromStoneType(otherPlayerStone);
+
+        var pushNotifier = _grainFactory.GetGrain<IPushNotifierGrain>(otherPlayerId);
+
+        await pushNotifier.SendMessage(new SignalRMessage(
+            type: SignalRMessageType.editDeadStone,
+            data: new EditDeadStoneMessage(
+                position: data.Position,
+                state: data.State,
+                game: game
+            )
+        ), GameId, toMe: true);
+
+        // var res = await gameGrain.MakeMove(move, userId);
+        return Ok(game);
     }
 }

@@ -43,6 +43,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         await gameGrain.AddPlayerToGame(userId, stone, time);
 
         // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
+        var game = await gameGrain.GetGame();
 
         _activeGameId = gameId;
         games.Add(gameId);

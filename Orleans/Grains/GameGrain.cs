@@ -17,12 +17,15 @@ public class GameGrain : Grain, IGameGrain
     private int _columns;
     private int _timeInSeconds;
     private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
-    private Dictionary<string, StoneType> _board = [];
-    private Dictionary<string, int> _playerScores = [];
+    private Dictionary<Position, StoneType> _board = [];
+    private Dictionary<string, int> _prisoners = [];
     private bool _initialized = false;
     private string? _startTime;
-    private string? koPositionInLastMove;
+    private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
+
+    // Score Calculation Things
+    private Dictionary<Position, DeadStoneState> _stoneStates = [];
 
 
     private readonly ILogger<GameGrain> _logger;
@@ -45,10 +48,11 @@ public class GameGrain : Grain, IGameGrain
         _board = [];
         _gameState = GameState.WaitingForStart;
         _moves = [];
-        _playerScores = [];
+        _prisoners = [];
         _winner = null;
         _loser = null;
         _initialized = true;
+        _stoneStates = [];
 
         return Task.CompletedTask;
     }
@@ -64,12 +68,13 @@ public class GameGrain : Grain, IGameGrain
             timeInSeconds: _timeInSeconds,
             timeLeftForPlayers: _timeLeftForPlayers,
             moves: _moves,
-            playgroundMap: _board,
+            playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
             players: _players,
-            playerScores: _playerScores,
+            prisoners: _prisoners,
             startTime: _startTime,
             gameState: _gameState,
-            koPositionInLastMove: koPositionInLastMove
+            koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
+            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList()
         );
     }
 
@@ -101,6 +106,7 @@ public class GameGrain : Grain, IGameGrain
             _gameState = GameState.WaitingForStart;
         }
         _timeLeftForPlayers[player] = _timeInSeconds;
+        _prisoners[player] = 0;
 
         var game = _GetGame();
         return Task.FromResult(game);
@@ -147,7 +153,10 @@ public class GameGrain : Grain, IGameGrain
             var board = utils.BoardStateFromGame(_GetGame());
 
             var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
-            koPositionInLastMove = updateResult.board.koDelete?.ToHighLevelRepr();
+            _koPositionInLastMove = updateResult.board.koDelete;
+
+            _prisoners[await GetPlayerIdFromStoneType(0)] += updateResult.board.prisoners[0];
+            _prisoners[await GetPlayerIdFromStoneType((StoneType)1)] += updateResult.board.prisoners[1];
 
             if (updateResult.result)
             {
@@ -194,6 +203,40 @@ public class GameGrain : Grain, IGameGrain
         return (true, game);
     }
 
+    public async Task<Game> ContinueGame(string playerId)
+    {
+        _gameState = GameState.Playing;
+
+        var game = await GetGame();
+        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
+
+        await pushNotifierGrain.SendMessage(new SignalRMessage(
+            type: SignalRMessageType.continueGame,
+            data: new ContinueGameMessage(game)
+        ), gameId, toMe: true);
+
+        return game;
+    }
+
+    public Task<Game> EditDeadStone(Position position, DeadStoneState state)
+    {
+        if (_stoneStates.ContainsKey(position) && _stoneStates[position] == state)
+        {
+            return GetGame();
+        }
+        else
+        {
+            var boardState = new BoardStateUtilities(_rows, _columns).BoardStateFromGame(_GetGame());
+            var cluster = boardState.playgroundMap[position].cluster;
+            foreach (var pos in cluster.data)
+            {
+                _stoneStates[pos] = state;
+            }
+
+            return GetGame();
+        }
+    }
+
     private void SetScoreCalculationState(MoveData lastMove)
     {
         Debug.Assert(HasPassedTwice());
@@ -221,6 +264,31 @@ public class GameGrain : Grain, IGameGrain
         }
         throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn");
     }
+
+
+    public Task<StoneType> GetStoneFromPlayerId(string id)
+    {
+        return Task.FromResult(_players[id]);
+    }
+
+    public async Task<StoneType> GetOtherStoneFromPlayerId(string id)
+    {
+        return await Task.FromResult(1 - await GetStoneFromPlayerId(id));
+    }
+
+    public Task<string> GetPlayerIdFromStoneType(StoneType stone)
+    {
+        Debug.Assert(_players.Count == 2);
+        foreach (var item in _players)
+        {
+            if (item.Value == stone)
+            {
+                return Task.FromResult(item.Key);
+            }
+        }
+        throw new UnreachableException($"Player: {stone} has not yet joined the game");
+    }
+
 
     private bool HasPassedTwice()
     {

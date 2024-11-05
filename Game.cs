@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
@@ -7,7 +9,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MoveData> moves, Dictionary<string, StoneType> players, Dictionary<string, int> playerScores, string? startTime, string? koPositionInLastMove, GameState gameState)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MoveData> moves, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, string? koPositionInLastMove, GameState gameState, List<string> deadStones)
     {
         GameId = gameId;
         Rows = rows;
@@ -17,10 +19,11 @@ public class Game
         PlaygroundMap = playgroundMap;
         Moves = moves;
         Players = players;
-        PlayerScores = playerScores;
+        Prisoners = prisoners;
         StartTime = startTime;
         KoPositionInLastMove = koPositionInLastMove;
         GameState = gameState;
+        DeadStones = deadStones;
     }
 
     [BsonId]
@@ -44,17 +47,18 @@ public class Game
     public List<MoveData> Moves { get; set; }
     [BsonElement("players")]
     public Dictionary<string, StoneType> Players { get; set; }
-    [BsonElement("playerScores")]
-    public Dictionary<string, int> PlayerScores { get; set; }
+    [BsonElement("prisoners")]
+    public Dictionary<string, int> Prisoners { get; set; }
     [BsonElement("startTime")]
     public string? StartTime { get; set; }
-
     [BsonElement("koPositionInLastMove")]
     public string? KoPositionInLastMove { get; set; }
-
     [BsonElement("gameState")]
     public GameState GameState { get; set; }
+    [BsonElement("deadStones")]
+    public List<string> DeadStones { get; set; }
 }
+
 
 
 [GenerateSerializer]
@@ -69,11 +73,12 @@ public enum StoneType
     /// White stone
     /// </summary>
     // [BsonRepresentation(BsonType.String)]
-    White
+    White,
 }
 
 [Serializable]
-public enum GameState {
+public enum GameState
+{
     WaitingForStart = 0,
     // Started,
     Playing = 1,
