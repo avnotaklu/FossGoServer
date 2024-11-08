@@ -9,7 +9,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, Dictionary<string, StoneType> playgroundMap, List<MoveData> moves, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, string? koPositionInLastMove, GameState gameState, List<string> deadStones)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores,float komi)
     {
         GameId = gameId;
         Rows = rows;
@@ -24,6 +24,9 @@ public class Game
         KoPositionInLastMove = koPositionInLastMove;
         GameState = gameState;
         DeadStones = deadStones;
+        WinnerId = winnerId;
+        FinalTerritoryScores = finalTerritoryScores;
+Komi = komi;
     }
 
     [BsonId]
@@ -57,6 +60,13 @@ public class Game
     public GameState GameState { get; set; }
     [BsonElement("deadStones")]
     public List<string> DeadStones { get; set; }
+    [BsonElement("winnerId")]
+    public string? WinnerId { get; set; }
+    [BsonElement("finalTerritoryScores")]
+    public List<int> FinalTerritoryScores { get; set; }
+
+    [BsonElement("komi")]
+    public float Komi { get; set; }
 }
 
 
@@ -83,5 +93,6 @@ public enum GameState
     // Started,
     Playing = 1,
     ScoreCalculation = 2,
-    Ended = 3
+    Paused = 3,
+    Ended = 4
 }

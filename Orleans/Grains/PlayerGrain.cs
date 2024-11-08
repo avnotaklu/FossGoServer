@@ -9,6 +9,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 {
     private readonly IHubContext<GameHub> _hubContext;
     private string _connectionId;
+    private bool _isInitialized = false;
     public List<string> games = [];
 
     public PlayerGrain(IHubContext<GameHub> hubContext)
@@ -21,13 +22,20 @@ public class PlayerGrain : Grain, IPlayerGrain
     public async Task InitializePlayer(string connectionId)
     {
         _connectionId = connectionId;
+        _isInitialized = true;
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(this.GetPrimaryKeyString());
         await notifierGrain.InitializeNotifier(connectionId);
     }
 
-    public Task<List<string>> GetAvailableGames() {
+    // public async Task<bool> IsInitializedByOtherDevice(string connectionId)
+    // {
+    //     return _isInitialized && connectionId != _connectionId;
+    // }
+
+    public Task<List<string>> GetAvailableGames()
+    {
         return Task.FromResult(games);
-     }
+    }
 
 
     public async Task<string> CreateGame(int rows, int columns, int timeInSeconds, StoneType stone, string time)
@@ -71,8 +79,9 @@ public class PlayerGrain : Grain, IPlayerGrain
         if (players.Any(player => player.Key == userId)) return gameId;
 
         Console.WriteLine("Joining game: " + gameId + " By player " + userId);
-        var firstPlayerStone = players.Values.First();
-        var myStone = 1 - firstPlayerStone;
+
+        var otherPlayerStone = players.Values.First(); // Because only other player exists at this point
+        var myStone = 1 - otherPlayerStone;
 
         var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString(), myStone, time);
 

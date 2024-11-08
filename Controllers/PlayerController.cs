@@ -31,8 +31,11 @@ public class PlayerController : ControllerBase
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
         // _grainFactory.GetGrain<IPlayerGrain>(userId);
-        var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
-        await player.InitializePlayer(data.ConnectionId);
+        var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
+
+        // if (playerGrain.IsInitializedByOtherDevice(data.ConnectionId).Result) return BadRequest("Player session already active elsewhere");
+
+        await playerGrain.InitializePlayer(data.ConnectionId);
         var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         await playerPoolGrain.AddActivePlayer(userId);
         var playerIds = await playerPoolGrain.GetActivePlayers();
@@ -88,10 +91,9 @@ public class PlayerController : ControllerBase
             return new GameJoinResult(
             game: oldGame,
             players: await getPlayerInfos(oldGame),
-            time: oldGame.StartTime!
+            time: oldGame.StartTime ?? DateTime.Now.ToString("o")
         );
         }
-
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
@@ -106,8 +108,11 @@ public class PlayerController : ControllerBase
             time: time
         );
 
-        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(newGame.Players.First().Key);
-        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
+        foreach (var id in newGame.Players.Keys)
+        {
+            var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(id);
+            await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
+        }
 
         return Ok(joinRes);
     }

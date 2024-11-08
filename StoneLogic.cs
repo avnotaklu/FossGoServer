@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using ZstdSharp.Unsafe;
 
@@ -38,8 +39,8 @@ namespace BadukServer
     [Immutable, GenerateSerializer]
     public class Position
     {
-        public int X {get; set;}
-        public int Y {get; set;}
+        public int X { get; set; }
+        public int Y { get; set; }
 
         public Position(int x, int y)
         {
@@ -384,8 +385,8 @@ namespace BadukServer
     public class ScoreCalculation
     {
         public Dictionary<Position, Area> AreaMap = [];
-        public List<Cluster> clusterEncountered = [];
         List<int> _territoryScores = [];
+        public ReadOnlyCollection<int> TerritoryScores => _territoryScores.AsReadOnly();
         Dictionary<Position, Stone> VirtualPlaygroundMap = [];
         HashSet<Cluster> DeadClusters = [];
         public Game Game;
@@ -393,11 +394,11 @@ namespace BadukServer
         public string WhitePlayerId;
         public int komi;
 
-        StoneType GetWinner(Game game)
+        public string GetWinner()
         {
-            var blackScore = _territoryScores[0] + game.Prisoners[BlackPlayerId];
-            var whiteScore = _territoryScores[1] + game.Prisoners[WhitePlayerId] + komi;
-            var winner = (blackScore > whiteScore) ? StoneType.Black : StoneType.White;
+            var blackScore = _territoryScores[0] + Game.Prisoners[BlackPlayerId];
+            var whiteScore = _territoryScores[1] + Game.Prisoners[WhitePlayerId] + komi;
+            var winner = (blackScore > whiteScore) ? BlackPlayerId : WhitePlayerId;
             return winner;
         }
 
@@ -413,20 +414,24 @@ namespace BadukServer
     Game game,
     string blackPlayerId,
     string whitePlayerId,
-Dictionary<Position, Stone> playground,
-HashSet<Cluster> deadClusters
+Dictionary<Position, Stone> playground
     )
         {
             Game = game;
             BlackPlayerId = blackPlayerId;
             WhitePlayerId = whitePlayerId;
             VirtualPlaygroundMap = playground;
-            DeadClusters = deadClusters;
+            DeadClusters = [];
+            foreach (var pos in game.DeadStones)
+            {
+                DeadClusters.Add(playground[new Position(pos)]!.cluster);
+            }
+
+            _CalculateScore();
         }
 
-        public void CalculateScore()
+        private void _CalculateScore()
         {
-            clusterEncountered.Clear();
             var rows = Game.Rows;
             var cols = Game.Columns;
 
@@ -442,11 +447,11 @@ HashSet<Cluster> deadClusters
             {
                 for (int j = 0; j < cols; j++)
                 {
-                    if (AreaMap[new Position(i, j)] == null &&
-                        VirtualPlaygroundMap[new Position(i, j)] == null)
+                    if (AreaMap.ContainsKey(new Position(i, j)) &&
+                        VirtualPlaygroundMap.ContainsKey(new Position(i, j)))
                     {
                         var pos = new Position(i, j);
-                        ForEachEmptyPosition(pos, [pos], null, false);
+                        ForEachEmptyPosition(pos, [pos], null, false, []);
                     }
                 }
             }
@@ -471,7 +476,7 @@ HashSet<Cluster> deadClusters
         }
 
 
-        void ForEachEmptyPosition(Position startPos, HashSet<Position> positionsSeenSoFar, int? owner, bool isDame)
+        void ForEachEmptyPosition(Position startPos, HashSet<Position> positionsSeenSoFar, int? owner, bool isDame, List<Cluster> clusterEncountered)
         {
             if (checkIfInsideBounds(startPos))
             {
@@ -490,11 +495,11 @@ HashSet<Cluster> deadClusters
                 {
                     if (checkIfInsideBounds(neighbor))
                     {
-                        if (VirtualPlaygroundMap[neighbor] == null)
+                        if (VirtualPlaygroundMap.ContainsKey(neighbor) )
                         {
                             if (!positionsSeenSoFar.Contains(neighbor))
                             {
-                                ForEachEmptyPosition(neighbor, [.. positionsSeenSoFar, neighbor], owner, isDame);
+                                ForEachEmptyPosition(neighbor, [.. positionsSeenSoFar, neighbor], owner, isDame, clusterEncountered);
                             }
                         }
                         if (VirtualPlaygroundMap[neighbor]?.player != null)

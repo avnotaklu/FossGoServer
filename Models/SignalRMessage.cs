@@ -17,6 +17,8 @@ static class SignalRMessageType
     public const string newGame = "NewGame";
     public const string newMove = "NewMove";
     public const string continueGame = "ContinueGame";
+    public const string acceptedScores = "AcceptedScores";
+    public const string gameOver = "GameOver";
     public const string editDeadStone = "EditDeadStone";
     public const string gameJoin = "GameJoin";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";

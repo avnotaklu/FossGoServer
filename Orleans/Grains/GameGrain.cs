@@ -1,4 +1,7 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Microsoft.CodeAnalysis;
+using MongoDB.Bson.Serialization.Serializers;
 using Orleans.Concurrency;
 
 namespace BadukServer.Orleans.Grains;
@@ -7,11 +10,8 @@ public class GameGrain : Grain, IGameGrain
 {
     // Player id with player's stone; 0 for black, 1 for white
     private Dictionary<string, StoneType> _players = [];
-    private int _currentMove;
     private GameState _gameState;
-    private string? _winner;
-    private string? _loser;
-
+    private string? _winnerId;
     private List<MoveData> _moves = [];
     private int _rows;
     private int _columns;
@@ -19,10 +19,12 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
     private Dictionary<string, int> _prisoners = [];
+    private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
     private bool _initialized = false;
     private string? _startTime;
     private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
+    private HashSet<string> _scoresAcceptedBy = [];
 
     // Score Calculation Things
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
@@ -30,8 +32,8 @@ public class GameGrain : Grain, IGameGrain
 
     private readonly ILogger<GameGrain> _logger;
 
+    private BoardStateUtilities _boardStateUtilities;
     public GameGrain(ILogger<GameGrain> logger)
-
     {
         _logger = logger;
     }
@@ -49,10 +51,12 @@ public class GameGrain : Grain, IGameGrain
         _gameState = GameState.WaitingForStart;
         _moves = [];
         _prisoners = [];
-        _winner = null;
-        _loser = null;
+        _finalTerritoryScores = new ReadOnlyCollection<int>([]);
+        _winnerId = null;
         _initialized = true;
         _stoneStates = [];
+        _scoresAcceptedBy = [];
+        _boardStateUtilities = new BoardStateUtilities(_rows, _columns);
 
         return Task.CompletedTask;
     }
@@ -74,7 +78,10 @@ public class GameGrain : Grain, IGameGrain
             startTime: _startTime,
             gameState: _gameState,
             koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
-            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList()
+            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
+            winnerId: _winnerId,
+            finalTerritoryScores: _finalTerritoryScores.ToList(),
+            komi: 6.5f
         );
     }
 
@@ -131,6 +138,8 @@ public class GameGrain : Grain, IGameGrain
     public async Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId)
     {
         Debug.Assert(_players.ContainsKey(playerId));
+        Debug.Assert(_gameState == GameState.Playing);
+
         var player = _players[playerId];
         Debug.Assert((turn % 2) == (int)player);
 
@@ -205,7 +214,10 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ContinueGame(string playerId)
     {
+        Debug.Assert(_gameState == GameState.ScoreCalculation);
         _gameState = GameState.Playing;
+        _stoneStates.Clear();
+        _scoresAcceptedBy.Clear();
 
         var game = await GetGame();
         var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
@@ -218,8 +230,48 @@ public class GameGrain : Grain, IGameGrain
         return game;
     }
 
+    public async Task<Game> AcceptScores(string playerId)
+    {
+        Debug.Assert(_gameState == GameState.ScoreCalculation);
+        _scoresAcceptedBy.Add(playerId);
+
+        var game = await GetGame();
+
+        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
+
+        if (_scoresAcceptedBy.Count == 2)
+        {
+            // Game is over
+            _gameState = GameState.Ended;
+
+            var scoreCalculator = _GetScoreCalculator();
+            _winnerId = scoreCalculator.GetWinner();
+            _finalTerritoryScores = scoreCalculator.TerritoryScores;
+
+            await pushNotifierGrain.SendMessage(new SignalRMessage(
+                type: SignalRMessageType.gameOver,
+                data: new GameOverMessage(
+                    GameOverMethod.Score,
+                    _GetGame()
+                )
+            ), gameId, toMe: true);
+        }
+        else
+        {
+            await pushNotifierGrain.SendMessage(new SignalRMessage(
+                type: SignalRMessageType.acceptedScores,
+                data: null
+            ), gameId, toMe: true);
+        }
+
+        return game;
+    }
+
+
     public Task<Game> EditDeadStone(Position position, DeadStoneState state)
     {
+        Debug.Assert(_gameState == GameState.ScoreCalculation);
+        _scoresAcceptedBy.Clear();
         if (_stoneStates.ContainsKey(position) && _stoneStates[position] == state)
         {
             return GetGame();
@@ -276,17 +328,23 @@ public class GameGrain : Grain, IGameGrain
         return await Task.FromResult(1 - await GetStoneFromPlayerId(id));
     }
 
-    public Task<string> GetPlayerIdFromStoneType(StoneType stone)
+
+    public string _GetPlayerIdFromStoneType(StoneType stone)
     {
         Debug.Assert(_players.Count == 2);
         foreach (var item in _players)
         {
             if (item.Value == stone)
             {
-                return Task.FromResult(item.Key);
+                return item.Key;
             }
         }
         throw new UnreachableException($"Player: {stone} has not yet joined the game");
+    }
+
+    public Task<string> GetPlayerIdFromStoneType(StoneType stone)
+    {
+        return Task.FromResult(_GetPlayerIdFromStoneType(stone));
     }
 
 
@@ -314,6 +372,17 @@ public class GameGrain : Grain, IGameGrain
             }
         }
         return hasPassedTwice;
+    }
+
+    private ScoreCalculation _GetScoreCalculator()
+    {
+        var playground = _boardStateUtilities.BoardStateFromGame(_GetGame()).playgroundMap;
+        return new ScoreCalculation(
+            _GetGame(),
+            _GetPlayerIdFromStoneType(StoneType.Black),
+            _GetPlayerIdFromStoneType(StoneType.White),
+            playground
+        );
     }
 
     public Task<Game> GetGame()
