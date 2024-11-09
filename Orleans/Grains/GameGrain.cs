@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using MongoDB.Bson.Serialization.Serializers;
@@ -28,17 +29,16 @@ public class GameGrain : Grain, IGameGrain
 
     // Score Calculation Things
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
-
-
+    private GameOverMethod _gameOverMethod;
     private readonly ILogger<GameGrain> _logger;
-
     private BoardStateUtilities _boardStateUtilities;
+
+    private string? _endTime;
+
     public GameGrain(ILogger<GameGrain> logger)
     {
         _logger = logger;
     }
-
-
 
     public Task CreateGame(int rows, int columns, int timeInSeconds)
     {
@@ -57,6 +57,7 @@ public class GameGrain : Grain, IGameGrain
         _stoneStates = [];
         _scoresAcceptedBy = [];
         _boardStateUtilities = new BoardStateUtilities(_rows, _columns);
+        _endTime = null;
 
         return Task.CompletedTask;
     }
@@ -81,7 +82,9 @@ public class GameGrain : Grain, IGameGrain
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
             winnerId: _winnerId,
             finalTerritoryScores: _finalTerritoryScores.ToList(),
-            komi: 6.5f
+            komi: 6.5f,
+            gameOverMethod: _gameOverMethod,
+            endTime: _endTime
         );
     }
 
@@ -209,9 +212,47 @@ public class GameGrain : Grain, IGameGrain
 
         }
 
+        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+        await gameTimer.StopTurnTimer();
+        await gameTimer.StartTurnTimer((int)(await CalculatePlayerTimesOfDiscreteSections(game))[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())].TotalMilliseconds);
+
         return (true, game);
     }
 
+    public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
+    {
+        var raw_times = new List<string> { game.StartTime! };
+        raw_times.AddRange(game.Moves.Select(move => move.Time));
+
+        var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
+
+        // Calculate first player's duration
+        var firstPlayerDuration = times
+            .Select((time, index) => (time, index))
+            .Where(pair => pair.index % 2 == 1)
+            .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+
+        var player0Time = TimeSpan.FromSeconds(game.TimeInSeconds) - firstPlayerDuration;
+
+        // Calculate second player's duration
+        var secondPlayerDuration = times
+            .Select((time, index) => (time, index))
+            .Skip(1)
+            .Where(pair => pair.index % 2 == 1)
+            .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+
+        var player1Time = TimeSpan.FromSeconds(game.TimeInSeconds) - secondPlayerDuration;
+
+        var playerTimes = new List<TimeSpan> { player0Time, player1Time };
+
+        // If the game has ended, apply the end time to the player with the turn
+        if (game.GameState == GameState.Ended)
+        {
+            playerTimes[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())] -= DateTime.Parse(game.EndTime!) - times.Last();
+        }
+
+        return playerTimes;
+    }
     public async Task<Game> ContinueGame(string playerId)
     {
         Debug.Assert(_gameState == GameState.ScoreCalculation);
@@ -242,11 +283,7 @@ public class GameGrain : Grain, IGameGrain
         if (_scoresAcceptedBy.Count == 2)
         {
             // Game is over
-            _gameState = GameState.Ended;
-
-            var scoreCalculator = _GetScoreCalculator();
-            _winnerId = scoreCalculator.GetWinner();
-            _finalTerritoryScores = scoreCalculator.TerritoryScores;
+            EndGame(GameOverMethod.Score);
 
             await pushNotifierGrain.SendMessage(new SignalRMessage(
                 type: SignalRMessageType.gameOver,
@@ -267,6 +304,55 @@ public class GameGrain : Grain, IGameGrain
         return game;
     }
 
+    public async Task<Game> ResignGame(string playerId)
+    {
+        var otherPlayerId = await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId));
+
+        EndGame(GameOverMethod.Resign, otherPlayerId);
+
+        var game = await GetGame();
+        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(otherPlayerId);
+
+        await pushNotifierGrain.SendMessage(new SignalRMessage(
+            type: SignalRMessageType.gameOver,
+            data: new GameOverMessage(
+                GameOverMethod.Resign,
+                game
+            )
+        ), gameId, toMe: true);
+
+        return game;
+    }
+
+    public async Task<Game> TimeoutCurrentPlayer()
+    {
+        var playerWithTurn = GetPlayerIdWithTurn();
+        var otherPlayerId = await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerWithTurn));
+
+        EndGame(GameOverMethod.Timeout, otherPlayerId);
+
+        return _GetGame();
+    }
+
+    private void EndGame(GameOverMethod method, string? winnerId = null)
+    {
+        _gameState = GameState.Ended;
+
+        if (winnerId != null)
+        {
+            _winnerId = winnerId;
+        }
+
+        if (method == GameOverMethod.Score)
+        {
+            var scoreCalculator = _GetScoreCalculator();
+            _winnerId = scoreCalculator.GetWinner();
+            _finalTerritoryScores = scoreCalculator.TerritoryScores;
+        }
+
+        _endTime = DateTime.Now.ToString("o");
+        _gameOverMethod = method;
+    }
 
     public Task<Game> EditDeadStone(Position position, DeadStoneState state)
     {

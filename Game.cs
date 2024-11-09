@@ -9,7 +9,7 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores,float komi)
+    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod gameOverMethod, string? endTime)
     {
         GameId = gameId;
         Rows = rows;
@@ -26,7 +26,9 @@ public class Game
         DeadStones = deadStones;
         WinnerId = winnerId;
         FinalTerritoryScores = finalTerritoryScores;
-Komi = komi;
+        Komi = komi;
+        GameOverMethod = gameOverMethod;
+        EndTime = endTime;
     }
 
     [BsonId]
@@ -67,6 +69,12 @@ Komi = komi;
 
     [BsonElement("komi")]
     public float Komi { get; set; }
+
+    [BsonElement("gameOverMethod")]
+    public GameOverMethod GameOverMethod { get; set; }
+
+    [BsonElement("endTime")]
+    public string? EndTime { get; set; }
 }
 
 

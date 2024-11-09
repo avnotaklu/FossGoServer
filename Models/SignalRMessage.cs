@@ -22,6 +22,7 @@ static class SignalRMessageType
     public const string editDeadStone = "EditDeadStone";
     public const string gameJoin = "GameJoin";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";
+    public const string timeout = "Timeout";
 }
 
 [Immutable, GenerateSerializer]

@@ -67,6 +67,17 @@ public class GameController : ControllerBase
         return Ok(game);
     }
 
+    [HttpPost("{gameId}/ResignGame")]
+    public async Task<ActionResult<Game>> ResignGame(string GameId)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
+        var game = await gameGrain.ResignGame(userId);
+
+        return Ok(game);
+    }
 
     [HttpPost("{gameId}/EditDeadStoneCluster")]
     public async Task<ActionResult<Game>> EditDeadStoneCluster(string GameId, [FromBody] EditDeadStoneClusterDto data)

@@ -11,6 +11,8 @@ public interface IGameGrain : IGrainWithStringKey
     Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId);
     Task<Game> ContinueGame(string playerId);
     Task<Game> AcceptScores(string playerId);
+    Task<Game> ResignGame(string playerId);
+    Task<Game> TimeoutCurrentPlayer();
     Task<Game> EditDeadStone(Position position, DeadStoneState state);
     Task<StoneType> GetStoneFromPlayerId(string id);
     Task<StoneType> GetOtherStoneFromPlayerId(string id);
