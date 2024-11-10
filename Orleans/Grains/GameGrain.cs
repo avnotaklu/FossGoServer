@@ -108,8 +108,7 @@ public class GameGrain : Grain, IGameGrain
 
         if (_players.Keys.Count == 2)
         {
-            _gameState = GameState.Playing;
-            _startTime = time;
+            StartGame(time);
         }
         else
         {
@@ -120,6 +119,14 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
         return Task.FromResult(game);
+    }
+
+    private void StartGame(string time)
+    {
+        _gameState = GameState.Playing;
+        _startTime = time;
+        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+        gameTimer.StartTurnTimer(_timeInSeconds * 1000);
     }
 
     public Task<Dictionary<string, StoneType>> GetPlayers()
@@ -214,7 +221,10 @@ public class GameGrain : Grain, IGameGrain
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         await gameTimer.StopTurnTimer();
-        await gameTimer.StartTurnTimer((int)(await CalculatePlayerTimesOfDiscreteSections(game))[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())].TotalMilliseconds);
+        var totalTimes = await CalculatePlayerTimesOfDiscreteSections(game);
+        var curPlayerRemainingTime = (int)totalTimes[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())].TotalMilliseconds;
+
+        await gameTimer.StartTurnTimer(curPlayerRemainingTime);
 
         return (true, game);
     }
@@ -227,19 +237,48 @@ public class GameGrain : Grain, IGameGrain
         var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
 
         // Calculate first player's duration
-        var firstPlayerDuration = times
-            .Select((time, index) => (time, index))
-            .Where(pair => pair.index % 2 == 1)
-            .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+        // var firstPlayerDuration = times
+        //     .Select((time, index) => (time, index))
+        //     .Where(pair => pair.index % 2 == 1)
+        //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+
+        var firstPlayerDuration = TimeSpan.Zero;
+
+        var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
+        var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+        var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
+
+        for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
+        {
+            firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
+        }
+
+
+
+
 
         var player0Time = TimeSpan.FromSeconds(game.TimeInSeconds) - firstPlayerDuration;
 
         // Calculate second player's duration
-        var secondPlayerDuration = times
-            .Select((time, index) => (time, index))
-            .Skip(1)
-            .Where(pair => pair.index % 2 == 1)
-            .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+        // var secondPlayerDuration = times
+        //     .Select((time, index) => (time, index))
+        //     .Skip(1)
+        //     .Where(pair => pair.index % 2 == 1)
+        //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+
+
+
+        var secondPlayerDuration = TimeSpan.Zero;
+
+        var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
+        var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+        var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
+
+        for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
+        {
+            secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
+        }
+
 
         var player1Time = TimeSpan.FromSeconds(game.TimeInSeconds) - secondPlayerDuration;
 

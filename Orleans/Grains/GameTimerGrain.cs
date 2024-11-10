@@ -47,8 +47,8 @@ public class GameTimerGrain : Grain, IGameTimerGrain
 
             await pushGrain.SendMessage(
                 new SignalRMessage(
-                    SignalRMessageType.timeout,
-                    new GameTimeoutMessage(game)
+                    SignalRMessageType.gameOver,
+                    new GameOverMessage(game: game, method: GameOverMethod.Timeout)
                 ),
                 gameId,
                 toMe: true
