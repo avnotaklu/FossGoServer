@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -9,13 +10,13 @@ namespace BadukServer;
 [GenerateSerializer]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, int timeInSeconds, Dictionary<string, int> timeLeftForPlayers, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod gameOverMethod, string? endTime)
+    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod gameOverMethod, string? endTime)
     {
         GameId = gameId;
         Rows = rows;
         Columns = columns;
-        TimeInSeconds = timeInSeconds;
-        TimeLeftForPlayers = timeLeftForPlayers;
+        TimeControl = timeControl;
+        PlayerTimeSnapshots = playerTimeSnapshots;
         PlaygroundMap = playgroundMap;
         Moves = moves;
         Players = players;
@@ -40,12 +41,10 @@ public class Game
     public int Rows { get; set; }
     [BsonElement("columns")]
     public int Columns { get; set; }
-    [BsonElement("timeInSeconds")]
-    public int TimeInSeconds { get; set; }
-    [BsonElement("timeLeftForPlayers")]
-    public Dictionary<string, int> TimeLeftForPlayers { get; set; }
-    // [BsonElement("playgroundMap")]
-    // public Dictionary<string, string> PlaygroundMap { get; set; }
+    [BsonElement("timeControl")]
+    public TimeControl TimeControl { get; set; }
+    [BsonElement("playerTimeSnapshots")]
+    public List<PlayerTimeSnapshot> PlayerTimeSnapshots { get; set; }
     [BsonElement("playgroundMap")]
     public Dictionary<string, StoneType> PlaygroundMap { get; set; }
     [BsonElement("moves")]
@@ -103,4 +102,50 @@ public enum GameState
     ScoreCalculation = 2,
     Paused = 3,
     Ended = 4
+}
+
+[Immutable, GenerateSerializer]
+public class TimeControl
+{
+    public int MainTimeSeconds { get; set; }
+    public int? IncrementSeconds { get; set; }
+    public ByoYomiTime? ByoYomiTime { get; set; }
+
+    public TimeControl(ByoYomiTime? byoYomiTime, int? incrementSeconds, int suddenDeathSeconds)
+    {
+        ByoYomiTime = byoYomiTime;
+        IncrementSeconds = incrementSeconds;
+        MainTimeSeconds = suddenDeathSeconds;
+    }
+}
+
+[Immutable, GenerateSerializer]
+public class ByoYomiTime
+{
+    public int ByoYomis { get; set; }
+    public int ByoYomiSeconds { get; set; }
+
+    public ByoYomiTime(int byoYomis, int byoYomiSeconds)
+    {
+        ByoYomis = byoYomis;
+        ByoYomiSeconds = byoYomiSeconds;
+    }
+}
+
+
+[Immutable, GenerateSerializer]
+public class PlayerTimeSnapshot
+{
+    public PlayerTimeSnapshot(string snapshotTimestamp, int mainTimeMilliseconds, int? byoYomisLeft, bool byoYomiActive)
+    {
+        SnapshotTimestamp = snapshotTimestamp;
+        MainTimeMilliseconds = mainTimeMilliseconds;
+        ByoYomisLeft = byoYomisLeft;
+        ByoYomiActive = byoYomiActive;
+    }
+
+    public string SnapshotTimestamp { get; set; }
+    public int MainTimeMilliseconds { get; set; }
+    public int? ByoYomisLeft { get; set; }
+    public bool ByoYomiActive { get; set; }
 }

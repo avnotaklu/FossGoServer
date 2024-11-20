@@ -16,8 +16,8 @@ public class GameGrain : Grain, IGameGrain
     private List<MoveData> _moves = [];
     private int _rows;
     private int _columns;
-    private int _timeInSeconds;
-    private Dictionary<string, int> _timeLeftForPlayers { get; set; } = [];
+    private TimeControl _timeControl;
+    private List<PlayerTimeSnapshot> _playerTimeSnapshots { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
     private Dictionary<string, int> _prisoners = [];
     private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
@@ -40,13 +40,13 @@ public class GameGrain : Grain, IGameGrain
         _logger = logger;
     }
 
-    public Task CreateGame(int rows, int columns, int timeInSeconds)
+    public Task CreateGame(int rows, int columns, TimeControl timeControl)
     {
         _players = [];
-        _timeLeftForPlayers = [];
         _rows = rows;
         _columns = columns;
-        _timeInSeconds = timeInSeconds;
+        _timeControl = timeControl;
+        _playerTimeSnapshots = [];
         _board = [];
         _gameState = GameState.WaitingForStart;
         _moves = [];
@@ -70,8 +70,8 @@ public class GameGrain : Grain, IGameGrain
             gameId: gameId,
             rows: _rows,
             columns: _columns,
-            timeInSeconds: _timeInSeconds,
-            timeLeftForPlayers: _timeLeftForPlayers,
+            timeControl: _timeControl,
+            playerTimeSnapshots: _playerTimeSnapshots,
             moves: _moves,
             playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
             players: _players,
@@ -114,19 +114,57 @@ public class GameGrain : Grain, IGameGrain
         {
             _gameState = GameState.WaitingForStart;
         }
-        _timeLeftForPlayers[player] = _timeInSeconds;
         _prisoners[player] = 0;
 
         var game = _GetGame();
         return Task.FromResult(game);
     }
 
+    static private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
+    {
+        var curTime = DateTime.Now.ToString("o");
+        var turn = moves.Count;
+        var curTurn = turn % 2;
+        var curPlayerTimeLeft = playerTimes[curTurn].MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(moves.Last().Time)).TotalMilliseconds;
+        var byoYomiMS = timeControl.ByoYomiTime?.ByoYomiSeconds * 1000;
+
+        var turnPlayerSnap = playerTimes[curTurn];
+
+        // playerTimes[curTurn] = new PlayerTimeSnapshot(
+        //     snapshotTimestamp: curTime,
+        //     mainTimeMilliseconds: curPlayerTimeLeft > 0 ? curPlayerTimeLeft : (byoYomiMS ?? 0),
+        //     byoYomisLeft: turnPlayerSnap.ByoYomisLeft - (turnPlayerSnap.ByoYomiActive ? 1 : 0),
+        //     byoYomiActive: curPlayerTimeLeft <= 0
+        // );
+
+        return new PlayerTimeSnapshot(
+                    snapshotTimestamp: curTime,
+                    mainTimeMilliseconds: curPlayerTimeLeft > 0 ? curPlayerTimeLeft : (byoYomiMS ?? 0),
+                    byoYomisLeft: turnPlayerSnap.ByoYomisLeft - (turnPlayerSnap.ByoYomiActive ? 1 : 0),
+                    byoYomiActive: curPlayerTimeLeft <= 0
+                );
+    }
+
     private void StartGame(string time)
     {
         _gameState = GameState.Playing;
         _startTime = time;
+        _playerTimeSnapshots = [
+                    new PlayerTimeSnapshot(
+                snapshotTimestamp: time,
+                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
+                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
+                byoYomiActive: false
+            ),
+            new PlayerTimeSnapshot(
+                snapshotTimestamp: time,
+                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
+                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
+                byoYomiActive: false
+            )
+                ];
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-        gameTimer.StartTurnTimer(_timeInSeconds * 1000);
+        gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
     }
 
     public Task<Dictionary<string, StoneType>> GetPlayers()
@@ -157,7 +195,7 @@ public class GameGrain : Grain, IGameGrain
         // {
         //     // Move was passed
         //     if(_moves.Last().IsPass()) {
-        //         // Two passes
+        //         // Two passesa
         //         _gameState = GameState.ScoreCalculation;
         //     }
         //     return await GetGame();
@@ -231,6 +269,8 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
     {
+        var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
+        // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
         var raw_times = new List<string> { game.StartTime! };
         raw_times.AddRange(game.Moves.Select(move => move.Time));
 
@@ -253,23 +293,10 @@ public class GameGrain : Grain, IGameGrain
             firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
         }
 
-
-
-
-
-        var player0Time = TimeSpan.FromSeconds(game.TimeInSeconds) - firstPlayerDuration;
-
-        // Calculate second player's duration
-        // var secondPlayerDuration = times
-        //     .Select((time, index) => (time, index))
-        //     .Skip(1)
-        //     .Where(pair => pair.index % 2 == 1)
-        //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
-
+        var player0Time = mainTimeSpan - firstPlayerDuration;
 
 
         var secondPlayerDuration = TimeSpan.Zero;
-
         var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
         var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
         var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
@@ -278,9 +305,8 @@ public class GameGrain : Grain, IGameGrain
         {
             secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
         }
+        var player1Time = mainTimeSpan - secondPlayerDuration;
 
-
-        var player1Time = TimeSpan.FromSeconds(game.TimeInSeconds) - secondPlayerDuration;
 
         var playerTimes = new List<TimeSpan> { player0Time, player1Time };
 
