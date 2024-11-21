@@ -50,11 +50,11 @@ public class PlayerController : ControllerBase
         if (userId == null) return Unauthorized();
         if (gameParams.Rows == 0) return BadRequest("Rows can't be 0");
         if (gameParams.Columns == 0) return BadRequest("Columns can't be 0");
-        if (gameParams.TimeInSeconds == 0) return BadRequest("TimeInSeconds can't be 0");
+        if (gameParams.TimeControl.MainTimeSeconds == 0) return BadRequest("main time can't be 0");
         var time = DateTime.Now.ToString("o");
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
-        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeInSeconds, gameParams.FirstPlayerStone, time);
+        var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeControl, gameParams.FirstPlayerStone, time);
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         var game = await gameGrain.GetGame();

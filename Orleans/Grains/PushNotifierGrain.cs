@@ -12,15 +12,14 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private string? _connectionId;
     private string ConnectionId => _connectionId ?? throw new NullReferenceException("_connectionId is not set");
     // private readonly HubReference _hub;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly ISignalRGameHubService _hubService;
 
     // private List<(SiloAddress Host, IRemoteLocationHub Hub)> _hubs = new();
-    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, IHubContext<GameHub> hubContext)
+    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRGameHubService hub)
 
     {
         _logger = logger;
-        // _hub = hubReference;
-        _hubContext = hubContext;
+        _hubService = hub;
     }
 
     private Task _flushTask = Task.CompletedTask;
@@ -155,10 +154,8 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     // TODO: This was done with GrainObserver [IRemoteGameHub], idk why
     public ValueTask _SendUpdate(SignalRMessage messages, string gameGroup) =>
-        new(_hubContext.Clients.Client(ConnectionId).SendAsync(
-            "gameUpdate", messages, CancellationToken.None));
+        _hubService.SendToClient(ConnectionId, "gameUpdate", messages, CancellationToken.None);
 
     public ValueTask _SendUpdatesAll(SignalRMessage messages, string gameGroup) =>
-        new(_hubContext.Clients.All.SendAsync(
-            "gameUpdate", messages, CancellationToken.None));
+        _hubService.SendToAll("gameUpdate", messages, CancellationToken.None);
 }

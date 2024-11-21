@@ -8,6 +8,7 @@ await Host.CreateDefaultBuilder(args)
         // Use the --InstanceId X option to launch subsequent hosts.
         var instanceId = ctx.Configuration.GetValue<int>("InstanceId");
         var port = 11_111;
+
         siloBuilder.UseLocalhostClustering(
             siloPort: port + instanceId,
             gatewayPort: 30000 + instanceId,

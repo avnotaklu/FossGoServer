@@ -3,11 +3,10 @@ using BadukServer;
 [GenerateSerializer]
 public enum GameOverMethod
 {
-    Timeout,
-    Resign,
-    Score,
-    Abandon,
-
+    Timeout = 0,
+    Resign = 1,
+    Score = 2,
+    Abandon = 3,
 }
 
 [Immutable, GenerateSerializer]

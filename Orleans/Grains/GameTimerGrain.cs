@@ -39,23 +39,12 @@ public class GameTimerGrain : Grain, IGameTimerGrain
         _isTurnActive = false;
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
-        var game = await gameGrain.TimeoutCurrentPlayer();
+        var res = await gameGrain.TimeoutCurrentPlayer();
 
-        foreach (var playerId in game.Players.Keys)
-        {
-            var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(playerId);
-
-            await pushGrain.SendMessage(
-                new SignalRMessage(
-                    SignalRMessageType.gameOver,
-                    new GameOverMessage(game: game, method: GameOverMethod.Timeout)
-                ),
-                gameId,
-                toMe: true
-            );
+        if(res != null && res.MainTimeMilliseconds > 0) {
+            await StopTurnTimer();
+            await StartTurnTimer(res.MainTimeMilliseconds);
         }
-
-        Console.WriteLine("Game timeout");
 
         return;
     }

@@ -1,6 +1,7 @@
 using System.CodeDom;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 //
@@ -34,11 +35,19 @@ namespace BadukServer;
 
 
 [Immutable, GenerateSerializer]
+[Alias("MoveData")]
 public class MoveData
 {
-    // [Id(0)] public string PlayerId { get; set; }
+    [BsonElement("x")]
+    [Id(0)]
     public int? X { get; set; }
+
+    [BsonElement("y")]
+    [Id(1)]
     public int? Y { get; set; }
+
+    [BsonElement("time")]
+    [Id(2)]
     public string Time { get; set; }
 
     public MoveData(int? x, int? y, string time)
@@ -59,7 +68,9 @@ public class MoveData
 public class MovePosition
 {
     // [Id(0)] public string PlayerId { get; set; }
+    [Id(0)]
     public int? X { get; set; }
+    [Id(1)]
     public int? Y { get; set; }
 
     public MovePosition(int? x, int? y)

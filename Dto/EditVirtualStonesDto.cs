@@ -1,11 +1,10 @@
 using BadukServer;
 
 
-[GenerateSerializer]
 public enum DeadStoneState
 {
-    Dead,
-    Alive
+    Dead  = 0,
+    Alive = 1
 }
 
 [Immutable, GenerateSerializer]

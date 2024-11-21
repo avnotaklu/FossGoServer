@@ -7,14 +7,12 @@ namespace BadukServer.Orleans.Grains;
 
 public class PlayerGrain : Grain, IPlayerGrain
 {
-    private readonly IHubContext<GameHub> _hubContext;
     private string _connectionId;
     private bool _isInitialized = false;
     public List<string> games = [];
 
-    public PlayerGrain(IHubContext<GameHub> hubContext)
+    public PlayerGrain()
     {
-        _hubContext = hubContext;
     }
 
     private string? _activeGameId;
@@ -38,7 +36,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    public async Task<string> CreateGame(int rows, int columns, int timeInSeconds, StoneType stone, string time)
+    public async Task<string> CreateGame(int rows, int columns, TimeControl timeControl,  StoneType stone, string time)
     {
         var gameId = Guid.NewGuid().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id
@@ -47,7 +45,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId); // create new game
 
         // add ourselves to the game
-        await gameGrain.CreateGame(rows, columns, timeInSeconds);
+        await gameGrain.CreateGame(rows, columns, timeControl);
         await gameGrain.AddPlayerToGame(userId, stone, time);
 
         // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);

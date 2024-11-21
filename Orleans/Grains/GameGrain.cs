@@ -29,15 +29,19 @@ public class GameGrain : Grain, IGameGrain
 
     // Score Calculation Things
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
-    private GameOverMethod _gameOverMethod;
+    private GameOverMethod? _gameOverMethod;
     private readonly ILogger<GameGrain> _logger;
+    private readonly IDateTimeService _dateTimeService;
     private BoardStateUtilities _boardStateUtilities;
 
     private string? _endTime;
 
-    public GameGrain(ILogger<GameGrain> logger)
+    private string now => _dateTimeService.NowFormatted();
+
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService)
     {
         _logger = logger;
+        _dateTimeService = dateTimeService;
     }
 
     public Task CreateGame(int rows, int columns, TimeControl timeControl)
@@ -49,6 +53,7 @@ public class GameGrain : Grain, IGameGrain
         _playerTimeSnapshots = [];
         _board = [];
         _gameState = GameState.WaitingForStart;
+        _gameOverMethod = null;
         _moves = [];
         _prisoners = [];
         _finalTerritoryScores = new ReadOnlyCollection<int>([]);
@@ -88,6 +93,7 @@ public class GameGrain : Grain, IGameGrain
         );
     }
 
+
     public Task<Game> AddPlayerToGame(string player, StoneType stone, string time)
     {
         Debug.Assert(_players.Keys.Count < 3, $"Maximum of two players can be added, Added were {_players.Keys.Count}");
@@ -120,29 +126,67 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(game);
     }
 
-    static private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
+    private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
     {
-        var curTime = DateTime.Now.ToString("o");
+        var curTime = now;
         var turn = moves.Count;
         var curTurn = turn % 2;
-        var curPlayerTimeLeft = playerTimes[curTurn].MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(moves.Last().Time)).TotalMilliseconds;
+
+        PlayerTimeSnapshot turnPlayerSnap() => playerTimes[curTurn];
+        PlayerTimeSnapshot nonTurnPlayerSnap() => playerTimes[1 - curTurn];
+
         var byoYomiMS = timeControl.ByoYomiTime?.ByoYomiSeconds * 1000;
 
-        var turnPlayerSnap = playerTimes[curTurn];
+        var activePlayerIdx = playerTimes.FindIndex((snap) => snap.TimeActive);
+        var activePlayerSnap = playerTimes[activePlayerIdx];
 
-        // playerTimes[curTurn] = new PlayerTimeSnapshot(
-        //     snapshotTimestamp: curTime,
-        //     mainTimeMilliseconds: curPlayerTimeLeft > 0 ? curPlayerTimeLeft : (byoYomiMS ?? 0),
-        //     byoYomisLeft: turnPlayerSnap.ByoYomisLeft - (turnPlayerSnap.ByoYomiActive ? 1 : 0),
-        //     byoYomiActive: curPlayerTimeLeft <= 0
-        // );
+        var activePlayerTimeLeft = activePlayerSnap.MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(activePlayerSnap.SnapshotTimestamp)).TotalMilliseconds;
 
-        return new PlayerTimeSnapshot(
+        var newByoYomi = activePlayerSnap.ByoYomisLeft - ((activePlayerSnap.ByoYomiActive && activePlayerTimeLeft <= 0) ? 1 : 0);
+
+        var applicableByoYomiTime = (newByoYomi > 0) ? (byoYomiMS ?? 0) : 0;
+
+        var applicableIncrement = (timeControl.IncrementSeconds ?? 0) * 1000;
+
+
+        Console.WriteLine("Calculated Player Times");
+        Debug.Write("Calculated Player Times");
+        _logger.LogInformation("Calculated Player Times");
+
+        playerTimes[activePlayerIdx] = new PlayerTimeSnapshot(
                     snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: curPlayerTimeLeft > 0 ? curPlayerTimeLeft : (byoYomiMS ?? 0),
-                    byoYomisLeft: turnPlayerSnap.ByoYomisLeft - (turnPlayerSnap.ByoYomiActive ? 1 : 0),
-                    byoYomiActive: curPlayerTimeLeft <= 0
+                    mainTimeMilliseconds: activePlayerTimeLeft > 0 ? activePlayerTimeLeft + applicableIncrement : applicableByoYomiTime,
+                    byoYomisLeft: newByoYomi,
+                    byoYomiActive: activePlayerTimeLeft <= 0,
+                    timeActive: playerTimes[activePlayerIdx].TimeActive
                 );
+
+        playerTimes[curTurn] = new PlayerTimeSnapshot(
+                            snapshotTimestamp: curTime,
+                            mainTimeMilliseconds: turnPlayerSnap().MainTimeMilliseconds,
+                            byoYomisLeft: turnPlayerSnap().ByoYomisLeft,
+                            byoYomiActive: turnPlayerSnap().ByoYomiActive,
+                            timeActive: true
+                        );
+
+        playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
+                    snapshotTimestamp: curTime,
+                    mainTimeMilliseconds: nonTurnPlayerSnap().MainTimeMilliseconds,
+                    byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
+                    byoYomiActive: false,
+                    timeActive: false
+                );
+        // var nonTurnPlayerSnap = playerTimes[1 - curTurn];
+
+        // playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
+        //             snapshotTimestamp: curTime,
+        //             mainTimeMilliseconds: nonTurnPlayerSnap.MainTimeMilliseconds,
+        //              byoYomisLeft: nonTurnPlayerSnap.ByoYomisLeft,
+        //             byoYomiActive: false,
+        //             timeActive: false
+        //         );
+
+        return playerTimes[curTurn];
     }
 
     private void StartGame(string time)
@@ -154,13 +198,15 @@ public class GameGrain : Grain, IGameGrain
                 snapshotTimestamp: time,
                 mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
                 byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
-                byoYomiActive: false
+                byoYomiActive: false,
+                timeActive: true
             ),
             new PlayerTimeSnapshot(
                 snapshotTimestamp: time,
                 mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
                 byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
-                byoYomiActive: false
+                byoYomiActive: false,
+                timeActive: false
             )
                 ];
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
@@ -171,7 +217,6 @@ public class GameGrain : Grain, IGameGrain
     {
         return Task.FromResult(_players);
     }
-
 
     public Task<List<MoveData>> GetMoves()
     {
@@ -191,15 +236,6 @@ public class GameGrain : Grain, IGameGrain
         var player = _players[playerId];
         Debug.Assert((turn % 2) == (int)player);
 
-        // if (move.X == null || move.Y == null)
-        // {
-        //     // Move was passed
-        //     if(_moves.Last().IsPass()) {
-        //         // Two passesa
-        //         _gameState = GameState.ScoreCalculation;
-        //     }
-        //     return await GetGame();
-        // }
         if (!move.IsPass())
         {
             var x = (int)move.X!;
@@ -229,7 +265,7 @@ public class GameGrain : Grain, IGameGrain
         var lastMove = new MoveData(
             move.X,
             move.Y,
-            DateTime.Now.ToString("o")
+            now
         );
 
         _logger.LogInformation("Move played <id>{gameId}<id>, <move>{move}<move>", gameId, lastMove);
@@ -240,6 +276,13 @@ public class GameGrain : Grain, IGameGrain
         {
             _logger.LogInformation("Game reached score calculation {gameId}", gameId);
             SetScoreCalculationState(lastMove);
+        }
+        else
+        {
+            var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+            await gameTimer.StopTurnTimer();
+            var turnPlayerTimeSnapshot = RecalculateTurnPlayerTimeSnapshots(_moves, _playerTimeSnapshots, _timeControl);
+            await gameTimer.StartTurnTimer(turnPlayerTimeSnapshot.MainTimeMilliseconds);
         }
 
         var game = await GetGame();
@@ -256,13 +299,6 @@ public class GameGrain : Grain, IGameGrain
             );
 
         }
-
-        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-        await gameTimer.StopTurnTimer();
-        var totalTimes = await CalculatePlayerTimesOfDiscreteSections(game);
-        var curPlayerRemainingTime = (int)totalTimes[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())].TotalMilliseconds;
-
-        await gameTimer.StartTurnTimer(curPlayerRemainingTime);
 
         return (true, game);
     }
@@ -389,14 +425,39 @@ public class GameGrain : Grain, IGameGrain
         return game;
     }
 
-    public async Task<Game> TimeoutCurrentPlayer()
+    public async Task<PlayerTimeSnapshot?> TimeoutCurrentPlayer()
     {
         var playerWithTurn = GetPlayerIdWithTurn();
         var otherPlayerId = await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerWithTurn));
 
-        EndGame(GameOverMethod.Timeout, otherPlayerId);
+        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
 
-        return _GetGame();
+        var curPlayerTime = RecalculateTurnPlayerTimeSnapshots(_moves, _playerTimeSnapshots, _timeControl);
+
+        var game = _GetGame();
+
+        if (curPlayerTime.MainTimeMilliseconds <= 0)
+        {
+            EndGame(GameOverMethod.Timeout, otherPlayerId);
+
+
+            foreach (var playerId in _players.Keys)
+            {
+                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(playerId);
+
+                await pushGrain.SendMessage(
+                    new SignalRMessage(
+                        SignalRMessageType.gameOver,
+                        new GameOverMessage(game: game, method: GameOverMethod.Timeout)
+                    ),
+                    gameId,
+                    toMe: true
+                );
+            }
+
+            Console.WriteLine("Game timeout");
+        }
+        return curPlayerTime;
     }
 
     private void EndGame(GameOverMethod method, string? winnerId = null)
@@ -415,7 +476,7 @@ public class GameGrain : Grain, IGameGrain
             _finalTerritoryScores = scoreCalculator.TerritoryScores;
         }
 
-        _endTime = DateTime.Now.ToString("o");
+        _endTime = now;
         _gameOverMethod = method;
     }
 
@@ -538,6 +599,7 @@ public class GameGrain : Grain, IGameGrain
 
     public Task<Game> GetGame()
     {
-        return Task.FromResult(_GetGame());
+        var game = _GetGame();
+        return Task.FromResult(game);
     }
 }

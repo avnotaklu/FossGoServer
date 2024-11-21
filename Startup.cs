@@ -26,9 +26,12 @@ public class Startup
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddControllers();
+
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
-        // services.AddSingleton<HubReference>();
+        services.AddSingleton<DateTimeService>();
+        services.AddSingleton<SignalRGameHubService>();
+
         services.AddEndpointsApiExplorer();
 
         services.Configure<DatabaseSettings>(
@@ -121,44 +124,7 @@ public class Startup
         {
             e.MapControllers();
             e.MapHub<GameHub>("/gameHub");
-            // e.MapGet("/weatherforecast", () =>
-            // {
-            //     Console.WriteLine("hello");
-            //     var forecast = Enumerable.Range(1, 5).Select(index =>
-            //         new WeatherForecast
-            //         (
-            //             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            //             Random.Shared.Next(-20, 55),
-            //             summaries[Random.Shared.Next(summaries.Length)]
-            //         ))
-            //         .ToArray();
-            //     return forecast;
-            // })
-            // .WithName("GetWeatherForecast")
-            // .WithOpenApi();
-
         });
-        //         app.MapPost("/echo", handler: async (HttpContext req) =>
-        //         {
-        //             Console.WriteLine(req.Request.Body);
-
-        //             var rawRequestBody = await new StreamReader(req.Request.Body).ReadToEndAsync();
-        //             return rawRequestBody;
-        //             // var forecast = Enumerable.Range(1, 5).Select(index =>
-        //             //     new WeatherForecast
-        //             //     (
-        //             //         DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-        //             //         Random.Shared.Next(-20, 55),
-        //             //         summaries[Random.Shared.Next(summaries.Length)]
-        //             //     ))
-        //             //     .ToArray();
-
-        //             // return forecast;
-        //         })
-        //         .WithName("echo")
-        //         .WithOpenApi();
-
-        // app.Run();
     }
 
     record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
