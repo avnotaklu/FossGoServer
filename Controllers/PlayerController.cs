@@ -72,11 +72,15 @@ public class PlayerController : ControllerBase
         return Ok(game);
     }
 
-    async Task<List<PublicUserInfo>> getPlayerInfos(Game game)
+    async Task<PublicUserInfo?> GetOtherPlayerData(Game game, string myId)
     {
-        var players = await _usersService.GetByIds([.. game.Players.Keys]);
-        var playerInfos = players.Select(p => new PublicUserInfo(id: p.Id!, email: p.Email)).ToList();
-        return playerInfos;
+        var otherPlayer = game.Players.Keys.FirstOrDefault(p => p != myId);
+        if (otherPlayer != null)
+        {
+            var otherPlayerData = _usersService.GetByIds([otherPlayer]).Result;
+            return new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
+        }
+        return null;
     }
 
     [HttpPost("JoinGame")]
@@ -90,13 +94,23 @@ public class PlayerController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
         var oldGame = await gameGrain.GetGame();
 
+
+        if (oldGame.GameCreator == userId)
+        {
+            return new GameJoinResult(
+                game: oldGame,
+                otherPlayerData: await GetOtherPlayerData(oldGame, userId),
+                time: oldGame.StartTime ?? DateTime.Now.ToString("o")
+            );
+        }
+
         if (oldGame.Players.Keys.Contains(userId))
         {
             return new GameJoinResult(
-            game: oldGame,
-            players: await getPlayerInfos(oldGame),
-            time: oldGame.StartTime ?? DateTime.Now.ToString("o")
-        );
+                game: oldGame,
+                otherPlayerData: await GetOtherPlayerData(oldGame, userId),
+                time: oldGame.StartTime ?? DateTime.Now.ToString("o")
+            );
         }
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
@@ -108,7 +122,7 @@ public class PlayerController : ControllerBase
 
         var joinRes = new GameJoinResult(
             game: newGame,
-            players: await getPlayerInfos(newGame),
+                otherPlayerData: await GetOtherPlayerData(newGame, userId),
             time: time
         );
 

@@ -40,9 +40,10 @@ public class GameTimerGrain : Grain, IGameTimerGrain
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
         var res = await gameGrain.TimeoutCurrentPlayer();
+        await StopTurnTimer();
 
-        if(res != null && res.MainTimeMilliseconds > 0) {
-            await StopTurnTimer();
+        if (res != null && res.MainTimeMilliseconds > 0)
+        {
             await StartTurnTimer(res.MainTimeMilliseconds);
         }
 
