@@ -53,8 +53,11 @@ public class PlayerController : ControllerBase
         if (gameParams.TimeControl.MainTimeSeconds == 0) return BadRequest("main time can't be 0");
         var time = DateTime.Now.ToString("o");
 
+
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
+
         var gameId = await player.CreateGame(gameParams.Rows, gameParams.Columns, gameParams.TimeControl, gameParams.FirstPlayerStone, time);
+
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         var game = await gameGrain.GetGame();
@@ -62,8 +65,8 @@ public class PlayerController : ControllerBase
 
         var newGameMessage = new NewGameCreatedMessage(game);
 
-        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(game.Players.First().Key);
-        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage), gameId, toMe: true);
+        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(userId);
+        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage), gameId, toMe: false);
 
         return Ok(game);
     }

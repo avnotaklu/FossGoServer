@@ -67,7 +67,7 @@ public class GameGrainTests
             byoYomiTime: new ByoYomiTime(3, 3)
         );
 
-        var gameId = await p1.CreateGame(rows, cols, timeControl, BadukServer.StoneType.Black, dateTimeMock.Object.NowFormatted());
+        var gameId = await p1.CreateGame(rows, cols, timeControl, BadukServer.StoneSelectionType.Black, dateTimeMock.Object.NowFormatted());
 
         var gameGrain = cluster.GrainFactory.GetGrain<IGameGrain>(gameId);
         var stoneType = await gameGrain.GetStoneFromPlayerId(p1Id);

@@ -36,7 +36,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    public async Task<string> CreateGame(int rows, int columns, TimeControl timeControl,  StoneType stone, string time)
+    public async Task<string> CreateGame(int rows, int columns, TimeControl timeControl,  StoneSelectionType stone, string time)
     {
         var gameId = Guid.NewGuid().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id
@@ -45,8 +45,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId); // create new game
 
         // add ourselves to the game
-        await gameGrain.CreateGame(rows, columns, timeControl);
-        await gameGrain.AddPlayerToGame(userId, stone, time);
+        await gameGrain.CreateGame(rows, columns, timeControl, stone, userId);
 
         // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
         var game = await gameGrain.GetGame();
@@ -72,22 +71,11 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
 
-        var players = await gameGrain.GetPlayers();
-
-        if (players.Any(player => player.Key == userId)) return gameId;
-
         Console.WriteLine("Joining game: " + gameId + " By player " + userId);
 
-        var otherPlayerStone = players.Values.First(); // Because only other player exists at this point
-        var myStone = 1 - otherPlayerStone;
-
-        var game = await gameGrain.AddPlayerToGame(this.GetPrimaryKeyString(), myStone, time);
-
-        // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
+        var game = await gameGrain.JoinGame(this.GetPrimaryKeyString(), time);
 
         _activeGameId = gameId;
-        // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
-        // await pairingGrain.RemoveGame(gameId);
 
         return game.GameId;
     }

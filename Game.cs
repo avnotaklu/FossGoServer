@@ -10,7 +10,10 @@ namespace BadukServer;
 [Alias("Game")]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime)
+    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
+StoneSelectionType stoneSelectionType,
+string? gameCreator
+    )
     {
         GameId = gameId;
         Rows = rows;
@@ -30,6 +33,8 @@ public class Game
         Komi = komi;
         GameOverMethod = gameOverMethod;
         EndTime = endTime;
+        StoneSelectionType = stoneSelectionType;
+        GameCreator = gameCreator;
     }
 
     [BsonId]
@@ -90,6 +95,14 @@ public class Game
     [BsonElement("endTime")]
     [Id(18)]
     public string? EndTime { get; set; }
+
+    [BsonElement("stoneSelectionType")]
+    [Id(19)]
+    public StoneSelectionType StoneSelectionType { get; set; }
+
+    [BsonElement("gameCreator")]
+    [Id(20)]
+    public string? GameCreator { get; set; }
 }
 
 [GenerateSerializer]

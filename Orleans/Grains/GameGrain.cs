@@ -17,6 +17,7 @@ public class GameGrain : Grain, IGameGrain
     private int _rows;
     private int _columns;
     private TimeControl _timeControl;
+    private StoneSelectionType _stoneSelectionType;
     private List<PlayerTimeSnapshot> _playerTimeSnapshots { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
     private Dictionary<string, int> _prisoners = [];
@@ -35,6 +36,7 @@ public class GameGrain : Grain, IGameGrain
     private BoardStateUtilities _boardStateUtilities;
 
     private string? _endTime;
+    private string? _gameCreator;
 
     private string now => _dateTimeService.NowFormatted();
 
@@ -44,12 +46,13 @@ public class GameGrain : Grain, IGameGrain
         _dateTimeService = dateTimeService;
     }
 
-    public Task CreateGame(int rows, int columns, TimeControl timeControl)
+    public Task CreateGame(int rows, int columns, TimeControl timeControl, StoneSelectionType stoneSelectionType, string gameCreator)
     {
         _players = [];
         _rows = rows;
         _columns = columns;
         _timeControl = timeControl;
+        _stoneSelectionType = stoneSelectionType;
         _playerTimeSnapshots = [];
         _board = [];
         _gameState = GameState.WaitingForStart;
@@ -63,6 +66,7 @@ public class GameGrain : Grain, IGameGrain
         _scoresAcceptedBy = [];
         _boardStateUtilities = new BoardStateUtilities(_rows, _columns);
         _endTime = null;
+        _gameCreator = gameCreator;
 
         return Task.CompletedTask;
     }
@@ -76,6 +80,7 @@ public class GameGrain : Grain, IGameGrain
             rows: _rows,
             columns: _columns,
             timeControl: _timeControl,
+            stoneSelectionType: _stoneSelectionType,
             playerTimeSnapshots: _playerTimeSnapshots,
             moves: _moves,
             playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
@@ -89,15 +94,14 @@ public class GameGrain : Grain, IGameGrain
             finalTerritoryScores: _finalTerritoryScores.ToList(),
             komi: 6.5f,
             gameOverMethod: _gameOverMethod,
-            endTime: _endTime
+            endTime: _endTime,
+            gameCreator: _gameCreator
         );
     }
 
 
-    public Task<Game> AddPlayerToGame(string player, StoneType stone, string time)
+    public Task<Game> JoinGame(string player, string time)
     {
-        Debug.Assert(_players.Keys.Count < 3, $"Maximum of two players can be added, Added were {_players.Keys.Count}");
-
         if (_players.Keys.Contains(player))
         {
             // TODO: this condition should never happen, Check whether i can throw here?? 
@@ -105,22 +109,7 @@ public class GameGrain : Grain, IGameGrain
             return Task.FromResult(premature_game);
         }
 
-        if (_players.Keys.Count == 1)
-        {
-            Debug.Assert(_initialized, $"Game must be initialized before calling AddPlayerToGame() for second player");
-        }
-
-        _players[player] = stone;
-
-        if (_players.Keys.Count == 2)
-        {
-            StartGame(time);
-        }
-        else
-        {
-            _gameState = GameState.WaitingForStart;
-        }
-        _prisoners[player] = 0;
+        StartGame(time, [_gameCreator, player]);
 
         var game = _GetGame();
         return Task.FromResult(game);
@@ -171,7 +160,7 @@ public class GameGrain : Grain, IGameGrain
 
         playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
                     snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: nonTurnPlayerSnap().MainTimeMilliseconds,
+                    mainTimeMilliseconds: playerTimes[1 - curTurn].ByoYomiActive ? (byoYomiMS ?? 0) : nonTurnPlayerSnap().MainTimeMilliseconds,
                     byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
                     byoYomiActive: false,
                     timeActive: false
@@ -189,7 +178,7 @@ public class GameGrain : Grain, IGameGrain
         return playerTimes[curTurn];
     }
 
-    private void StartGame(string time)
+    private void StartGame(string time, List<string> players)
     {
         _gameState = GameState.Playing;
         _startTime = time;
@@ -209,6 +198,26 @@ public class GameGrain : Grain, IGameGrain
                 timeActive: false
             )
                 ];
+
+        var stoneSelectionType = _stoneSelectionType;
+        var firstPlayerToAssignStone = _gameCreator ?? players.First();
+
+        foreach (var player in players)
+        {
+            var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)stoneSelectionType;
+            var secondPlayerStone = 1 - firstPlayerStone;
+
+            if (player == firstPlayerToAssignStone)
+            {
+                _players[player] = firstPlayerStone;
+            }
+            else
+            {
+                _players[player] = secondPlayerStone;
+            }
+            _prisoners[player] = 0;
+        }
+
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
     }
@@ -232,7 +241,6 @@ public class GameGrain : Grain, IGameGrain
     {
         Debug.Assert(_players.ContainsKey(playerId));
         Debug.Assert(_gameState == GameState.Playing);
-
         var player = _players[playerId];
         Debug.Assert((turn % 2) == (int)player);
 

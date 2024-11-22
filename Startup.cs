@@ -29,8 +29,8 @@ public class Startup
 
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
-        services.AddSingleton<DateTimeService>();
-        services.AddSingleton<SignalRGameHubService>();
+        services.AddSingleton<IDateTimeService, DateTimeService>();
+        services.AddSingleton<ISignalRGameHubService, SignalRGameHubService>();
 
         services.AddEndpointsApiExplorer();
 
