@@ -3,8 +3,8 @@ using BadukServer;
 [Immutable, GenerateSerializer]
 class NewGameCreatedMessage
 {
-    public Game Game { get; set; }
-    public NewGameCreatedMessage(Game game)
+    public AvailableGameData Game { get; set; }
+    public NewGameCreatedMessage(AvailableGameData game)
     {
         Game = game;
     }

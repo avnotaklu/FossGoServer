@@ -61,9 +61,10 @@ public class PlayerController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         var game = await gameGrain.GetGame();
+        var creatorData = _usersService.GetByIds([userId]).Result;
+        var creatorPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email);
 
-
-        var newGameMessage = new NewGameCreatedMessage(game);
+        var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(userId);
         await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage), gameId, toMe: false);
@@ -129,6 +130,13 @@ public class PlayerController : ControllerBase
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        return Ok(new AvailableGamesResult(games: [.. (games ?? [])]));
+        var result = games.Select(g =>
+        {
+            var creatorData = _usersService.GetByIds([g.GameCreator]).Result;
+            var createPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email);
+            return new AvailableGameData(game: g, creatorInfo: createPublicData);
+        }).ToList();
+
+        return Ok(new AvailableGamesResult(games: [.. (result ?? [])]));
     }
 }

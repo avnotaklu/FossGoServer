@@ -149,6 +149,11 @@ public class TimeControl
 
     public TimeControl(ByoYomiTime? byoYomiTime, int? incrementSeconds, int mainTimeSeconds)
     {
+        Debug.Assert(mainTimeSeconds > 0);
+        Debug.Assert(incrementSeconds == null || incrementSeconds > 0);
+        Debug.Assert(byoYomiTime == null || byoYomiTime.ByoYomiSeconds > 0);
+        Debug.Assert(byoYomiTime == null || byoYomiTime.ByoYomis > 0);
+
         ByoYomiTime = byoYomiTime;
         IncrementSeconds = incrementSeconds;
         MainTimeSeconds = mainTimeSeconds;
