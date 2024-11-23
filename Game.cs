@@ -10,7 +10,7 @@ namespace BadukServer;
 [Alias("Game")]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, Dictionary<string, int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
+    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, List<int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
 StoneSelectionType stoneSelectionType,
 string? gameCreator
     )
@@ -67,7 +67,7 @@ string? gameCreator
     public Dictionary<string, StoneType> Players { get; set; }
     [BsonElement("prisoners")]
     [Id(9)]
-    public Dictionary<string, int> Prisoners { get; set; }
+    public List<int> Prisoners { get; set; }
     [BsonElement("startTime")]
     [Id(10)]
     public string? StartTime { get; set; }

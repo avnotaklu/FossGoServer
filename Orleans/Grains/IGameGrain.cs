@@ -12,7 +12,7 @@ public interface IGameGrain : IGrainWithStringKey
     Task<Game> ContinueGame(string playerId);
     Task<Game> AcceptScores(string playerId);
     Task<Game> ResignGame(string playerId);
-    Task<PlayerTimeSnapshot> TimeoutCurrentPlayer();
+    Task<PlayerTimeSnapshot?> TimeoutCurrentPlayer();
     Task<Game> EditDeadStone(Position position, DeadStoneState state);
     Task<StoneType> GetStoneFromPlayerId(string id);
     Task<StoneType> GetOtherStoneFromPlayerId(string id);

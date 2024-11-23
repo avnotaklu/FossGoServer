@@ -8,8 +8,11 @@ using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+
+
 public class Startup
 {
+    private string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
     // var builder = WebApplication.CreateBuilder(args);
     // var services = builder.Services;
     // var config = builder.Configuration;
@@ -26,6 +29,12 @@ public class Startup
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddControllers();
+
+        services.AddCors(options =>
+        {
+            options.AddPolicy(MyAllowSpecificOrigins,
+                            policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()); 
+        });
 
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
@@ -63,7 +72,6 @@ public class Startup
             });
         // services.AddHostedService<HubReference>();
         services.AddSignalR().AddJsonProtocol();
-
     }
 
     // Add services to the container.
@@ -110,6 +118,7 @@ public class Startup
             app.UseSwaggerUI();
         }
 
+        app.UseCors(MyAllowSpecificOrigins);
         app.UseAuthentication();
         app.UseRouting();
         app.UseAuthorization();

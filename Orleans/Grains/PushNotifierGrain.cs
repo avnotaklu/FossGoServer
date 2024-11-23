@@ -72,69 +72,16 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     public ValueTask SendMessage(SignalRMessage message, string gameGroup, bool toMe = true)
     {
-        // Add a message to the send queue
-        // _messageQueue.Enqueue(message);
-
         _logger.LogInformation("Notification sent to <users>{users}<users>, <message>{message}<message>", toMe ? ConnectionId : "All", message);
         return SendUpdate(message, gameGroup, toMe ? ConnectionId : null);
         // return new(Flush());
     }
 
-    // private Task Flush()
-    // {
-    //     if (_flushTask.IsCompleted)
-    //     {
-    //         _flushTask = FlushInternal();
-    //     }
-
-    //     return _flushTask;
-
-    //     async Task FlushInternal()
-    //     {
-    //         const int maxMessagesPerBatch = 100;
-    //         if (_messageQueue.Count == 0) return;
-
-    //         while (_messageQueue.Count > 0)
-    //         {
-    //             // Send all messages to all SignalR hubs
-    //             var messagesToSend = new List<SignalRMessage>(Math.Min(_messageQueue.Count, maxMessagesPerBatch));
-    //             while (messagesToSend.Count < maxMessagesPerBatch && _messageQueue.TryDequeue(out SignalRMessage? msg))
-    //                 messagesToSend.Add(msg);
-
-    //             // var tasks = new List<Task>(_hubs.Count);
-    //             // var batch = new JoinMessagesBatch(messagesToSend);
-    //             //
-    //             // foreach ((SiloAddress Host, IRemoteGameHub Hub) hub in _hubs)
-    //             // {
-    //             //     tasks.Add(BroadcastUpdates(hub.Host, hub.Hub, batch, connectionId, _logger));
-    //             // }
-
-    //             var batch = new SignalRMessagesBatch(messagesToSend);
-
-    //             // await BroadcastUpdates(_hub.RemoteGameHub, batch, ConnectionId, _logger);
-    //             await BroadcastUpdates(batch, ConnectionId, _logger);
-    //         }
-    //     }
-    // }
-
-    // private static async Task BroadcastUpdates(IRemoteGameHub hub, JoinMessagesBatch message,
-    //     string connectionId, ILogger logger)
-    // {
-    //     try
-    //     {
-    //         await hub.BroadcastUpdates(message, connectionId);
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         logger.LogError(ex, "Error broadcasting to host");
-    //     }
-    // }
-
     private ValueTask SendUpdate(SignalRMessage message, string gameGroup, string? connectionId = null)
     {
         try
         {
-            if (connectionId == null)
+            if (connectionId != null)
             {
                 return _SendUpdate(message, gameGroup);
             }

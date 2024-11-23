@@ -20,7 +20,7 @@ public class GameGrain : Grain, IGameGrain
     private StoneSelectionType _stoneSelectionType;
     private List<PlayerTimeSnapshot> _playerTimeSnapshots { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
-    private Dictionary<string, int> _prisoners = [];
+    private List<int> _prisoners = [];
     private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
     private bool _initialized = false;
     private string? _startTime;
@@ -37,7 +37,7 @@ public class GameGrain : Grain, IGameGrain
 
     private string? _endTime;
     private string? _gameCreator;
-
+    private float _komi = 6.5f;
     private string now => _dateTimeService.NowFormatted();
 
     public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService)
@@ -92,7 +92,7 @@ public class GameGrain : Grain, IGameGrain
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
             winnerId: _winnerId,
             finalTerritoryScores: _finalTerritoryScores.ToList(),
-            komi: 6.5f,
+            komi: _komi,
             gameOverMethod: _gameOverMethod,
             endTime: _endTime,
             gameCreator: _gameCreator
@@ -215,8 +215,8 @@ public class GameGrain : Grain, IGameGrain
             {
                 _players[player] = secondPlayerStone;
             }
-            _prisoners[player] = 0;
         }
+        _prisoners = [0, 0];
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
@@ -256,8 +256,8 @@ public class GameGrain : Grain, IGameGrain
             var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
             _koPositionInLastMove = updateResult.board.koDelete;
 
-            _prisoners[await GetPlayerIdFromStoneType(0)] += updateResult.board.prisoners[0];
-            _prisoners[await GetPlayerIdFromStoneType((StoneType)1)] += updateResult.board.prisoners[1];
+            _prisoners[0] += updateResult.board.prisoners[0];
+            _prisoners[1] += updateResult.board.prisoners[1];
 
             if (updateResult.result)
             {
@@ -385,8 +385,6 @@ public class GameGrain : Grain, IGameGrain
         Debug.Assert(_gameState == GameState.ScoreCalculation);
         _scoresAcceptedBy.Add(playerId);
 
-        var game = await GetGame();
-
         var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
 
         if (_scoresAcceptedBy.Count == 2)
@@ -400,7 +398,7 @@ public class GameGrain : Grain, IGameGrain
                     GameOverMethod.Score,
                     _GetGame()
                 )
-            ), gameId, toMe: true);
+            ), gameId, toMe: false);
         }
         else
         {
@@ -410,6 +408,7 @@ public class GameGrain : Grain, IGameGrain
             ), gameId, toMe: true);
         }
 
+        var game = await GetGame();
         return game;
     }
 
@@ -442,12 +441,12 @@ public class GameGrain : Grain, IGameGrain
 
         var curPlayerTime = RecalculateTurnPlayerTimeSnapshots(_moves, _playerTimeSnapshots, _timeControl);
 
-        var game = _GetGame();
 
         if (curPlayerTime.MainTimeMilliseconds <= 0)
         {
             EndGame(GameOverMethod.Timeout, otherPlayerId);
 
+            var game = _GetGame();
 
             foreach (var playerId in _players.Keys)
             {
@@ -465,12 +464,51 @@ public class GameGrain : Grain, IGameGrain
 
             Console.WriteLine("Game timeout");
         }
+        else
+        {
+            foreach (var playerId in _players.Keys)
+            {
+                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(playerId);
+
+                await pushGrain.SendMessage(
+                    new SignalRMessage(
+                        SignalRMessageType.gameTimerUpdate,
+                        new GameTimerUpdateMessage(
+                            currentPlayerTime: curPlayerTime,
+                            player: await GetStoneFromPlayerId(playerWithTurn)
+                        )
+                    ),
+                    gameId,
+                    toMe: true
+                );
+            }
+        }
         return curPlayerTime;
     }
 
     private void EndGame(GameOverMethod method, string? winnerId = null)
     {
         _gameState = GameState.Ended;
+
+        _playerTimeSnapshots = [
+            new PlayerTimeSnapshot(
+                snapshotTimestamp: _playerTimeSnapshots[0].SnapshotTimestamp,
+                mainTimeMilliseconds: _playerTimeSnapshots[0].MainTimeMilliseconds,
+                byoYomisLeft: _playerTimeSnapshots[0].ByoYomisLeft,
+                byoYomiActive: _playerTimeSnapshots[0].ByoYomiActive,
+                timeActive: false
+            ),
+            new PlayerTimeSnapshot(
+                snapshotTimestamp: _playerTimeSnapshots[1].SnapshotTimestamp,
+                mainTimeMilliseconds: _playerTimeSnapshots[1].MainTimeMilliseconds,
+                byoYomisLeft: _playerTimeSnapshots[1].ByoYomisLeft,
+                byoYomiActive: _playerTimeSnapshots[1].ByoYomiActive,
+                timeActive: false
+            )
+        ];
+
+        var gameTimerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+        gameTimerGrain.StopTurnTimer();
 
         if (winnerId != null)
         {
@@ -480,7 +518,7 @@ public class GameGrain : Grain, IGameGrain
         if (method == GameOverMethod.Score)
         {
             var scoreCalculator = _GetScoreCalculator();
-            _winnerId = scoreCalculator.GetWinner();
+            _winnerId = scoreCalculator.GetWinner() == 0 ? _GetPlayerIdFromStoneType(StoneType.Black) : _GetPlayerIdFromStoneType(StoneType.White);
             _finalTerritoryScores = scoreCalculator.TerritoryScores;
         }
 
@@ -598,9 +636,12 @@ public class GameGrain : Grain, IGameGrain
     {
         var playground = _boardStateUtilities.BoardStateFromGame(_GetGame()).playgroundMap;
         return new ScoreCalculation(
-            _GetGame(),
-            _GetPlayerIdFromStoneType(StoneType.Black),
-            _GetPlayerIdFromStoneType(StoneType.White),
+            // _GetGame(),
+            rows: _rows,
+            cols: _columns,
+            komi: _komi,
+            prisoners: _prisoners,
+            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select(a => a.Key).ToList(),
             playground
         );
     }
