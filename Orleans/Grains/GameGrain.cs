@@ -311,57 +311,59 @@ public class GameGrain : Grain, IGameGrain
         return (true, game);
     }
 
-    public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
-    {
-        var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-        // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-        var raw_times = new List<string> { game.StartTime! };
-        raw_times.AddRange(game.Moves.Select(move => move.Time));
+    // public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
+    // {
+    //     Debug.Assert(DidStart());
+    //     var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
+    //     // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
+    //     var raw_times = new List<string> { game.StartTime! };
+    //     raw_times.AddRange(game.Moves.Select(move => move.Time));
 
-        var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
+    //     var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
 
-        // Calculate first player's duration
-        // var firstPlayerDuration = times
-        //     .Select((time, index) => (time, index))
-        //     .Where(pair => pair.index % 2 == 1)
-        //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+    //     // Calculate first player's duration
+    //     // var firstPlayerDuration = times
+    //     //     .Select((time, index) => (time, index))
+    //     //     .Where(pair => pair.index % 2 == 1)
+    //     //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
 
-        var firstPlayerDuration = TimeSpan.Zero;
+    //     var firstPlayerDuration = TimeSpan.Zero;
 
-        var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
-        var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-        var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
+    //     var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
+    //     var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+    //     var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
 
-        for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
-        {
-            firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
-        }
+    //     for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
+    //     {
+    //         firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
+    //     }
 
-        var player0Time = mainTimeSpan - firstPlayerDuration;
-
-
-        var secondPlayerDuration = TimeSpan.Zero;
-        var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
-        var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-        var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
-
-        for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
-        {
-            secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
-        }
-        var player1Time = mainTimeSpan - secondPlayerDuration;
+    //     var player0Time = mainTimeSpan - firstPlayerDuration;
 
 
-        var playerTimes = new List<TimeSpan> { player0Time, player1Time };
+    //     var secondPlayerDuration = TimeSpan.Zero;
+    //     var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
+    //     var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+    //     var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
 
-        // If the game has ended, apply the end time to the player with the turn
-        if (game.GameState == GameState.Ended)
-        {
-            playerTimes[(int)await GetStoneFromPlayerId(GetPlayerIdWithTurn())] -= DateTime.Parse(game.EndTime!) - times.Last();
-        }
+    //     for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
+    //     {
+    //         secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
+    //     }
+    //     var player1Time = mainTimeSpan - secondPlayerDuration;
 
-        return playerTimes;
-    }
+
+    //     var playerTimes = new List<TimeSpan> { player0Time, player1Time };
+
+    //     // If the game has ended, apply the end time to the player with the turn
+    //     if (game.GameState == GameState.Ended)
+    //     {
+    //         playerTimes[(int)GetStoneFromPlayerId(GetPlayerIdWithTurn()!)] -= DateTime.Parse(game.EndTime!) - times.Last();
+    //     }
+
+    //     return playerTimes;
+    // }
+
     public async Task<Game> ContinueGame(string playerId)
     {
         Debug.Assert(_gameState == GameState.ScoreCalculation);
@@ -370,7 +372,7 @@ public class GameGrain : Grain, IGameGrain
         _scoresAcceptedBy.Clear();
 
         var game = await GetGame();
-        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
+        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId)));
 
         await pushNotifierGrain.SendMessage(new SignalRMessage(
             type: SignalRMessageType.continueGame,
@@ -385,7 +387,7 @@ public class GameGrain : Grain, IGameGrain
         Debug.Assert(_gameState == GameState.ScoreCalculation);
         _scoresAcceptedBy.Add(playerId);
 
-        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId)));
+        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId)));
 
         if (_scoresAcceptedBy.Count == 2)
         {
@@ -414,7 +416,7 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ResignGame(string playerId)
     {
-        var otherPlayerId = await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerId));
+        var otherPlayerId = GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId));
 
         EndGame(GameOverMethod.Resign, otherPlayerId);
 
@@ -435,7 +437,7 @@ public class GameGrain : Grain, IGameGrain
     public async Task<PlayerTimeSnapshot?> TimeoutCurrentPlayer()
     {
         var playerWithTurn = GetPlayerIdWithTurn();
-        var otherPlayerId = await GetPlayerIdFromStoneType(await GetOtherStoneFromPlayerId(playerWithTurn));
+        var otherPlayerId = GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerWithTurn));
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
 
@@ -475,7 +477,7 @@ public class GameGrain : Grain, IGameGrain
                         SignalRMessageType.gameTimerUpdate,
                         new GameTimerUpdateMessage(
                             currentPlayerTime: curPlayerTime,
-                            player: await GetStoneFromPlayerId(playerWithTurn)
+                            player: GetStoneFromPlayerId(playerWithTurn)
                         )
                     ),
                     gameId,
@@ -518,7 +520,7 @@ public class GameGrain : Grain, IGameGrain
         if (method == GameOverMethod.Score)
         {
             var scoreCalculator = _GetScoreCalculator();
-            _winnerId = scoreCalculator.GetWinner() == 0 ? _GetPlayerIdFromStoneType(StoneType.Black) : _GetPlayerIdFromStoneType(StoneType.White);
+            _winnerId = scoreCalculator.GetWinner() == 0 ? GetPlayerIdFromStoneType(StoneType.Black) : GetPlayerIdFromStoneType(StoneType.White);
             _finalTerritoryScores = scoreCalculator.TerritoryScores;
         }
 
@@ -561,50 +563,6 @@ public class GameGrain : Grain, IGameGrain
             null
         ), gameId);
     }
-
-    private string GetPlayerIdWithTurn()
-    {
-        Debug.Assert(_players.Count == 2);
-        foreach (var item in _players)
-        {
-            if ((int)item.Value == (turn % 2))
-            {
-                return item.Key;
-            }
-        }
-        throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn");
-    }
-
-
-    public Task<StoneType> GetStoneFromPlayerId(string id)
-    {
-        return Task.FromResult(_players[id]);
-    }
-
-    public async Task<StoneType> GetOtherStoneFromPlayerId(string id)
-    {
-        return await Task.FromResult(1 - await GetStoneFromPlayerId(id));
-    }
-
-
-    public string _GetPlayerIdFromStoneType(StoneType stone)
-    {
-        Debug.Assert(_players.Count == 2);
-        foreach (var item in _players)
-        {
-            if (item.Value == stone)
-            {
-                return item.Key;
-            }
-        }
-        throw new UnreachableException($"Player: {stone} has not yet joined the game");
-    }
-
-    public Task<string> GetPlayerIdFromStoneType(StoneType stone)
-    {
-        return Task.FromResult(_GetPlayerIdFromStoneType(stone));
-    }
-
 
     private bool HasPassedTwice()
     {
@@ -650,5 +608,40 @@ public class GameGrain : Grain, IGameGrain
     {
         var game = _GetGame();
         return Task.FromResult(game);
+    }
+
+    // Helpers
+
+    private bool DidStart()
+    {
+        return _GetGame().DidStart();
+    }
+
+
+    private string GetPlayerIdWithTurn()
+    {
+        Debug.Assert(DidStart());
+        return _GetGame().GetPlayerIdWithTurn()!;
+    }
+
+
+    private StoneType GetStoneFromPlayerId(string id)
+    {
+        Debug.Assert(DidStart());
+        return (StoneType)_GetGame().GetStoneFromPlayerId(id)!;
+    }
+
+
+    private StoneType GetOtherStoneFromPlayerId(string id)
+    {
+        Debug.Assert(DidStart());
+        return (StoneType)_GetGame().GetOtherStoneFromPlayerId(id)!;
+    }
+
+
+    private string GetPlayerIdFromStoneType(StoneType stone)
+    {
+        Debug.Assert(DidStart());
+        return _GetGame().GetPlayerIdFromStoneType(stone)!;
     }
 }

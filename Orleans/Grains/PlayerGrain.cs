@@ -30,7 +30,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return _isInitialized && connectionId != _connectionId;
     // }
 
-    public Task<List<string>> GetAvailableGames()
+    public Task<List<string>> GetCreatedGames()
     {
         return Task.FromResult(games);
     }

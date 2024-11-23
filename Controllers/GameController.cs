@@ -90,8 +90,7 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.EditDeadStone(position, data.State);
 
-        var otherPlayerStone = await gameGrain.GetOtherStoneFromPlayerId(userId);
-        var otherPlayerId = await gameGrain.GetPlayerIdFromStoneType(otherPlayerStone);
+        var otherPlayerId = game.GetOtherPlayerIdFromPlayerId(userId);
 
         var pushNotifier = _grainFactory.GetGrain<IPushNotifierGrain>(otherPlayerId);
 

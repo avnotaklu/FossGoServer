@@ -563,46 +563,10 @@ Dictionary<Position, Stone> playground
             Owner = owner;
             Spaces = spaces;
         }
-        // public Area()
-        // {
-        //     IsDame = false;
-        //     Owner = null;
-        // }
     }
 
     public class BoardStateUtilities(int rows, int cols)
     {
-
-        // public int[,] GetFreedomsFromBoard(int[,] board)
-        // {
-        //     int[,] freedoms = new int[board.GetLength(0), board.GetLength(1)];
-        //     for (int i = 0; i < board.GetLength(1); i++)
-        //     {
-        //         for (int j = 0; j < board.GetLength(0); j++)
-        //         {
-        //             if (board[i, j] != 0)
-        //             {
-        //                 List<Position> neighbors = [
-        //                     new Position(i - 1, j),
-        //                 new Position(i , j - 1),
-        //                 new Position(i , j + 1),
-        //                 new Position(i + 1, j),
-        //             ];
-        //                 int freedomsForMe = 0;
-
-        //                 foreach (var neighbor in neighbors)
-        //                 {
-        //                     if (checkIfInsideBounds(neighbor) && board[neighbor.x, neighbor.y] == 0)
-        //                     {
-        //                         freedomsForMe += 1;
-        //                     }
-        //                 }
-        //                 freedoms[i, j] = freedomsForMe;
-        //             }
-        //         }
-        //     }
-        //     return freedoms;
-        // }
         public BoardState BoardStateFromGame(Game game)
         {
             var map = game.PlaygroundMap;

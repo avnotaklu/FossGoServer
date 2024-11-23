@@ -70,9 +70,10 @@ public class GameGrainTests
         var gameId = await p1.CreateGame(rows, cols, timeControl, BadukServer.StoneSelectionType.Black, dateTimeMock.Object.NowFormatted());
 
         var gameGrain = cluster.GrainFactory.GetGrain<IGameGrain>(gameId);
-        var stoneType = await gameGrain.GetStoneFromPlayerId(p1Id);
 
         var game = await gameGrain.GetGame();
+
+        var stoneType = game.GetStoneFromPlayerId(p1Id);
 
 
         Assert.IsTrue(game.Players.ContainsKey(p1Id));

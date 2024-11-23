@@ -3,7 +3,7 @@ using BadukServer;
 public interface IPlayerGrain : IGrainWithStringKey
 {
     // Task<PairingSummary[]> GetAvailableGames();
-    Task<List<string>> GetAvailableGames();
+    Task<List<string>> GetCreatedGames();
     // Task<List<GameSummary>> GetGameSummaries();
 
     Task InitializePlayer(string connectionId);

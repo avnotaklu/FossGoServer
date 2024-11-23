@@ -6,6 +6,70 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
+
+public static class GameHelpers
+{
+    public static bool DidStart(this Game game)
+    {
+        return game.GameState != GameState.WaitingForStart;
+    }
+
+
+    public static string? GetPlayerIdWithTurn(this Game game)
+    {
+        if (!game.DidStart()) return null;
+
+        var turn = game.Moves.Count;
+        foreach (var item in game.Players)
+        {
+            if ((int)item.Value == (turn % 2))
+            {
+                return item.Key;
+            }
+        }
+
+        throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn once game has started");
+    }
+
+
+    public static StoneType? GetStoneFromPlayerId(this Game game, string id)
+    {
+        if (!game.DidStart()) return null;
+        return game.Players[id];
+    }
+
+
+    public static StoneType? GetOtherStoneFromPlayerId(this Game game, string id)
+    {
+        if (!game.DidStart()) return null;
+        return 1 - game.GetStoneFromPlayerId(id);
+    }
+
+    public static string? GetOtherPlayerIdFromPlayerId(this Game game, string id)
+    {
+        var otherStone = game.GetOtherStoneFromPlayerId(id);
+        if (otherStone == null) return null;
+
+        return game.GetPlayerIdFromStoneType((StoneType)otherStone);
+    }
+
+
+    public static string? GetPlayerIdFromStoneType(this Game game, StoneType stone)
+    {
+        if (!game.DidStart()) return null;
+        foreach (var item in game.Players)
+        {
+            if (item.Value == stone)
+            {
+                return item.Key;
+            }
+        }
+
+        // Player: {stone} has not yet joined the game
+        return null;
+    }
+}
+
 [Immutable, GenerateSerializer]
 [Alias("Game")]
 public class Game

@@ -138,13 +138,21 @@ public class PlayerController : ControllerBase
     [HttpGet("AvailableGames")]
     public async Task<ActionResult<AvailableGamesResult>> AvailableGames()
     {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
         var playerPool = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         var players = await playerPool.GetActivePlayers();
-        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetAvailableGames()))).SelectMany(x => x) ?? [];
+
+        players.RemoveWhere(a => a == userId);
+
+        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetCreatedGames()))).SelectMany(x => x) ?? [];
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        var result = games.Select(g =>
+        var availableGames = games.Where(a => !a.DidStart());
+
+        var result = availableGames.Select(g =>
         {
             var creatorData = _usersService.GetByIds([g.GameCreator]).Result;
             var createPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email);
@@ -152,5 +160,35 @@ public class PlayerController : ControllerBase
         }).ToList();
 
         return Ok(new AvailableGamesResult(games: [.. (result ?? [])]));
+    }
+
+    [HttpGet("MyGames")]
+    public async Task<ActionResult<MyGamesResult>> MyGames()
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var playerPool = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
+        var players = await playerPool.GetActivePlayers();
+
+        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetCreatedGames()))).SelectMany(x => x) ?? [];
+
+        var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
+
+        var myGames = games.Where(a => a.Players.ContainsKey(userId));
+
+        var result = games.Select(g =>
+        {
+            PublicUserInfo? otherPlayerPublicData = null;
+            if (g.DidStart())
+            {
+                var otherPlayerId = g.GetOtherPlayerIdFromPlayerId(userId);
+                var otherPlayerData = _usersService.GetByIds([otherPlayerId]).Result;
+                otherPlayerPublicData = new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
+            }
+            return new MyGameData(game: g, opposingPlayer: otherPlayerPublicData);
+        }).ToList();
+
+        return Ok(new MyGamesResult(games: [.. (result ?? [])]));
     }
 }

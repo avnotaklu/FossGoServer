@@ -14,8 +14,8 @@ public interface IGameGrain : IGrainWithStringKey
     Task<Game> ResignGame(string playerId);
     Task<PlayerTimeSnapshot?> TimeoutCurrentPlayer();
     Task<Game> EditDeadStone(Position position, DeadStoneState state);
-    Task<StoneType> GetStoneFromPlayerId(string id);
-    Task<StoneType> GetOtherStoneFromPlayerId(string id);
-    Task<string> GetPlayerIdFromStoneType(StoneType stone);
+    // Task<StoneType> GetStoneFromPlayerId(string id);
+    // Task<StoneType> GetOtherStoneFromPlayerId(string id);
+    // Task<string> GetPlayerIdFromStoneType(StoneType stone);
 }
 
