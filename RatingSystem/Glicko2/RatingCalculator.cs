@@ -8,12 +8,18 @@ namespace Glicko2
         private const double DefaultRating = 1500.0;
         private const double DefaultDeviation = 350;
         private const double DefaultVolatility = 0.06;
+        private const double DefaultRatingPeriodsPerDay = 0.21436;
         private const double DefaultTau = 0.75;
         private const double Multiplier = 173.7178;
         private const double ConvergenceTolerance = 0.000001;
 
         private readonly double _tau; // constrains volatility over time
         private readonly double _defaultVolatility;
+        private readonly double _ratingPeriodsPerDay;
+
+        private readonly double DAYS_PER_MILLI = 1.0 / (1000 * 60 * 60 * 24);
+
+        private double ratingPeriodsPerMilli => _ratingPeriodsPerDay * DAYS_PER_MILLI;
 
         /// <summary>
         /// Standard constructor, taking default values for volatility and tau.
@@ -22,6 +28,7 @@ namespace Glicko2
         {
             _tau = DefaultTau;
             _defaultVolatility = DefaultVolatility;
+            _ratingPeriodsPerDay = DefaultRatingPeriodsPerDay;
         }
 
         /// <summary>
@@ -29,11 +36,13 @@ namespace Glicko2
         /// </summary>
         /// <param name="initVolatility"></param>
         /// <param name="tau"></param>
-        public RatingCalculator(double initVolatility, double tau)
+        public RatingCalculator(double initVolatility, double tau, double ratingPeriodsPerDay)
         {
             _defaultVolatility = initVolatility;
             _tau = tau;
+            _ratingPeriodsPerDay = ratingPeriodsPerDay;
         }
+
 
         /// <summary>
         /// Run through all players within a resultset and calculate their new ratings.
@@ -155,6 +164,38 @@ namespace Glicko2
             player.IncrementNumberOfResults(results.Count);
         }
 
+
+        /// <summary>
+        /// This is the formula defined in step 6. It is also used for players who have not competed during the
+        /// rating period.
+        /// </summary>
+        /// <param name="player">The player's rating object.</param>
+        /// <param name="ratingPeriodEndDate">The end date of the rating period.</param>
+        /// <param name="reverse">Indicates whether to reverse the elapsed periods.</param>
+        /// <returns>The new rating deviation.</returns>
+        public double PreviewDeviation(Rating player, DateTime ratingPeriodEndDate, bool reverse)
+        {
+            double elapsedRatingPeriods = 0;
+
+            DateTime? periodEnd = player.GetLastRatingPeriodEnd();
+
+            if (periodEnd != null && ratingPeriodsPerMilli > 0)
+            {
+                var interval = ratingPeriodEndDate - (DateTime)periodEnd;
+                elapsedRatingPeriods = interval.TotalMilliseconds * ratingPeriodsPerMilli;
+            }
+
+            if (reverse)
+            {
+                elapsedRatingPeriods = -elapsedRatingPeriods;
+            }
+
+            var newRD = CalculateNewRatingDeviation(player.GetGlicko2RatingDeviation(), player.GetVolatility(), elapsedRatingPeriods);
+            return ConvertRatingDeviationToOriginalGlickoScale(newRD);
+        }
+
+
+
         private static double F(double x, double delta, double phi, double v, double a, double tau)
         {
             return (Math.Exp(x) * (Math.Pow(delta, 2) - Math.Pow(phi, 2) - v - Math.Exp(x)) /
@@ -252,7 +293,7 @@ namespace Glicko2
         /// <param name="phi"></param>
         /// <param name="sigma"></param>
         /// <returns>New rating deviation.</returns>
-        private static double CalculateNewRatingDeviation(double phi, double sigma, int elapsedPeriods)
+        private static double CalculateNewRatingDeviation(double phi, double sigma, double elapsedPeriods)
         {
             return Math.Sqrt(Math.Pow(phi, 2) + elapsedPeriods * Math.Pow(sigma, 2));
         }

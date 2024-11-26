@@ -46,12 +46,12 @@ public class GameGrain : Grain, IGameGrain
         _dateTimeService = dateTimeService;
     }
 
-    public Task CreateGame(int rows, int columns, TimeControl timeControl, StoneSelectionType stoneSelectionType, string gameCreator)
+    public Task CreateGame(int rows, int columns, TimeControlData timeControl, StoneSelectionType stoneSelectionType, string gameCreator)
     {
         _players = [];
         _rows = rows;
         _columns = columns;
-        _timeControl = timeControl;
+        _timeControl = new TimeControl(timeControl);
         _stoneSelectionType = stoneSelectionType;
         _playerTimeSnapshots = [];
         _board = [];

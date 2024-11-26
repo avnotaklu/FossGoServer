@@ -6,7 +6,6 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
-
 public static class GameHelpers
 {
     public static bool DidStart(this Game game)
@@ -53,6 +52,34 @@ public static class GameHelpers
         return game.GetPlayerIdFromStoneType((StoneType)otherStone);
     }
 
+    public static StoneType? GetOtherStoneFromPlayerIdAlt(this Dictionary<string, StoneType> players, string id)
+    {
+        return 1 - players[id];
+    }
+
+    public static string? GetOtherPlayerIdFromPlayerIdAlt(this Dictionary<string, StoneType> players, string id)
+    {
+        var otherStone = players.GetOtherStoneFromPlayerIdAlt(id);
+        if (otherStone == null) return null;
+
+        return players.GetPlayerIdFromStoneTypeAlt((StoneType)otherStone);
+    }
+
+
+    public static string? GetPlayerIdFromStoneTypeAlt(this Dictionary<string, StoneType> players, StoneType stone)
+    {
+        foreach (var item in players)
+        {
+            if (item.Value == stone)
+            {
+                return item.Key;
+            }
+        }
+
+        // Player: {stone} has not yet joined the game
+        return null;
+    }
+
 
     public static string? GetPlayerIdFromStoneType(this Game game, StoneType stone)
     {
@@ -68,6 +95,26 @@ public static class GameHelpers
         // Player: {stone} has not yet joined the game
         return null;
     }
+
+
+    public static BoardSize GetBoardSize(this Game game)
+    {
+        return game.Rows switch
+        {
+            9 => game.Columns switch { 9 => BoardSize.Nine, _ => BoardSize.Other },
+            13 => game.Columns switch { 13 => BoardSize.Thirteen, _ => BoardSize.Other },
+            19 => game.Columns switch { 19 => BoardSize.Nineteen, _ => BoardSize.Other },
+            _ => BoardSize.Other
+        };
+    }
+}
+
+public enum BoardSize
+{
+    Nine = 0,
+    Thirteen = 1,
+    Nineteen = 2,
+    Other = 3
 }
 
 [Immutable, GenerateSerializer]
@@ -195,6 +242,16 @@ public enum GameState
     Ended = 4
 }
 
+public enum TimeStandard
+{
+    Blitz = 0,
+    Rapid = 1,
+    Classical = 2,
+    Correspondence = 3,
+    Unknown = 4
+}
+
+
 [Immutable, GenerateSerializer]
 [Alias("TimeControl")]
 public class TimeControl
@@ -211,7 +268,12 @@ public class TimeControl
     [Id(2)]
     public ByoYomiTime? ByoYomiTime { get; set; }
 
-    public TimeControl(ByoYomiTime? byoYomiTime, int? incrementSeconds, int mainTimeSeconds)
+    [BsonElement("timeStandard")]
+    [Id(3)]
+    public TimeStandard TimeStandard { get; set; }
+
+
+    public TimeControl(ByoYomiTime? byoYomiTime, int? incrementSeconds, int mainTimeSeconds, TimeStandard timeStandard)
     {
         Debug.Assert(mainTimeSeconds > 0);
         Debug.Assert(incrementSeconds == null || incrementSeconds > 0);
@@ -221,6 +283,15 @@ public class TimeControl
         ByoYomiTime = byoYomiTime;
         IncrementSeconds = incrementSeconds;
         MainTimeSeconds = mainTimeSeconds;
+        TimeStandard = timeStandard;
+    }
+
+    public TimeControl(TimeControlData data)
+    {
+        ByoYomiTime = data.ByoYomiTime;
+        IncrementSeconds = data.IncrementSeconds;
+        MainTimeSeconds = data.MainTimeSeconds;
+        TimeStandard = data.GetTimeStandard();
     }
 }
 

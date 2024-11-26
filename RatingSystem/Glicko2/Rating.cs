@@ -1,4 +1,6 @@
-﻿namespace Glicko2
+﻿using System.Globalization;
+
+namespace Glicko2
 {
     /// <summary>
     /// Holds an individual's Glicko-2 rating.
@@ -16,6 +18,7 @@
         private double _rating;
         private double _ratingDeviation;
         private double _volatility;
+        private DateTime? _lastRatingPeriodEnd;
         /// <summary>
         /// The number of results from which the rating has been calculated.
         /// </summary>
@@ -36,6 +39,7 @@
             _ratingSystem = ratingSystem;
             _rating = _ratingSystem.GetDefaultRating();
             _ratingDeviation = _ratingSystem.GetDefaultRatingDeviation();
+            _numberOfResults = 0;
             _volatility = ratingSystem.GetDefaultVolatility();
         }
 
@@ -47,12 +51,14 @@
         /// <param name="initRatingDeviation"></param>
         /// <param name="initVolatility"></param>
         public Rating(RatingCalculator ratingSystem, double initRating, double initRatingDeviation,
-            double initVolatility)
+            double initVolatility, int numberOfResults, DateTime? lastRatingPeriodEnd)
         {
             _ratingSystem = ratingSystem;
             _rating = initRating;
             _ratingDeviation = initRatingDeviation;
             _volatility = initVolatility;
+            _numberOfResults = numberOfResults;
+            _lastRatingPeriodEnd = lastRatingPeriodEnd;
         }
 
         /// <summary>
@@ -101,6 +107,16 @@
         public double GetRatingDeviation()
         {
             return _ratingDeviation;
+        }
+
+        public DateTime? GetLastRatingPeriodEnd()
+        {
+            return _lastRatingPeriodEnd;
+        }
+
+        public void SetLastRatingPeriodEnd(DateTime? lastRatingPeriodEnd)
+        {
+            _lastRatingPeriodEnd = lastRatingPeriodEnd;
         }
 
         public void SetRatingDeviation(double ratingDeviation)

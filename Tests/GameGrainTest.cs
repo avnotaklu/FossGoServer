@@ -61,10 +61,11 @@ public class GameGrainTests
 
         var rows = 9;
         var cols = 9;
-        var timeControl = new TimeControl(
+        var timeControl = new TimeControlData(
             mainTimeSeconds: 10,
             incrementSeconds: null,
             byoYomiTime: new ByoYomiTime(3, 3)
+            // timeStandard: TimeStandard.Blitz
         );
 
         var gameId = await p1.CreateGame(rows, cols, timeControl, BadukServer.StoneSelectionType.Black, dateTimeMock.Object.NowFormatted());

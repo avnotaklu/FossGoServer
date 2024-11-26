@@ -36,7 +36,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    public async Task<string> CreateGame(int rows, int columns, TimeControl timeControl,  StoneSelectionType stone, string time)
+    public async Task<string> CreateGame(int rows, int columns, TimeControlData timeControl,  StoneSelectionType stone, string time)
     {
         var gameId = Guid.NewGuid().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id

@@ -1,8 +1,11 @@
 
+using System.CodeDom;
 using System.Diagnostics;
 using BadukServer;
 using Glicko2;
+using Google.Apis.Util;
 using Microsoft.VisualStudio.TestPlatform.PlatformAbstractions;
+using Moq;
 
 // public class RatingPlayer
 // {
@@ -10,284 +13,112 @@ using Microsoft.VisualStudio.TestPlatform.PlatformAbstractions;
 // }
 
 
-public class GlickoSettings
-{
-    public Rating start_rating;
-    public double volatility_change;
-    public double convergence_tolerance;
-    public TimeSpan RatingPeriodDuration;
-}
+// public class GlickoSettings
+// {
+//     public Rating StartRating;
+//     public double VolatilityChange;
+//     public double ConvergenceTolerance;
+//     public TimeSpan RatingPeriodDuration;
+
+//     public GlickoSettings(Rating startRating, double volatilityChange, double convergenceTolerance, TimeSpan ratingPeriodDuration)
+//     {
+//         StartRating = startRating;
+//         VolatilityChange = volatilityChange;
+//         ConvergenceTolerance = convergenceTolerance;
+//         RatingPeriodDuration = ratingPeriodDuration;
+//     }
+// }
 
 
 public class RatingEngine
 {
+    private const double ProvisionalDeviation = 110;
     // private readonly List<Rating> _players = [];
     // private readonly List<Result> _results = [];
     private readonly RatingPeriodResults _result;
     private DateTime _lastRatingPeriodStart;
-    private GlickoSettings _settings;
+    // private GlickoSettings _settings;
     private RatingCalculator _calculator;
-    private Logger<RatingEngine> _logger;
+    private ILogger<RatingEngine> _logger;
+    private IUserRatingService _userRepo;
 
-    public RatingEngine(GlickoSettings settings, Logger<RatingEngine> logger)
+    public RatingEngine(ILogger<RatingEngine> logger, IUserRatingService userRepo)
     {
         _lastRatingPeriodStart = DateTime.Now;
-        _settings = settings;
+        // _settings = settings;
         _result = new();
         _calculator = new();
         _logger = logger;
+        _userRepo = userRepo;
     }
 
-    public RatingEngine(DateTime startAt, GlickoSettings settings)
+
+    public RatingEngine(DateTime startAt, ILogger<RatingEngine> logger, UserRatingService userRepo)
     {
         _lastRatingPeriodStart = startAt;
-        _settings = settings;
         _result = new();
         _calculator = new();
+        _userRepo = userRepo;
+        _logger = logger;
     }
 
-
-    // /// <summary>
-    // /// Add a result to the result.
-    // /// </summary>
-    // /// <param name="winner"></param>
-    // /// <param name="loser"></param>
-    // public void AddResult(Rating winner, Rating loser)
-    // {
-    //     _result.AddResult(winner, loser);
-    // }
-
-    // /// <summary>
-    // /// Record a draw between two players and add to the result.
-    // /// </summary>
-    // /// <param name="player1"></param>
-    // /// <param name="player2"></param>
-    // public void AddDraw(Rating player1, Rating player2)
-    // {
-    //     _result.AddDraw(player1, player2);
-    // }
-
-
-    // public Rating GetRating(Rating player)
-    // {
-    //     throw new NotImplementedException();
-    // }
-
-    // /// <summary>
-    // /// Calculates a player's rating at the current point in time.
-    // /// This calculation is based on the registered results for this player.
-    // /// </summary>
-    // /// <param name="player">The player handle.</param>
-    // /// <returns>
-    // /// A tuple containing the player's current rating and the number of rating periods
-    // /// that were closed during this operation.
-    // /// </returns>
-    // /// <exception cref="InvalidOperationException">
-    // /// Thrown if the player was not sourced from this <see cref="RatingEngine"/>.
-    // /// </exception>
-    // public (Rating, uint) GetPlayerRating<TScale>(PlayerHandle player)
-    // {
-    //     return GetPlayerRatingAt(player, DateTime.UtcNow);
-    // }
-
-    // /// <summary>
-    // /// Calculates a player's rating at a given point in time.
-    // /// This calculation is based on the registered results for this player.
-    // /// </summary>
-    // /// <param name="player">The player handle.</param>
-    // /// <param name="time">The point in time for which to calculate the rating.</param>
-    // /// <returns>
-    // /// A tuple containing the player's current rating and the number of rating periods
-    // /// that were closed during this operation.
-    // /// </returns>
-    // /// <exception cref="InvalidOperationException">
-    // /// Thrown if the player was not sourced from this <see cref="RatingEngine"/>.
-    // /// </exception>
-    // public (Rating, uint) GetPlayerRatingAt(PlayerHandle player, DateTime time)
-    // {
-    //     var (elapsedPeriods, closedPeriods) = MaybeCloseRatingPeriodsAt(time);
-
-    //     if (player.Index < 0 || player.Index >= _managedPlayers.Count)
-    //     {
-    //         throw new InvalidOperationException("Player did not belong to this RatingEngine.");
-    //     }
-
-    //     var managedPlayer = _managedPlayers[player.Index];
-
-    //     var rating = Algorithm.RateGamesUntimed(
-    //         managedPlayer.Rating,
-    //         managedPlayer.CurrentRatingPeriodResults,
-    //         elapsedPeriods,
-    //         _settings
-    //     ).WithSettings(_settings);
-
-    //     return (rating, closedPeriods);
-    // }
-
-    // /// <summary>
-    // /// Closes all open rating periods that have elapsed by now.
-    // /// This doesn't need to be called manually.
-    // /// When a rating period is closed, the stored results are cleared, and the players' ratings
-    // /// at the end of the period are stored as their ratings at the beginning of the next one.
-    // /// </summary>
-    // /// <returns>
-    // /// A tuple containing the elapsed periods in the current rating period <i>after</i> all previous periods 
-    // /// have been closed as a fraction, as well as the amount of rating periods that have been closed.
-    // /// The elapsed periods will always be smaller than 1.
-    // /// </returns>
-    // public (double elapsedPeriods, uint closedPeriods) MaybeCloseRatingPeriods()
-    // {
-    //     return MaybeCloseRatingPeriodsAt(DateTime.UtcNow);
-    // }
-
-    // /// <summary>
-    // /// Closes all open rating periods that have elapsed by a given point in time.
-    // /// This doesn't need to be called manually.
-    // /// When a rating period is closed, the stored results are cleared, and the players' ratings
-    // /// at the end of the period are stored as their ratings at the beginning of the next one.
-    // /// </summary>
-    // /// <param name="time">The point in time to calculate elapsed periods.</param>
-    // /// <returns>
-    // /// A tuple containing the elapsed periods in the current rating period <i>after</i> all previous periods 
-    // /// have been closed as a fraction, as well as the amount of rating periods that have been closed.
-    // /// The elapsed periods will always be smaller than 1.0.
-    // /// </returns>
-    // public (double elapsedPeriods, uint closedPeriods) MaybeCloseRatingPeriodsAt(DateTime time)
-    // {
-    //     double elapsedPeriods = ElapsedPeriodsAt(time);
-
-    //     // Truncate elapsedPeriods to get the number of periods to close.
-    //     uint periodsToClose = (uint)Math.Floor(elapsedPeriods);
-
-    //     // Close the rating periods.
-    //     for (int i = 0; i < periodsToClose; i++)
-    //     {
-    //         foreach (var player in _players)
-    //         {
-    //             // Update the player's rating with the current rating period results.
-    //             // player.Rating = 
-
-    //             // Algorithm.RateGamesUntimed(
-    //             //     player.Rating,
-    //             //     player.CurrentRatingPeriodResults,
-    //             //     1.0,
-    //             //     settings
-    //             // );
-
-    //             _calculator.CalculateNewRating(player, )
-
-    //             // Clear the results for the next period.
-    //             player.CurrentRatingPeriodResults.Clear();
-    //         }
-    //     }
-
-    //     // Update the start of the last rating period.
-    //     _lastRatingPeriodStart = _lastRatingPeriodStart.AddSeconds(periodsToClose * ratingPeriodDuration.TotalSeconds);
-
-    //     // Return the fractional part of the elapsed periods and the number of periods closed.
-    //     return (elapsedPeriods % 1.0, periodsToClose);
-    // }
-
-    // /// <summary>
-    // /// The amount of rating periods that have elapsed since the last one was closed as a fraction.
-    // /// </summary>
-    // /// <returns>The elapsed periods as a fraction.</returns>
-    // public double ElapsedPeriods()
-    // {
-    //     return ElapsedPeriodsAt(DateTime.UtcNow);
-    // }
-
-    // /// <summary>
-    // /// The amount of rating periods that have elapsed at the given point in time since the last one was closed as a fraction.
-    // /// If the given time is earlier than the start of the last rating period, this function returns 0.0.
-    // /// </summary>
-    // /// <param name="time">The point in time to calculate elapsed periods.</param>
-    // /// <returns>The elapsed periods as a fraction.</returns>
-    // public double ElapsedPeriodsAt(DateTime time)
-    // {
-    //     if (time >= _lastRatingPeriodStart)
-    //     {
-    //         var elapsedDuration = time - _lastRatingPeriodStart;
-    //         return elapsedDuration.TotalSeconds / _settings.RatingPeriodDuration.TotalSeconds;
-    //     }
-    //     return 0.0;
-    // }
-
-    private Rating RatingFromGlickoRating(GlickoRating rating)
+    private Rating RatingFromRatingData(PlayerRatingData ratingData)
     {
-        return new Rating(_calculator, rating.Rating, rating.Deviation, rating.Volatility);
+        var glicko = ratingData.Glicko;
+        return new Rating(
+            ratingSystem: _calculator,
+            initRating: glicko.Rating,
+            initRatingDeviation: glicko.Deviation,
+            initVolatility: glicko.Volatility,
+            numberOfResults: ratingData.NB,
+            lastRatingPeriodEnd: ratingData.Latest
+             );
     }
 
     // 
-    public async Task<(string GameId, List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserWithPlayerRating> Users, string PerfKey)> CalculateRatingAndPerfsAsync(Game game)
+    public async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> Users)> CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, DateTime endTime)
     {
-        if (game.GameOverMethod == null && game.WinnerId == null)
+        if (winnerId == null)
         {
             throw new InvalidOperationException("Game is not over yet");
         }
+        if (boardSize == BoardSize.Other)
+        {
+            throw new InvalidOperationException("Can't calculate rating for games with board size other than 9, 13, 19");
+        }
 
-        var ratingGame = GetPlayerRatingsForGame(game);
-        var key = GetStyleKey(game);
-        var users = GetUsers(game);
+        var users = await Task.WhenAll(players.Keys.Select(id => _userRepo.GetUserRatings(id)!).ToList());
+        var ratingGame = GetPlayerRatingsForGame(boardSize, timeStandard, users.ToList(), winnerId, players, endTime);
 
-
-        var prevPerfs = ratingGame.Players.Select(p => p.Rating).ToList();
+        var oldRatings = ratingGame.PlayersRatingData;
 
         // var prevPlayers = prevPerfs.Select(perfs => perfs[perfKey].ToGlickoPlayer()).ToList();
         var result = new RatingPeriodResults();
 
-        var winner = ratingGame.Players[(int)game.GetStoneFromPlayerId(game.WinnerId!)!];
-        var loser = ratingGame.Players[(int)game.GetOtherStoneFromPlayerId(game.WinnerId!)!];
+        var winner = ratingGame.PlayersRatingData[(int)players[winnerId]!];
+        var loser = ratingGame.PlayersRatingData[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!];
 
         result.AddResult(
-                winner: new Rating(
-                    ratingSystem: _calculator,
-                    initRating: winner.Rating.Rating.Rating,
-                    initRatingDeviation: winner.Rating.Rating.Deviation,
-                    initVolatility: winner.Rating.Rating.Volatility
-                ),
-                loser: new Rating(
-                    ratingSystem: _calculator,
-                    initRating: loser.Rating.Rating.Rating,
-                    initRatingDeviation: loser.Rating.Rating.Deviation,
-                    initVolatility: loser.Rating.Rating.Volatility
-                )
+            winner: RatingFromRatingData(winner),
+            loser: RatingFromRatingData(loser)
         );
 
         var computedPlayers = ComputeGlickoAsync(result, ratingGame);
 
-        // var newGlickos = _ratingRegulator.Regulate(
-        //     perfKey,
-        //     prevPlayers.Select(p => p.Glicko).ToList(),
-        //     computedPlayers.Select(p => p.Glicko).ToList(),
-        //     users.Select(u => u.IsBot).ToList()
-        // );
+        var newRatings = computedPlayers;
 
-        var newPerfs = computedPlayers;
-
-        // var newPerfs = prevPerfs.Zip(newGlickos, (perfs, glicko) => AddToPerfs(game, perfs, perfKey, glicko)).ToList();
-
-        var ratingDiffs = prevPerfs.Zip(newPerfs, (prev, next) =>
+        var ratingDiffs = oldRatings.Zip(newRatings, (prev, next) =>
         {
-            int ratingOf(PlayerRatingData p) => (int)p.Rating.Rating;
+            int ratingOf(PlayerRatingData p) => (int)p.Glicko.Rating;
             return ratingOf(next) - ratingOf(prev);
         }).ToList();
 
-        var newUsers = users.Zip(newPerfs, (user, perfs) =>
-        {
-            user.Ratings[key] = perfs;
-            return new UserWithPlayerRating(
-                        user.UserId,
-                        user.Ratings
-                    );
-        }).ToList();
+        var newUsers = usersWithNewRatings(users.ToList(), newRatings, ratingGame);
 
-        // _bus.Publish(new PerfsUpdate(game, newUsers), "perfsUpdate");
-
-        return (game.Id!, ratingDiffs, prevPerfs, newPerfs, users.ToList(), key);
+        return (ratingDiffs, oldRatings, newRatings, users.ToList());
     }
 
-    private List<PlayerRatingData> ComputeGlickoAsync(RatingPeriodResults results, RatingGame game)
+    private List<PlayerRatingData> ComputeGlickoAsync(RatingPeriodResults results, UncalculatedRatingGame game)
     {
         Debug.Assert(results.GetParticipants().Count() == 2, "Only one result should be added at a time");
 
@@ -299,26 +130,28 @@ public class RatingEngine
 
             List<PlayerRatingData> players = [null, null];
 
-            players[game.Winner] = new PlayerRatingData(
-                glicko: new GlickoRating(
+            var winnerGlicko = new GlickoRating(
                     rating: result.GetWinner().GetRating(),
                     deviation: result.GetWinner().GetRatingDeviation(),
                     volatility: result.GetWinner().GetVolatility()
-                ),
-                nb: 1,
-                recent: null,
+                );
+            players[game.Winner] = new PlayerRatingData(
+                glicko: winnerGlicko,
+                nb: game.PlayersRatingData[game.Winner].NB + 1,
+                recent: game.PlayersRatingData[game.Winner].UpdateRecentWith(winnerGlicko),
                 latest: DateTime.Now
             );
 
 
-            players[game.Winner] = new PlayerRatingData(
-                glicko: new GlickoRating(
-                    rating: result.GetWinner().GetRating(),
-                    deviation: result.GetWinner().GetRatingDeviation(),
-                    volatility: result.GetWinner().GetVolatility()
-                ),
-                nb: 1,
-                recent: null,
+            var loserGlicko = new GlickoRating(
+                    rating: result.GetLoser().GetRating(),
+                    deviation: result.GetLoser().GetRatingDeviation(),
+                    volatility: result.GetLoser().GetVolatility()
+                );
+            players[game.Loser] = new PlayerRatingData(
+                glicko: loserGlicko,
+                nb: game.PlayersRatingData[game.Loser].NB + 1,
+                recent: game.PlayersRatingData[game.Loser].UpdateRecentWith(loserGlicko),
                 latest: DateTime.Now
             );
 
@@ -334,90 +167,178 @@ public class RatingEngine
         }
     }
 
-    private RatingGame GetPlayerRatingsForGame(Game game)
+
+
+    private UncalculatedRatingGame GetPlayerRatingsForGame(BoardSize boardSize, TimeStandard timeStandard, List<UserRating> userRating, string winnerId, Dictionary<string, StoneType> players, DateTime endTime)
     {
-        throw new NotImplementedException();
+        var style = RatingKey(boardSize, timeStandard);
+        var userRatings = userRating.Select(u => u.Ratings[style]).ToList();
+        var winner = players[winnerId];
+
+        return new UncalculatedRatingGame(userRatings, (int)winner, endTime, boardSize, timeStandard);
     }
 
-    private string GetStyleKey(Game game)
+    private List<UserRating> usersWithNewRatings(List<UserRating> oldUsers, List<PlayerRatingData> newRatings, UncalculatedRatingGame ratingGame)
     {
-        throw new NotImplementedException();
+        var style = ratingGame.GameStyle;
+
+        var result = oldUsers.Zip(newRatings, (oldUser, rating) =>
+        {
+            oldUser.Ratings[style] = rating;
+
+            var (key, data) = RatingForTimeStandard(ratingGame.Standard, oldUser);
+            oldUser.Ratings[key] = data;
+
+            return new UserRating(
+                oldUser.UserId,
+                oldUser.Ratings
+            );
+        }).ToList();
+
+        return result;
+    }
+
+    public (string standardKey, PlayerRatingData data) RatingForTimeStandard(TimeStandard timeStandard, UserRating p)
+    {
+        var timeStandardStyle = RatingKey(null, timeStandard);
+
+        // Collecting the sub-performances
+        var subs = RateableBoards().Select(boardSize => p.Ratings[RatingKey(boardSize, timeStandard)])
+            .Where(perf => !IsRatingProvisional(perf))
+            .ToList();
+
+        // Determining the latest date
+        var latestStyle = subs.Where(a => a.Latest != null).MaxBy((a) => a.Latest);
+        // .MaxByOption(perf => perf.Latest.HasValue ? perf.Latest.Value.Ticks : 0)
+        // ?.Latest;
+
+        static int nbSelector(PlayerRatingData p) => p.NB;
+
+        // Updating the standard performance
+        var newStandard = (latestStyle?.Latest.HasValue ?? false)
+            ? new PlayerRatingData
+            (
+                glicko: new GlickoRating(
+                    rating: subs.Sum(s => s.Glicko.Rating * (s.NB / subs.Sum(nbSelector))),
+                    deviation: subs.Sum(s => s.Glicko.Deviation * (s.NB / subs.Sum(nbSelector))),
+                    volatility: subs.Sum(s => s.Glicko.Volatility * (s.NB / subs.Sum(nbSelector)))
+            ),
+                nb: subs.Sum(nbSelector),
+                recent: new(),
+                latest: latestStyle.Latest
+            )
+            : p.Ratings[timeStandardStyle];
+
+        // Returning a new UserPerfs instance with the updated Standard
+        return (timeStandardStyle, new PlayerRatingData(
+            glicko: newStandard.Glicko,
+            nb: newStandard.NB,
+            recent: newStandard.Recent,
+            latest: newStandard.Latest
+        ));
+    }
+
+    public static IEnumerable<BoardSize> RateableBoards()
+    {
+        return Enum.GetValues(typeof(BoardSize)).Cast<BoardSize>().Where(a => a != BoardSize.Other);
+    }
+
+    public static IEnumerable<TimeStandard> RateableTimeStandards()
+    {
+        return Enum.GetValues(typeof(TimeStandard)).Cast<TimeStandard>();
     }
 
 
-    private List<UserWithPlayerRating> GetUsers(Game game)
+    public static bool IsRatingProvisional(PlayerRatingData rating)
     {
-        throw new NotImplementedException();
+        return rating.Glicko.Deviation > ProvisionalDeviation;
     }
 
-
+    public static string RatingKey(BoardSize? size, TimeStandard time)
+    {
+        if (size == null)
+        {
+            return $"S{(int)time}";
+        }
+        return $"B{(int)size}-S{(int)time}";
+    }
 }
 
-public class RatingGame
+public class UncalculatedRatingGame
 {
-    public List<PlayerRatingPerStyle> Players;
+    public List<PlayerRatingData> PlayersRatingData;
+    public string GameStyle => RatingEngine.RatingKey(Size, Standard);
+    public BoardSize Size;
+    public TimeStandard Standard;
     public int Winner;
     public int Loser => 1 - Winner;
+    public DateTime EndTime;
 
-    public RatingGame(List<PlayerRatingPerStyle> players, int winner)
+    public UncalculatedRatingGame(List<PlayerRatingData> players, int winner, DateTime endTime, BoardSize size, TimeStandard standard)
     {
-        Players = players;
+        PlayersRatingData = players;
         Winner = winner;
+        EndTime = endTime;
+        Size = size;
+        Standard = standard;
     }
 
 }
 
-public enum BoardSize
+// public class UserRatingForGame
+// {
+//     public string UserId => _user.UserId;
+//     public Dictionary<string, PlayerRatingData> _Ratings => ;
+//     private UserRating _user;
+//     private UserRating _user;
+
+//     public UserRatingForGame(Game game, UserRating rating)
+//     {
+//         UserId = userId;
+//         Ratings = ratings;
+//     }
+// }
+
+
+// public class PlayerRatingPerStyle
+// {
+//     public PlayerRatingData Rating;
+//     public BoardSize? BoardSize;
+//     public GameSpeed? GameSpeed;
+
+// }
+
+static class PlayerRatingDataExt
 {
-    Nine = 0,
-    Thirteen = 1,
-    Nineteen = 2
-}
+    public static readonly int RecentMaxSize = 12;
 
-
-public enum GameSpeed
-{
-    Blitz = 0,
-    Rapid = 1,
-    Classical = 2,
-    Correspondence = 3
-}
-
-public class UserWithPlayerRating
-{
-    public string UserId;
-    public Dictionary<string, PlayerRatingData> Ratings;
-
-    public UserWithPlayerRating(string userId, Dictionary<string, PlayerRatingData> ratings)
+    public static List<int> UpdateRecentWith(this PlayerRatingData data, GlickoRating glicko)
     {
-        UserId = userId;
-        Ratings = ratings;
-    }
-}
+        var p = data;
+        if (p.NB < 10)
+        {
+            return p.Recent;
+        }
 
+        // Prepend glicko.IntRating to p.Recent and limit to Perf.RecentMaxSize
+        var updatedRecent = new List<int> { (int)glicko.Rating };
+        updatedRecent.AddRange(p.Recent);
 
-public class PlayerRatingPerStyle
-{
-    public PlayerRatingData Rating;
-    public BoardSize? BoardSize;
-    public GameSpeed? GameSpeed;
-
-    public String Key()
-    {
-        return $"B{BoardSize}-S{GameSpeed}";
+        // Truncate the list to Perf.RecentMaxSize
+        return updatedRecent.Take(RecentMaxSize).ToList();
     }
 }
 
 public class PlayerRatingData
 {
-    public GlickoRating Rating;
-    public int NB;
-    public List<int>? Recent;
-    public DateTime Latest;
+    public GlickoRating Glicko;
+    public int NB; // number of results
+    public List<int> Recent;
+    public DateTime? Latest; // last rating period end date
 
-    public PlayerRatingData(GlickoRating glicko, int nb, List<int>? recent, DateTime latest)
+    public PlayerRatingData(GlickoRating glicko, int nb, List<int> recent, DateTime? latest)
     {
-        Rating = glicko;
+        Glicko = glicko;
         NB = nb;
         Recent = recent;
         Latest = latest;

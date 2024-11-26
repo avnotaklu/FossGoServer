@@ -13,14 +13,16 @@ public class AuthenticationController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
     private readonly UsersService _usersService;
+    private readonly UserRatingService _userRatingService;
     private readonly AuthenticationService _authenticationService;
 
     [ActivatorUtilitiesConstructorAttribute]
-    public AuthenticationController(ILogger<AuthenticationController> logger, UsersService usersService, AuthenticationService authenticationService)
+    public AuthenticationController(ILogger<AuthenticationController> logger, UsersService usersService, UserRatingService userRatingService, AuthenticationService authenticationService)
     {
         _logger = logger;
         _authenticationService = authenticationService;
         _usersService = usersService;
+        _userRatingService = userRatingService;
     }
 
     [AllowAnonymous]
@@ -127,6 +129,7 @@ public class AuthenticationController : ControllerBase
             password = BCrypt.Net.BCrypt.HashPassword(request.Password, salt);
         }
         var newUser = await _usersService.CreateUser(request.Email, request.GoogleSignIn, password);
+        var newRatings = await _userRatingService.CreateUserRatings(newUser!.Id!);
 
         if (newUser == null)
         {
