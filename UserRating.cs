@@ -4,7 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 [Immutable, GenerateSerializer]
 [Alias("UserRating")]
 
-public static class UserRatingFieldNames {
+public class UserRatingFieldNames {
     public const string Ratings ="rts";
 
     public const string Glicko ="g";
@@ -22,7 +22,7 @@ public class UserRating
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     [Id(0)]
-    public string? UserId { get; set; }
+    public string UserId { get; set; }
 
     [BsonElement(UserRatingFieldNames.Ratings)]
     [Id(1)]

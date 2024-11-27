@@ -118,6 +118,11 @@ public class RatingEngine
         return (ratingDiffs, oldRatings, newRatings, users.ToList());
     }
 
+    public double PreviewDeviation(PlayerRatingData data, DateTime ratingPeriodEndDate, bool reverse)
+    {
+        return _calculator.PreviewDeviation(RatingFromRatingData(data), ratingPeriodEndDate, reverse);
+    }
+
     private List<PlayerRatingData> ComputeGlickoAsync(RatingPeriodResults results, UncalculatedRatingGame game)
     {
         Debug.Assert(results.GetParticipants().Count() == 2, "Only one result should be added at a time");

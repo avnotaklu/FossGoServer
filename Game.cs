@@ -121,7 +121,7 @@ public enum BoardSize
     Other = 3
 }
 
-public static class GameFieldNames
+public class GameFieldNames
 {
     public const string Rows = "r";
     public const string Cols = "c";

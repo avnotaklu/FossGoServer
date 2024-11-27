@@ -15,7 +15,9 @@ public interface IUserRatingService
 public class UserRatingService : IUserRatingService
 {
     private readonly IMongoCollection<UserRating> _ratingsCollection;
-    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserRating>> ratingsCollection)
+    private readonly RatingEngine _ratingEngine;
+    private readonly IDateTimeService _dateTimeService;
+    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserRating>> ratingsCollection, RatingEngine ratingEngine, IDateTimeService dateTimeService)
     {
         var mongoClient = new MongoClient(
             userDatabaseSettings.Value.ConnectionString);
@@ -25,11 +27,24 @@ public class UserRatingService : IUserRatingService
 
         _ratingsCollection = mongoDatabase.GetCollection<UserRating>(
             ratingsCollection.Value.Name);
+
+        _ratingEngine = ratingEngine;
+        _dateTimeService = dateTimeService;
+    }
+
+
+    public UserRating UpdateUserRatingToCurrent(UserRating oldRating)
+    {
+        return new UserRating(oldRating.UserId, new Dictionary<string, PlayerRatingData>(oldRating.Ratings.Select(a =>
+        new KeyValuePair<string, PlayerRatingData>(a.Key, new PlayerRatingData(new GlickoRating(
+            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), false), a.Value.Glicko.Volatility
+        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
+        )));
     }
 
     public async Task<UserRating> GetUserRatings(string userId)
     {
-        return await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync();
+        return UpdateUserRatingToCurrent(await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync());
     }
 
     public async Task<UserRating?> CreateUserRatings(string userId)

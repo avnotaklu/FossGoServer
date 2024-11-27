@@ -3,7 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
-public static class UserFieldNames
+public class UserFieldNames
 {
     public const string Email = "em";
     public const string PasswordHash = "ph";
