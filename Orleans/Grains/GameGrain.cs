@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using MongoDB.Bson.Serialization.Serializers;
@@ -16,14 +17,14 @@ public class GameGrain : Grain, IGameGrain
     private List<MoveData> _moves = [];
     private int _rows;
     private int _columns;
-    private TimeControl _timeControl;
+    private TimeControl _timeControl = null!;
     private StoneSelectionType _stoneSelectionType;
     private List<PlayerTimeSnapshot> _playerTimeSnapshots { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
     private List<int> _prisoners = [];
     private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
     private bool _initialized = false;
-    private string? _startTime;
+    private DateTime? _startTime;
     private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
     private HashSet<string> _scoresAcceptedBy = [];
@@ -31,72 +32,113 @@ public class GameGrain : Grain, IGameGrain
     // Score Calculation Things
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
     private GameOverMethod? _gameOverMethod;
-    private readonly ILogger<GameGrain> _logger;
-    private readonly IDateTimeService _dateTimeService;
-    private BoardStateUtilities _boardStateUtilities;
 
-    private string? _endTime;
+    private List<int>? _playersRatings = [];
+    private List<int>? _playersRatingsDiff = [];
+
+    private DateTime? _endTime;
     private string? _gameCreator;
     private float _komi = 6.5f;
     private string now => _dateTimeService.NowFormatted();
 
-    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService)
+
+    // Injected
+    private readonly ILogger<GameGrain> _logger;
+    private readonly IDateTimeService _dateTimeService;
+    private readonly IUserRatingService _userRatingService;
+    private readonly IGameService _gameService;
+
+
+    private BoardStateUtilities _boardStateUtilities;
+    private RatingEngine _ratingEngine;
+
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUserRatingService userRatingService, IGameService gameService, RatingEngine ratingEngine)
     {
         _logger = logger;
         _dateTimeService = dateTimeService;
+        _userRatingService = userRatingService;
+        _gameService = gameService;
+        _boardStateUtilities = new BoardStateUtilities();
+        _ratingEngine = ratingEngine;
     }
+
+    public void SetState(
+ int rows,
+ int columns,
+ TimeControl timeControl,
+ List<PlayerTimeSnapshot> playerTimeSnapshots,
+ List<MoveData> moves,
+ Dictionary<string, StoneType> playgroundMap,
+ Dictionary<string, StoneType> players,
+ List<int> prisoners,
+ string? startTime,
+ GameState gameState,
+ string? koPositionInLastMove,
+ List<string> deadStones,
+ string? winnerId,
+ List<int> finalTerritoryScores,
+ float komi,
+ GameOverMethod? gameOverMethod,
+ string? endTime,
+ StoneSelectionType stoneSelectionType,
+ string? gameCreator,
+ List<int>? playersRatings,
+ List<int>? playersRatingsDiff
+    )
+    {
+        _rows = rows;
+        _columns = columns;
+        _timeControl = timeControl;
+        _playerTimeSnapshots = playerTimeSnapshots;
+        _moves = moves;
+        _board = playgroundMap.ToDictionary(a => new Position(a.Key), a => a.Value);
+        _players = players;
+        _prisoners = prisoners;
+        _startTime = startTime?.DeserializedDate();
+        _gameState = gameState;
+        _koPositionInLastMove = koPositionInLastMove == null ? null : new Position(koPositionInLastMove);
+        _stoneStates = deadStones.Select(a => new Position(a)).ToDictionary(a => a, a => DeadStoneState.Dead);
+        _winnerId = winnerId;
+        _finalTerritoryScores = new ReadOnlyCollection<int>(finalTerritoryScores);
+        _komi = komi;
+        _gameOverMethod = gameOverMethod;
+        _endTime = endTime?.DeserializedDate();
+        _stoneSelectionType = stoneSelectionType;
+        _gameCreator = gameCreator;
+        _playersRatings = playersRatings;
+        _playersRatingsDiff = playersRatingsDiff;
+        _initialized = true;
+    }
+
+    // Grain overrides
 
     public Task CreateGame(int rows, int columns, TimeControlData timeControl, StoneSelectionType stoneSelectionType, string gameCreator)
     {
-        _players = [];
-        _rows = rows;
-        _columns = columns;
-        _timeControl = new TimeControl(timeControl);
-        _stoneSelectionType = stoneSelectionType;
-        _playerTimeSnapshots = [];
-        _board = [];
-        _gameState = GameState.WaitingForStart;
-        _gameOverMethod = null;
-        _moves = [];
-        _prisoners = [];
-        _finalTerritoryScores = new ReadOnlyCollection<int>([]);
-        _winnerId = null;
-        _initialized = true;
-        _stoneStates = [];
-        _scoresAcceptedBy = [];
-        _boardStateUtilities = new BoardStateUtilities(_rows, _columns);
-        _endTime = null;
-        _gameCreator = gameCreator;
+        SetState(
+            rows: rows,
+            columns: columns,
+            timeControl: new TimeControl(timeControl),
+            playerTimeSnapshots: [],
+            moves: [],
+            playgroundMap: [],
+            players: [],
+            prisoners: [0, 0],
+            startTime: null,
+            gameState: GameState.WaitingForStart,
+            koPositionInLastMove: null,
+            deadStones: [],
+            winnerId: null,
+            finalTerritoryScores: [],
+            komi: 6.5f,
+            gameOverMethod: null,
+            endTime: null,
+            stoneSelectionType: stoneSelectionType,
+            gameCreator: gameCreator,
+            playersRatings: [],
+            playersRatingsDiff: []
+        );
 
         return Task.CompletedTask;
-    }
-
-    private string gameId => this.GetPrimaryKeyString();
-
-    private Game _GetGame()
-    {
-        return new Game(
-            gameId: gameId,
-            rows: _rows,
-            columns: _columns,
-            timeControl: _timeControl,
-            stoneSelectionType: _stoneSelectionType,
-            playerTimeSnapshots: _playerTimeSnapshots,
-            moves: _moves,
-            playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
-            players: _players,
-            prisoners: _prisoners,
-            startTime: _startTime,
-            gameState: _gameState,
-            koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
-            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
-            winnerId: _winnerId,
-            finalTerritoryScores: _finalTerritoryScores.ToList(),
-            komi: _komi,
-            gameOverMethod: _gameOverMethod,
-            endTime: _endTime,
-            gameCreator: _gameCreator
-        );
     }
 
 
@@ -113,113 +155,6 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
         return Task.FromResult(game);
-    }
-
-    private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
-    {
-        var curTime = now;
-        var turn = moves.Count;
-        var curTurn = turn % 2;
-
-        PlayerTimeSnapshot turnPlayerSnap() => playerTimes[curTurn];
-        PlayerTimeSnapshot nonTurnPlayerSnap() => playerTimes[1 - curTurn];
-
-        var byoYomiMS = timeControl.ByoYomiTime?.ByoYomiSeconds * 1000;
-
-        var activePlayerIdx = playerTimes.FindIndex((snap) => snap.TimeActive);
-        var activePlayerSnap = playerTimes[activePlayerIdx];
-
-        var activePlayerTimeLeft = activePlayerSnap.MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(activePlayerSnap.SnapshotTimestamp)).TotalMilliseconds;
-
-        var newByoYomi = activePlayerSnap.ByoYomisLeft - ((activePlayerSnap.ByoYomiActive && activePlayerTimeLeft <= 0) ? 1 : 0);
-
-        var applicableByoYomiTime = (newByoYomi > 0) ? (byoYomiMS ?? 0) : 0;
-
-        var applicableIncrement = (timeControl.IncrementSeconds ?? 0) * 1000;
-
-
-        Console.WriteLine("Calculated Player Times");
-        Debug.Write("Calculated Player Times");
-        _logger.LogInformation("Calculated Player Times");
-
-        playerTimes[activePlayerIdx] = new PlayerTimeSnapshot(
-                    snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: activePlayerTimeLeft > 0 ? activePlayerTimeLeft + applicableIncrement : applicableByoYomiTime,
-                    byoYomisLeft: newByoYomi,
-                    byoYomiActive: activePlayerTimeLeft <= 0,
-                    timeActive: playerTimes[activePlayerIdx].TimeActive
-                );
-
-        playerTimes[curTurn] = new PlayerTimeSnapshot(
-                            snapshotTimestamp: curTime,
-                            mainTimeMilliseconds: turnPlayerSnap().MainTimeMilliseconds,
-                            byoYomisLeft: turnPlayerSnap().ByoYomisLeft,
-                            byoYomiActive: turnPlayerSnap().ByoYomiActive,
-                            timeActive: true
-                        );
-
-        playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
-                    snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: playerTimes[1 - curTurn].ByoYomiActive ? (byoYomiMS ?? 0) : nonTurnPlayerSnap().MainTimeMilliseconds,
-                    byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
-                    byoYomiActive: false,
-                    timeActive: false
-                );
-        // var nonTurnPlayerSnap = playerTimes[1 - curTurn];
-
-        // playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
-        //             snapshotTimestamp: curTime,
-        //             mainTimeMilliseconds: nonTurnPlayerSnap.MainTimeMilliseconds,
-        //              byoYomisLeft: nonTurnPlayerSnap.ByoYomisLeft,
-        //             byoYomiActive: false,
-        //             timeActive: false
-        //         );
-
-        return playerTimes[curTurn];
-    }
-
-    private void StartGame(string time, List<string> players)
-    {
-        _gameState = GameState.Playing;
-        _startTime = time;
-        _playerTimeSnapshots = [
-                    new PlayerTimeSnapshot(
-                snapshotTimestamp: time,
-                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
-                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
-                byoYomiActive: false,
-                timeActive: true
-            ),
-            new PlayerTimeSnapshot(
-                snapshotTimestamp: time,
-                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
-                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
-                byoYomiActive: false,
-                timeActive: false
-            )
-                ];
-
-        var stoneSelectionType = _stoneSelectionType;
-        var firstPlayerToAssignStone = _gameCreator ?? players.First();
-
-        foreach (var player in players)
-        {
-            var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)stoneSelectionType;
-            var secondPlayerStone = 1 - firstPlayerStone;
-
-            if (player == firstPlayerToAssignStone)
-            {
-                _players[player] = firstPlayerStone;
-            }
-            else
-            {
-                _players[player] = secondPlayerStone;
-            }
-        }
-        _prisoners = [0, 0];
-
-        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-        gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
     }
 
     public Task<Dictionary<string, StoneType>> GetPlayers()
@@ -250,8 +185,7 @@ public class GameGrain : Grain, IGameGrain
             var y = (int)move.Y!;
 
             var position = new Position(x, y);
-            var utils = new BoardStateUtilities(_rows, _columns);
-            var board = utils.BoardStateFromGame(_GetGame());
+            var board = _boardStateUtilities.BoardStateFromGame(_GetGame());
 
             var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
             _koPositionInLastMove = updateResult.board.koDelete;
@@ -261,12 +195,12 @@ public class GameGrain : Grain, IGameGrain
 
             if (updateResult.result)
             {
-                var map = utils.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
+                var map = _boardStateUtilities.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
                 _board = map;
             }
             else
             {
-                return (false, await GetGame());
+                return (false, _GetGame());
             }
         }
 
@@ -293,7 +227,7 @@ public class GameGrain : Grain, IGameGrain
             await gameTimer.StartTurnTimer(turnPlayerTimeSnapshot.MainTimeMilliseconds);
         }
 
-        var game = await GetGame();
+        var game = _GetGame();
 
         {
             // Send message to player with current turn
@@ -310,59 +244,6 @@ public class GameGrain : Grain, IGameGrain
 
         return (true, game);
     }
-
-    // public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
-    // {
-    //     Debug.Assert(DidStart());
-    //     var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-    //     // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-    //     var raw_times = new List<string> { game.StartTime! };
-    //     raw_times.AddRange(game.Moves.Select(move => move.Time));
-
-    //     var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
-
-    //     // Calculate first player's duration
-    //     // var firstPlayerDuration = times
-    //     //     .Select((time, index) => (time, index))
-    //     //     .Where(pair => pair.index % 2 == 1)
-    //     //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
-
-    //     var firstPlayerDuration = TimeSpan.Zero;
-
-    //     var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
-    //     var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-    //     var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
-
-    //     for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
-    //     {
-    //         firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
-    //     }
-
-    //     var player0Time = mainTimeSpan - firstPlayerDuration;
-
-
-    //     var secondPlayerDuration = TimeSpan.Zero;
-    //     var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
-    //     var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-    //     var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
-
-    //     for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
-    //     {
-    //         secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
-    //     }
-    //     var player1Time = mainTimeSpan - secondPlayerDuration;
-
-
-    //     var playerTimes = new List<TimeSpan> { player0Time, player1Time };
-
-    //     // If the game has ended, apply the end time to the player with the turn
-    //     if (game.GameState == GameState.Ended)
-    //     {
-    //         playerTimes[(int)GetStoneFromPlayerId(GetPlayerIdWithTurn()!)] -= DateTime.Parse(game.EndTime!) - times.Last();
-    //     }
-
-    //     return playerTimes;
-    // }
 
     public async Task<Game> ContinueGame(string playerId)
     {
@@ -488,7 +369,7 @@ public class GameGrain : Grain, IGameGrain
         return curPlayerTime;
     }
 
-    private void EndGame(GameOverMethod method, string? winnerId = null)
+    private async void EndGame(GameOverMethod method, string? winnerId = null)
     {
         _gameState = GameState.Ended;
 
@@ -510,7 +391,8 @@ public class GameGrain : Grain, IGameGrain
         ];
 
         var gameTimerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-        gameTimerGrain.StopTurnTimer();
+
+        await gameTimerGrain.StopTurnTimer();
 
         if (winnerId != null)
         {
@@ -524,8 +406,15 @@ public class GameGrain : Grain, IGameGrain
             _finalTerritoryScores = scoreCalculator.TerritoryScores;
         }
 
-        _endTime = now;
+        _endTime = now.DeserializedDate();
         _gameOverMethod = method;
+
+        var res = await UpdateRatingsOnResult();
+
+        foreach (var rating in res.UserRatings)
+        {
+            await _userRatingService.SaveUserRatings(rating);
+        }
     }
 
     public Task<Game> EditDeadStone(Position position, DeadStoneState state)
@@ -538,7 +427,7 @@ public class GameGrain : Grain, IGameGrain
         }
         else
         {
-            var boardState = new BoardStateUtilities(_rows, _columns).BoardStateFromGame(_GetGame());
+            var boardState = _boardStateUtilities.BoardStateFromGame(_GetGame());
             var cluster = boardState.playgroundMap[position].cluster;
             foreach (var pos in cluster.data)
             {
@@ -547,6 +436,261 @@ public class GameGrain : Grain, IGameGrain
 
             return GetGame();
         }
+    }
+
+    public Task<Game> GetGame()
+    {
+        var game = _GetGame();
+        return Task.FromResult(game);
+    }
+
+    /// <summary>
+    /// In case of an external error use this function
+    /// Set grain state to a game supplied from database
+    /// </summary>
+    /// <param name="playerId"></param>
+    /// <returns></returns>
+    public Task<Game> ResetGame(Game game)
+    {
+        SetState(
+            rows: game.Rows,
+            columns: game.Columns,
+            timeControl: game.TimeControl,
+            playerTimeSnapshots: game.PlayerTimeSnapshots,
+            moves: game.Moves,
+            playgroundMap: game.PlaygroundMap,
+            players: game.Players,
+            prisoners: game.Prisoners,
+            startTime: game.StartTime,
+            gameState: game.GameState,
+            koPositionInLastMove: game.KoPositionInLastMove,
+            deadStones: game.DeadStones,
+            winnerId: game.WinnerId,
+            finalTerritoryScores: game.FinalTerritoryScores.ToList(),
+            komi: game.Komi,
+            gameOverMethod: game.GameOverMethod,
+            endTime: game.EndTime,
+            stoneSelectionType: game.StoneSelectionType,
+            gameCreator: game.GameCreator,
+            playersRatings: game.PlayersRatings,
+            playersRatingsDiff: game.PlayersRatingsDiff
+        );
+
+        return GetGame();
+    }
+    // Grain Overrides //
+
+
+    private string gameId => this.GetPrimaryKeyString();
+
+    private async Task<Game?> SaveGame()
+    {
+        var game = _GetGame();
+        return await _gameService.SaveGame(game);
+    }
+
+    private Game _GetGame()
+    {
+        return new Game(
+            gameId: gameId,
+            rows: _rows,
+            columns: _columns,
+            timeControl: _timeControl,
+            stoneSelectionType: _stoneSelectionType,
+            playerTimeSnapshots: _playerTimeSnapshots,
+            moves: _moves,
+            playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
+            players: _players,
+            prisoners: _prisoners,
+            startTime: _startTime?.SerializedDate(),
+            gameState: _gameState,
+            koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
+            deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
+            winnerId: _winnerId,
+            finalTerritoryScores: _finalTerritoryScores.ToList(),
+            komi: _komi,
+            gameOverMethod: _gameOverMethod,
+            endTime: _endTime?.SerializedDate(),
+            gameCreator: _gameCreator,
+            playersRatings: _playersRatings,
+            playersRatingsDiff: _playersRatingsDiff
+        );
+    }
+
+    private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
+    {
+        var curTime = now;
+        var turn = moves.Count;
+        var curTurn = turn % 2;
+
+        PlayerTimeSnapshot turnPlayerSnap() => playerTimes[curTurn];
+        PlayerTimeSnapshot nonTurnPlayerSnap() => playerTimes[1 - curTurn];
+
+        var byoYomiMS = timeControl.ByoYomiTime?.ByoYomiSeconds * 1000;
+
+        var activePlayerIdx = playerTimes.FindIndex((snap) => snap.TimeActive);
+        var activePlayerSnap = playerTimes[activePlayerIdx];
+
+        var activePlayerTimeLeft = activePlayerSnap.MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(activePlayerSnap.SnapshotTimestamp)).TotalMilliseconds;
+
+        var newByoYomi = activePlayerSnap.ByoYomisLeft - ((activePlayerSnap.ByoYomiActive && activePlayerTimeLeft <= 0) ? 1 : 0);
+
+        var applicableByoYomiTime = (newByoYomi > 0) ? (byoYomiMS ?? 0) : 0;
+
+        var applicableIncrement = (timeControl.IncrementSeconds ?? 0) * 1000;
+
+
+        Console.WriteLine("Calculated Player Times");
+        Debug.Write("Calculated Player Times");
+        _logger.LogInformation("Calculated Player Times");
+
+        playerTimes[activePlayerIdx] = new PlayerTimeSnapshot(
+                    snapshotTimestamp: curTime,
+                    mainTimeMilliseconds: activePlayerTimeLeft > 0 ? activePlayerTimeLeft + applicableIncrement : applicableByoYomiTime,
+                    byoYomisLeft: newByoYomi,
+                    byoYomiActive: activePlayerTimeLeft <= 0,
+                    timeActive: playerTimes[activePlayerIdx].TimeActive
+                );
+
+        playerTimes[curTurn] = new PlayerTimeSnapshot(
+                            snapshotTimestamp: curTime,
+                            mainTimeMilliseconds: turnPlayerSnap().MainTimeMilliseconds,
+                            byoYomisLeft: turnPlayerSnap().ByoYomisLeft,
+                            byoYomiActive: turnPlayerSnap().ByoYomiActive,
+                            timeActive: true
+                        );
+
+        playerTimes[1 - curTurn] = new PlayerTimeSnapshot(
+                    snapshotTimestamp: curTime,
+                    mainTimeMilliseconds: playerTimes[1 - curTurn].ByoYomiActive ? (byoYomiMS ?? 0) : nonTurnPlayerSnap().MainTimeMilliseconds,
+                    byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
+                    byoYomiActive: false,
+                    timeActive: false
+                );
+        return playerTimes[curTurn];
+    }
+
+    private async void StartGame(string time, List<string> players)
+    {
+        _gameState = GameState.Playing;
+        _startTime = time.DeserializedDate();
+        _playerTimeSnapshots = [
+                    new PlayerTimeSnapshot(
+                snapshotTimestamp: time,
+                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
+                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
+                byoYomiActive: false,
+                timeActive: true
+            ),
+            new PlayerTimeSnapshot(
+                snapshotTimestamp: time,
+                mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
+                byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
+                byoYomiActive: false,
+                timeActive: false
+            )
+                ];
+
+        var stoneSelectionType = _stoneSelectionType;
+        var firstPlayerToAssignStone = _gameCreator ?? players.First();
+
+        foreach (var player in players)
+        {
+            var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)stoneSelectionType;
+            var secondPlayerStone = 1 - firstPlayerStone;
+
+            if (player == firstPlayerToAssignStone)
+            {
+                _players[player] = firstPlayerStone;
+            }
+            else
+            {
+                _players[player] = secondPlayerStone;
+            }
+        }
+
+        _prisoners = [0, 0];
+
+        _playersRatings = [
+            (int)MathF.Floor((float)(await _userRatingService.GetUserRatings(GetPlayerIdFromStoneType(StoneType.Black))).Ratings[RatingEngine.RatingKey(_GetGame().GetBoardSize(), _timeControl.TimeStandard)].Glicko.Rating),
+            (int)MathF.Floor((float)(await _userRatingService.GetUserRatings(GetPlayerIdFromStoneType(StoneType.White))).Ratings[RatingEngine.RatingKey(_GetGame().GetBoardSize(), _timeControl.TimeStandard)].Glicko.Rating),
+        ];
+
+        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+        await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
+    }
+
+
+    // public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
+    // {
+    //     Debug.Assert(DidStart());
+    //     var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
+    //     // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
+    //     var raw_times = new List<string> { game.StartTime! };
+    //     raw_times.AddRange(game.Moves.Select(move => move.Time));
+
+    //     var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
+
+    //     // Calculate first player's duration
+    //     // var firstPlayerDuration = times
+    //     //     .Select((time, index) => (time, index))
+    //     //     .Where(pair => pair.index % 2 == 1)
+    //     //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
+
+    //     var firstPlayerDuration = TimeSpan.Zero;
+
+    //     var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
+    //     var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+    //     var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
+
+    //     for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
+    //     {
+    //         firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
+    //     }
+
+    //     var player0Time = mainTimeSpan - firstPlayerDuration;
+
+
+    //     var secondPlayerDuration = TimeSpan.Zero;
+    //     var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
+    //     var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
+    //     var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
+
+    //     for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
+    //     {
+    //         secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
+    //     }
+    //     var player1Time = mainTimeSpan - secondPlayerDuration;
+
+
+    //     var playerTimes = new List<TimeSpan> { player0Time, player1Time };
+
+    //     // If the game has ended, apply the end time to the player with the turn
+    //     if (game.GameState == GameState.Ended)
+    //     {
+    //         playerTimes[(int)GetStoneFromPlayerId(GetPlayerIdWithTurn()!)] -= DateTime.Parse(game.EndTime!) - times.Last();
+    //     }
+
+    //     return playerTimes;
+    // }
+
+    private async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings)> UpdateRatingsOnResult()
+    {
+        Debug.Assert(_gameState == GameState.Ended, "Game must be ended to update ratings");
+
+        var game = _GetGame();
+
+        var res = await _ratingEngine.CalculateRatingAndPerfsAsync(
+            winnerId: _winnerId!,
+            boardSize: game.GetBoardSize(),
+            timeStandard: game.TimeControl.TimeStandard,
+            players: game.Players,
+            endTime: (DateTime)_endTime!
+        );
+
+        _playersRatingsDiff = res.RatingDiffs;
+
+        return res;
     }
 
     private void SetScoreCalculationState(MoveData lastMove)
@@ -602,12 +746,6 @@ public class GameGrain : Grain, IGameGrain
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select(a => a.Key).ToList(),
             playground
         );
-    }
-
-    public Task<Game> GetGame()
-    {
-        var game = _GetGame();
-        return Task.FromResult(game);
     }
 
     // Helpers

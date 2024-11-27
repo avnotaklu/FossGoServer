@@ -63,8 +63,8 @@ public class StoneLogicTest
     public void TestGetClusters()
     {
         var board = _5x5BasicBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
 
         Assert.AreEqual(1, clusters.Count);
         Assert.AreEqual(5, clusters.First().data.Count);
@@ -77,8 +77,8 @@ public class StoneLogicTest
     public void TestGetStones()
     {
         var board = _5x5BasicBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
         var stones = boardCons.GetStones(clusters);
 
         Assert.AreEqual(5, stones.Count);
@@ -88,8 +88,8 @@ public class StoneLogicTest
     public void TestAddition()
     {
         var board = _5x5BasicBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
         var stones = boardCons.GetStones(clusters);
         var stoneLogic = new StoneLogic(boardCons.ConstructBoard(5, 5, stones));
 
@@ -110,8 +110,8 @@ public class StoneLogicTest
     public void TestUnplayableDueToNoFreedoms()
     {
         var board = _5x5BasicBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
         var stones = boardCons.GetStones(clusters);
         var stoneLogic = new StoneLogic(boardCons.ConstructBoard(5, 5, stones));
 
@@ -127,8 +127,8 @@ public class StoneLogicTest
     public void TestKillStone()
     {
         var board = _5x5DeathBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
         var stones = boardCons.GetStones(clusters);
         var boardState = boardCons.ConstructBoard(5, 5, stones);
         var stoneLogic = new StoneLogic(boardState);
@@ -152,8 +152,8 @@ public class StoneLogicTest
     public void TestKoInsert()
     {
         var board = _5x5DeathBoard();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(5, 5));
         var stones = boardCons.GetStones(clusters);
         var boardState = boardCons.ConstructBoard(5, 5, stones);
         var stoneLogic = new StoneLogic(boardState);
@@ -182,8 +182,8 @@ public class StoneLogicTest
     public void TestSimpleBoardRepresentation()
     {
         var highLevelBoard = _5x5BasicBoardHighLevelRepr();
-        var boardCons = new BoardStateUtilities(5, 5);
-        var result = boardCons.SimpleBoardRepresentation(highLevelBoard);
+        var boardCons = new BoardStateUtilities();
+        var result = boardCons.SimpleBoardRepresentation(highLevelBoard, new BoardSizeParams(5, 5));    
 
         Assert.IsTrue(_2DArrayEqual(result, _5x5BasicBoard()));
     }

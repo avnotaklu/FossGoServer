@@ -96,7 +96,6 @@ public static class GameHelpers
         return null;
     }
 
-
     public static BoardSize GetBoardSize(this Game game)
     {
         return game.Rows switch
@@ -106,6 +105,11 @@ public static class GameHelpers
             19 => game.Columns switch { 19 => BoardSize.Nineteen, _ => BoardSize.Other },
             _ => BoardSize.Other
         };
+    }
+
+    public static BoardSizeParams GetBoardSizeParams(this Game game)
+    {
+        return new BoardSizeParams(rows: game.Rows, columns: game.Columns);
     }
 }
 
@@ -117,13 +121,54 @@ public enum BoardSize
     Other = 3
 }
 
+public static class GameFieldNames
+{
+    public const string Rows = "r";
+    public const string Cols = "c";
+    public const string TimeControl = "tc";
+    public const string PlayerTimeSnapshots = "ts";
+    public const string PlaygroundMap = "map";
+    public const string Moves = "mv";
+    public const string Players = "p";
+    public const string Prisoners = "pr";
+    public const string StartTime = "st";
+    public const string EndTime = "et";
+    public const string KoPositionInLastMove = "ko";
+    public const string GameState = "gs";
+    public const string DeadStones = "ds";
+    public const string WinnerId = "wi";
+    public const string FinalTerritoryScores = "fts";
+    public const string Komi = "k";
+    public const string GameOverMethod = "gom";
+    public const string StoneSelectionType = "sst";
+    public const string GameCreator = "gc";
+    public const string PlayersRatings = "rts";
+    public const string PlayersRatingsDiff = "prd";
+
+    public const string MainTimeSeconds = "mts";
+    public const string IncrementSeconds = "is";
+    public const string ByoYomiTime = "byt";
+    public const string TimeStandard = "ts";
+    public const string ByoYomiCount = "byc";
+    public const string ByoYomiSeconds = "bys";
+
+    public const string SnapshotTimestamp = "st";
+    public const string MainTimeMilliseconds = "mt";
+    public const string ByoYomisLeft = "byl";
+    public const string ByoYomiActive = "bya";
+    public const string TimeActive = "ta";
+}
+
 [Immutable, GenerateSerializer]
 [Alias("Game")]
+[BsonIgnoreExtraElements]
 public class Game
 {
     public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, List<int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
 StoneSelectionType stoneSelectionType,
-string? gameCreator
+string? gameCreator,
+List<int>? playersRatings,
+List<int>? playersRatingsDiff
     )
     {
         GameId = gameId;
@@ -146,74 +191,81 @@ string? gameCreator
         EndTime = endTime;
         StoneSelectionType = stoneSelectionType;
         GameCreator = gameCreator;
+        PlayersRatings = playersRatings;
+        PlayersRatingsDiff = playersRatingsDiff;
     }
 
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    [Id(0)]
-    public string? Id { get; set; }
-    [BsonElement("gameId")]
     [Id(1)]
     public string GameId { get; set; }
-    [BsonElement("rows")]
+    [BsonElement(GameFieldNames.Rows)]
     [Id(2)]
     public int Rows { get; set; }
-    [BsonElement("columns")]
+    [BsonElement(GameFieldNames.Cols)]
     [Id(3)]
     public int Columns { get; set; }
-    [BsonElement("timeControl")]
+    [BsonElement(GameFieldNames.TimeControl)]
     [Id(4)]
     public TimeControl TimeControl { get; set; }
-    [BsonElement("playerTimeSnapshots")]
+    [BsonElement(GameFieldNames.PlayerTimeSnapshots)]
     [Id(5)]
     public List<PlayerTimeSnapshot> PlayerTimeSnapshots { get; set; }
-    [BsonElement("playgroundMap")]
+    [BsonElement(GameFieldNames.PlaygroundMap)]
     [Id(6)]
     public Dictionary<string, StoneType> PlaygroundMap { get; set; }
-    [BsonElement("moves")]
+    [BsonElement(GameFieldNames.Moves)]
     [Id(7)]
     public List<MoveData> Moves { get; set; }
-    [BsonElement("players")]
+    [BsonElement(GameFieldNames.Players)]
     [Id(8)]
     public Dictionary<string, StoneType> Players { get; set; }
-    [BsonElement("prisoners")]
+    [BsonElement(GameFieldNames.Prisoners)]
     [Id(9)]
     public List<int> Prisoners { get; set; }
-    [BsonElement("startTime")]
+    [BsonElement(GameFieldNames.StartTime)]
     [Id(10)]
     public string? StartTime { get; set; }
-    [BsonElement("koPositionInLastMove")]
+    [BsonElement(GameFieldNames.KoPositionInLastMove)]
     [Id(11)]
     public string? KoPositionInLastMove { get; set; }
-    [BsonElement("gameState")]
+    [BsonElement(GameFieldNames.GameState)]
     [Id(12)]
     public GameState GameState { get; set; }
-    [BsonElement("deadStones")]
+    [BsonElement(GameFieldNames.DeadStones)]
     [Id(13)]
     public List<string> DeadStones { get; set; }
-    [BsonElement("winnerId")]
+    [BsonElement(GameFieldNames.WinnerId)]
     [Id(14)]
     public string? WinnerId { get; set; }
-    [BsonElement("finalTerritoryScores")]
+    [BsonElement(GameFieldNames.FinalTerritoryScores)]
     [Id(15)]
     public List<int> FinalTerritoryScores { get; set; }
-    [BsonElement("komi")]
+    [BsonElement(GameFieldNames.Komi)]
     [Id(16)]
     public float Komi { get; set; }
-    [BsonElement("gameOverMethod")]
+    [BsonElement(GameFieldNames.GameOverMethod)]
     [Id(17)]
     public GameOverMethod? GameOverMethod { get; set; }
-    [BsonElement("endTime")]
+    [BsonElement(GameFieldNames.EndTime)]
     [Id(18)]
     public string? EndTime { get; set; }
 
-    [BsonElement("stoneSelectionType")]
+    [BsonElement(GameFieldNames.StoneSelectionType)]
     [Id(19)]
     public StoneSelectionType StoneSelectionType { get; set; }
 
-    [BsonElement("gameCreator")]
+    [BsonElement(GameFieldNames.GameCreator)]
     [Id(20)]
     public string? GameCreator { get; set; }
+
+    [BsonElement(GameFieldNames.PlayersRatings)]
+    [Id(21)]
+    public List<int>? PlayersRatings { get; set; }
+
+    [BsonElement(GameFieldNames.PlayersRatingsDiff)]
+    [Id(22)]
+    public List<int>? PlayersRatingsDiff { get; set; }
 }
 
 [GenerateSerializer]
@@ -256,19 +308,19 @@ public enum TimeStandard
 [Alias("TimeControl")]
 public class TimeControl
 {
-    [BsonElement("mainTimeSeconds")]
+    [BsonElement(GameFieldNames.MainTimeSeconds)]
     [Id(0)]
     public int MainTimeSeconds { get; set; }
 
-    [BsonElement("incrementSeconds")]
+    [BsonElement(GameFieldNames.IncrementSeconds)]
     [Id(1)]
     public int? IncrementSeconds { get; set; }
 
-    [BsonElement("byoYomiTime")]
+    [BsonElement(GameFieldNames.ByoYomiTime)]
     [Id(2)]
     public ByoYomiTime? ByoYomiTime { get; set; }
 
-    [BsonElement("timeStandard")]
+    [BsonElement(GameFieldNames.TimeStandard)]
     [Id(3)]
     public TimeStandard TimeStandard { get; set; }
 
@@ -299,11 +351,11 @@ public class TimeControl
 [Alias("ByoYomiTime")]
 public class ByoYomiTime
 {
-    [BsonElement("byoYomis")]
+    [BsonElement(GameFieldNames.ByoYomiCount)]
     [Id(0)]
     public int ByoYomis { get; set; }
 
-    [BsonElement("byoYomiSeconds")]
+    [BsonElement(GameFieldNames.ByoYomiSeconds)]
     [Id(1)]
     public int ByoYomiSeconds { get; set; }
 
@@ -328,23 +380,45 @@ public class PlayerTimeSnapshot
         TimeActive = timeActive;
     }
 
-    [BsonElement("snapshotTimestamp")]
+    [BsonElement(GameFieldNames.SnapshotTimestamp)]
     [Id(0)]
     public string SnapshotTimestamp { get; set; }
 
-    [BsonElement("mainTimeMilliseconds")]
+    [BsonElement(GameFieldNames.MainTimeMilliseconds)]
     [Id(1)]
     public int MainTimeMilliseconds { get; set; }
 
-    [BsonElement("byoYomisLeft")]
+    [BsonElement(GameFieldNames.ByoYomisLeft)]
     [Id(2)]
     public int? ByoYomisLeft { get; set; }
 
-    [BsonElement("byoYomiActive")]
+    [BsonElement(GameFieldNames.ByoYomiActive)]
     [Id(3)]
     public bool ByoYomiActive { get; set; }
 
-    [BsonElement("timeActive")]
+    [BsonElement(GameFieldNames.TimeActive)]
     [Id(4)]
     public bool TimeActive { get; set; }
+}
+
+public static class BoardSizeParamsExt
+{
+    public static bool checkIfInsideBounds(this BoardSizeParams p, Position pos)
+    {
+        return pos.X > -1 && pos.X < p.Rows && pos.Y < p.Columns && pos.Y > -1;
+    }
+}
+
+/// <summary>
+/// Helper class to store board size parameters
+/// </summary>
+public class BoardSizeParams
+{
+    public int Rows;
+    public int Columns;
+    public BoardSizeParams(int rows, int columns)
+    {
+        Rows = rows;
+        Columns = columns;
+    }
 }

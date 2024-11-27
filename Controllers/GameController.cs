@@ -16,14 +16,33 @@ public class GameController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
     private readonly UsersService _usersService;
+    private readonly IGameService _gameService;
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructorAttribute]
-    public GameController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory)
+    public GameController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory, IGameService gameService)
     {
         _logger = logger;
         _usersService = usersService;
         _grainFactory = grainFactory;
+        _gameService = gameService;
+    }
+
+    private async Task<Game> SaveGame(string gameId)
+    {
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
+        var curGame = await gameGrain.GetGame();
+        var res = await _gameService.SaveGame(curGame);
+        if (res == null)
+        {
+            var oldGame = await _gameService.GetGame(gameId);
+            await gameGrain.ResetGame(oldGame);
+            throw new Exception("Failed to save game");
+        }
+        else
+        {
+            return res;
+        }
     }
 
     [HttpPost("{gameId}/MakeMove")]
@@ -35,8 +54,9 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var res = await gameGrain.MakeMove(move, userId);
 
+        var game = await SaveGame(GameId);
         return Ok(new NewMoveResult(
-            game: res.game,
+            game: game,
             result: res.moveSuccess
         ));
     }
@@ -50,7 +70,7 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.ContinueGame(userId);
 
-        // var res = await gameGrain.MakeMove(move, userId);
+        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -63,7 +83,7 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.AcceptScores(userId);
 
-        // var res = await gameGrain.MakeMove(move, userId);
+        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -76,6 +96,7 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.ResignGame(userId);
 
+        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -85,7 +106,7 @@ public class GameController : ControllerBase
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
 
-        var position = new Position(data.Position.X, data.Position.Y);        
+        var position = new Position(data.Position.X, data.Position.Y);
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.EditDeadStone(position, data.State);
@@ -103,7 +124,7 @@ public class GameController : ControllerBase
             )
         ), GameId, toMe: true);
 
-        // var res = await gameGrain.MakeMove(move, userId);
+        await SaveGame(GameId);
         return Ok(game);
     }
 }

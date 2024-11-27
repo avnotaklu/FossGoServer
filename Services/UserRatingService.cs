@@ -1,12 +1,15 @@
 using System.Reflection.Metadata.Ecma335;
 using BadukServer;
 using BadukServer.Models;
+using Glicko2;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 public interface IUserRatingService
 {
     public Task<UserRating> GetUserRatings(string userId);
+    public Task<UserRating?> CreateUserRatings(string userId);
+    public Task<UserRating?> SaveUserRatings(UserRating userRating);
 }
 
 public class UserRatingService : IUserRatingService
@@ -24,9 +27,9 @@ public class UserRatingService : IUserRatingService
             ratingsCollection.Value.Name);
     }
 
-    public Task<UserRating> GetUserRatings(string userId)
+    public async Task<UserRating> GetUserRatings(string userId)
     {
-        throw new NotImplementedException();
+        return await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync();
     }
 
     public async Task<UserRating?> CreateUserRatings(string userId)
@@ -36,6 +39,20 @@ public class UserRatingService : IUserRatingService
             var rating = new UserRating(userId, GetInitialRatings());
             await _ratingsCollection.InsertOneAsync(rating);
             return rating;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<UserRating?> SaveUserRatings(UserRating userRating)
+    {
+        try
+        {
+            var res = await _ratingsCollection.UpdateOneAsync(Builders<UserRating>.Filter.Eq(a => a.UserId, userRating.UserId), Builders<UserRating>.Update.Set(a => a.Ratings, userRating.Ratings));
+
+            return userRating;
         }
         catch
         {
@@ -53,18 +70,6 @@ public class UserRatingService : IUserRatingService
     private static PlayerRatingData GetInitialRatingData()
     {
         return new PlayerRatingData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
-    }
-}
-
-public class UserRating
-{
-    public string UserId;
-    public Dictionary<string, PlayerRatingData> Ratings;
-
-    public UserRating(string userId, Dictionary<string, PlayerRatingData> ratings)
-    {
-        UserId = userId;
-        Ratings = ratings;
     }
 }
 

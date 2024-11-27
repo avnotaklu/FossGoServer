@@ -38,6 +38,9 @@ public class Startup
 
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<UsersService>();
+        services.AddSingleton<IUserRatingService, UserRatingService>();
+        services.AddSingleton<IGameService, GameService>();
+        services.AddSingleton<RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ISignalRGameHubService, SignalRGameHubService>();
 
@@ -48,6 +51,12 @@ public class Startup
 
         services.Configure<MongodbCollectionParams<User>>(
             Configuration.GetSection("UserCollection"));
+
+        services.Configure<MongodbCollectionParams<UserRating>>(
+            Configuration.GetSection("UserRatingsCollection"));
+
+        services.Configure<MongodbCollectionParams<Game>>(
+            Configuration.GetSection("GameCollection"));
 
         services.Configure<JwtSettings>(
             Configuration.GetSection("JwtSettings"));
@@ -122,12 +131,6 @@ public class Startup
         app.UseAuthentication();
         app.UseRouting();
         app.UseAuthorization();
-        //         app.MapControllers();
-
-        var summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
 
         app.UseEndpoints(e =>
         {

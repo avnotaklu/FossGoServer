@@ -76,7 +76,7 @@ public class RatingEngine
     }
 
     // 
-    public async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> Users)> CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, DateTime endTime)
+    public async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings)> CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, DateTime endTime)
     {
         if (winnerId == null)
         {
@@ -198,7 +198,7 @@ public class RatingEngine
         return result;
     }
 
-    public (string standardKey, PlayerRatingData data) RatingForTimeStandard(TimeStandard timeStandard, UserRating p)
+    private (string standardKey, PlayerRatingData data) RatingForTimeStandard(TimeStandard timeStandard, UserRating p)
     {
         var timeStandardStyle = RatingKey(null, timeStandard);
 
@@ -328,35 +328,3 @@ static class PlayerRatingDataExt
         return updatedRecent.Take(RecentMaxSize).ToList();
     }
 }
-
-public class PlayerRatingData
-{
-    public GlickoRating Glicko;
-    public int NB; // number of results
-    public List<int> Recent;
-    public DateTime? Latest; // last rating period end date
-
-    public PlayerRatingData(GlickoRating glicko, int nb, List<int> recent, DateTime? latest)
-    {
-        Glicko = glicko;
-        NB = nb;
-        Recent = recent;
-        Latest = latest;
-    }
-}
-
-public class GlickoRating
-{
-    public double Rating;
-    public double Deviation;
-    public double Volatility;
-
-    public GlickoRating(double rating, double deviation, double volatility)
-    {
-        Rating = rating;
-        Deviation = deviation;
-        Volatility = volatility;
-    }
-}
-
-

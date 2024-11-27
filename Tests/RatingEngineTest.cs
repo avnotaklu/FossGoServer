@@ -44,8 +44,8 @@ public class RatingEngineTest
         Assert.IsTrue(res.RatingDiffs[(int)players[winnerId]] > 0);
         Assert.IsTrue(res.RatingDiffs[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!] < 0);
 
-        Assert.IsTrue(res.Users[(int)players[winnerId]].Ratings[blitz_nine_by_nine_style].Glicko.Rating > 1500);
-        Assert.IsTrue(res.Users[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating < 1500);
+        Assert.IsTrue(res.UserRatings[(int)players[winnerId]].Ratings[blitz_nine_by_nine_style].Glicko.Rating > 1500);
+        Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating < 1500);
 
 
         // Assert.IsTrue(res.Users[(int)players[winnerId]].Ratings[blitz_style].Glicko.Rating > 1500);

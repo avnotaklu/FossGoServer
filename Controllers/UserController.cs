@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 [Route("[controller]")]
 public class UserController : ControllerBase
 {
-    private UserRatingService _ratingService;
-    private Logger<UserController> _logger;
-    public UserController(UserRatingService userRepo, Logger<UserController> logger)
+    private IUserRatingService _ratingService;
+    private ILogger<UserController> _logger;
+    public UserController(IUserRatingService userRepo, ILogger<UserController> logger)
     {
         _ratingService = userRepo;
         _logger = logger;
@@ -16,7 +16,9 @@ public class UserController : ControllerBase
     [HttpGet("GetUserRatings")]
     public async Task<ActionResult<UserRating>> GetUserRatings([FromQuery] string userId)
     {
-        return await _ratingService.GetUserRatings(userId);
+        _logger.LogInformation("Getting user ratings for user {userId}", userId);
+        var res = await _ratingService.GetUserRatings(userId);
+        return Ok(res);
     }
 
 }

@@ -18,8 +18,8 @@ public class ScoreCalculationTest
 
         var rows = 5;
         var cols = 5;
-        var boardCons = new BoardStateUtilities(rows, cols);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(rows, cols));
         var stones = boardCons.GetStones(clusters);
         var boardState = boardCons.ConstructBoard(rows, cols, stones);
         // var stoneLogic = new StoneLogic(boardState);
@@ -58,8 +58,8 @@ public class ScoreCalculationTest
 
         var rows = 5;
         var cols = 5;
-        var boardCons = new BoardStateUtilities(rows, cols);
-        var clusters = boardCons.GetClusters(board);
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(board, new BoardSizeParams(rows, cols));
         var stones = boardCons.GetStones(clusters);
         var boardState = boardCons.ConstructBoard(rows, cols, stones);
         // var stoneLogic = new StoneLogic(boardState);

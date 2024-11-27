@@ -565,22 +565,29 @@ Dictionary<Position, Stone> playground
         }
     }
 
-    public class BoardStateUtilities(int rows, int cols)
+    public class BoardStateUtilities()
     {
         public BoardState BoardStateFromGame(Game game)
         {
+            var rows = game.Rows;
+            var cols = game.Columns;
+
             var map = game.PlaygroundMap;
 
-            var simpleB = SimpleBoardRepresentation(map);
-            var clusters = GetClusters(simpleB);
+            var boardSize = game.GetBoardSizeParams();
+            var simpleB = SimpleBoardRepresentation(map, boardSize);
+            var clusters = GetClusters(simpleB, boardSize);
 
             var stones = GetStones(clusters);
             var board = ConstructBoard(rows, cols, stones, game.KoPositionInLastMove == null ? null : new Position(game.KoPositionInLastMove!));
 
             return board;
         }
-        public int[,] SimpleBoardRepresentation(Dictionary<string, StoneType> map)
+        public int[,] SimpleBoardRepresentation(Dictionary<string, StoneType> map, BoardSizeParams boardSize)
         {
+            var rows = boardSize.Rows;
+            var cols = boardSize.Columns;
+
             var board = new int[rows, cols];
 
             foreach (var item in map)
@@ -592,7 +599,7 @@ Dictionary<Position, Stone> playground
             return board;
         }
 
-        public List<Cluster> GetClusters(int[,] board)
+        public List<Cluster> GetClusters(int[,] board, BoardSizeParams boardSize)
         {
             Dictionary<Position, Cluster> clusters = [];
 
@@ -620,7 +627,7 @@ Dictionary<Position, Stone> playground
                         new Position(i + 1, j),
                     ];
 
-                    neighbors.RemoveAll(p => !checkIfInsideBounds(p));
+                    neighbors.RemoveAll(p => !boardSize.checkIfInsideBounds(p));
 
                     if (board[i, j] != 0)
                     {
@@ -702,10 +709,6 @@ Dictionary<Position, Stone> playground
             return boardState.playgroundMap.ToDictionary(e => e.Key, e => (StoneType)e.Value.player);
         }
 
-        bool checkIfInsideBounds(Position pos)
-        {
-            return pos.X > -1 && pos.X < rows && pos.Y < cols && pos.Y > -1;
-        }
 
     }
 

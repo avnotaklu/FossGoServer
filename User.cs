@@ -3,20 +3,27 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
+public static class UserFieldNames
+{
+    public const string Email = "em";
+    public const string PasswordHash = "ph";
+    public const string GoogleSignIn = "gs";
+}
+
 [BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     public string? Id { get; set; }
-    [BsonElement("email")]
+    [BsonElement(UserFieldNames.Email)]
     public string Email { get; set; }
-    [BsonElement("passwordHash")]
+    [BsonElement(UserFieldNames.PasswordHash)]
     [BsonIgnoreIfNull]
     public string? PasswordHash { get; set; }
-    [BsonElement("googleSignIn")]
+    [BsonElement(UserFieldNames.GoogleSignIn)]
     public bool GoogleSignIn { get; set; }
-    public User(string email,  bool googleSignIn, string? passwordHash = null)
+    public User(string email, bool googleSignIn, string? passwordHash = null)
     {
         Email = email;
         PasswordHash = passwordHash;

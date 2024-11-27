@@ -14,14 +14,16 @@ public class PlayerController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
     private readonly UsersService _usersService;
+    private readonly IGameService _gameService;
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructor]
-    public PlayerController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory)
+    public PlayerController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory, IGameService gameService)
     {
         _logger = logger;
         _usersService = usersService;
         _grainFactory = grainFactory;
+        _gameService = gameService;
     }
 
 
@@ -41,6 +43,25 @@ public class PlayerController : ControllerBase
         var playerIds = await playerPoolGrain.GetActivePlayers();
         var users = await _usersService.GetByIds(playerIds.ToList());
         return Ok(new RegisterPlayerResult(users));
+    }
+
+
+
+    private async Task<Game> SaveGame(string gameId)
+    {
+        var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
+        var curGame = await gameGrain.GetGame();
+        var res = await _gameService.SaveGame(curGame);
+        if (res == null)
+        {
+            var oldGame = await _gameService.GetGame(gameId);
+            await gameGrain.ResetGame(oldGame);
+            throw new Exception("Failed to save game");
+        }
+        else
+        {
+            return res;
+        }
     }
 
     [HttpPost("CreateGame")]
@@ -69,6 +90,7 @@ public class PlayerController : ControllerBase
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(userId);
         await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage), gameId, toMe: false);
 
+        await SaveGame(gameId);
         return Ok(game);
     }
 
@@ -132,6 +154,7 @@ public class PlayerController : ControllerBase
             await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
         }
 
+        await SaveGame(gameId);
         return Ok(joinRes);
     }
 
