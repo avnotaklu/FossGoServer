@@ -65,6 +65,22 @@ public class PlayerRatingData
     }
 }
 
+public static class GlickoRatingExtensions
+{
+    public static (double min, double max) GetRatingRange(this PlayerRatingData playerRatingData)
+    {
+        return (playerRatingData.Glicko.Rating - playerRatingData.Glicko.Deviation, playerRatingData.Glicko.Rating + playerRatingData.Glicko.Deviation);
+    }
+
+    public static bool RatingRangeOverlap(this PlayerRatingData playerRatingData, PlayerRatingData otherPlayerRatingData)
+    {
+        var (min, max) = playerRatingData.GetRatingRange();
+        var (otherMin, otherMax) = otherPlayerRatingData.GetRatingRange();
+
+        return min <= otherMax && max >= otherMin;
+    }
+}
+
 
 [Immutable, GenerateSerializer]
 [Alias("GlickoRating")]

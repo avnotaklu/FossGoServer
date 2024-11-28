@@ -13,12 +13,12 @@ namespace BadukServer.Controllers;
 public class PlayerController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
-    private readonly UsersService _usersService;
+    private readonly IUsersService _usersService;
     private readonly IGameService _gameService;
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructor]
-    public PlayerController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory, IGameService gameService)
+    public PlayerController(ILogger<AuthenticationController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
     {
         _logger = logger;
         _usersService = usersService;
@@ -88,18 +88,18 @@ public class PlayerController : ControllerBase
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(userId);
-        await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage), gameId, toMe: false);
+        await notifierGrain.SendMessageToMe(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
 
         await SaveGame(gameId);
         return Ok(game);
     }
 
-    async Task<PublicUserInfo?> GetOtherPlayerData(Game game, string myId)
+    private async Task<PublicUserInfo?> GetOtherPlayerData(Game game, string myId)
     {
         var otherPlayer = game.Players.Keys.FirstOrDefault(p => p != myId);
         if (otherPlayer != null)
         {
-            var otherPlayerData = _usersService.GetByIds([otherPlayer]).Result;
+            var otherPlayerData = await _usersService.GetByIds([otherPlayer]);
             return new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
         }
         return null;
@@ -139,20 +139,13 @@ public class PlayerController : ControllerBase
 
         var time = DateTime.Now.ToString("o");
 
-        await player.JoinGame(gameId, time);
-        var newGame = await gameGrain.GetGame();
+        var res = await player.JoinGame(gameId, time);
 
         var joinRes = new GameJoinResult(
-            game: newGame,
-                otherPlayerData: await GetOtherPlayerData(newGame, userId),
+            game: res.game,
+            otherPlayerData: res.creatorData,
             time: time
         );
-
-        foreach (var id in newGame.Players.Keys)
-        {
-            var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(id);
-            await notifierGrain.SendMessage(new SignalRMessage(type: SignalRMessageType.gameJoin, data: joinRes), gameId, toMe: true);
-        }
 
         await SaveGame(gameId);
         return Ok(joinRes);
@@ -205,7 +198,7 @@ public class PlayerController : ControllerBase
             PublicUserInfo? otherPlayerPublicData = null;
             if (g.DidStart())
             {
-                var otherPlayerId = g.GetOtherPlayerIdFromPlayerId(userId);
+                var otherPlayerId = g.Players.GetOtherPlayerIdFromPlayerId(userId);
                 var otherPlayerData = _usersService.GetByIds([otherPlayerId]).Result;
                 otherPlayerPublicData = new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
             }

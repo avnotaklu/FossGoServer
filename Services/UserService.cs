@@ -7,7 +7,16 @@ using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 namespace BadukServer.Services;
 
-public class UsersService
+
+public interface IUsersService
+{
+    public Task<List<User>> Get();
+    public Task<List<User>> GetByIds(List<string> ids);
+    public Task<User?> GetByEmail(string email);
+    public Task<User?> CreateUser(string email, bool googleSignIn, string? password = null);
+}
+
+public class UsersService : IUsersService
 {
     private readonly IMongoCollection<User> _usersCollection;
 

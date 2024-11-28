@@ -3,7 +3,7 @@ using BadukServer;
 
 public enum DeadStoneState
 {
-    Dead  = 0,
+    Dead = 0,
     Alive = 1
 }
 
@@ -19,6 +19,15 @@ public class EditDeadStoneClusterDto
         Position = position;
     }
 }
+
+public static class RawPositionExtensions
+{
+    public static Position ToGamePosition(this RawPosition position)
+    {
+        return new Position(position.X, position.Y);
+    }
+}
+
 
 [Immutable, GenerateSerializer]
 public class RawPosition

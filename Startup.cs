@@ -4,6 +4,7 @@ using BadukServer;
 using BadukServer.Hubs;
 using BadukServer.Models;
 using BadukServer.Services;
+using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -37,10 +38,10 @@ public class Startup
         });
 
         services.AddSingleton<AuthenticationService>();
-        services.AddSingleton<UsersService>();
+        services.AddSingleton<IUsersService,  UsersService>();
         services.AddSingleton<IUserRatingService, UserRatingService>();
         services.AddSingleton<IGameService, GameService>();
-        services.AddSingleton<RatingEngine>();
+        services.AddSingleton<IRatingEngine,RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ISignalRGameHubService, SignalRGameHubService>();
 

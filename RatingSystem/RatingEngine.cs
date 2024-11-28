@@ -29,38 +29,42 @@ using Moq;
 //     }
 // }
 
+public interface IRatingEngine
+{
+    public (List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings) CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, List<UserRating> usersRatings, DateTime endTime);
+    public double PreviewDeviation(PlayerRatingData data, DateTime ratingPeriodEndDate, bool reverse);
+}
 
-public class RatingEngine
+public class RatingEngine : IRatingEngine
 {
     private const double ProvisionalDeviation = 110;
     // private readonly List<Rating> _players = [];
     // private readonly List<Result> _results = [];
     private readonly RatingPeriodResults _result;
-    private DateTime _lastRatingPeriodStart;
+    // private DateTime _lastRatingPeriodStart;
     // private GlickoSettings _settings;
     private RatingCalculator _calculator;
     private ILogger<RatingEngine> _logger;
-    private IUserRatingService _userRepo;
 
-    public RatingEngine(ILogger<RatingEngine> logger, IUserRatingService userRepo)
+    public RatingEngine(ILogger<RatingEngine> logger)
     {
-        _lastRatingPeriodStart = DateTime.Now;
+        // _lastRatingPeriodStart = DateTime.Now;
         // _settings = settings;
         _result = new();
         _calculator = new();
         _logger = logger;
-        _userRepo = userRepo;
     }
 
 
-    public RatingEngine(DateTime startAt, ILogger<RatingEngine> logger, UserRatingService userRepo)
-    {
-        _lastRatingPeriodStart = startAt;
-        _result = new();
-        _calculator = new();
-        _userRepo = userRepo;
-        _logger = logger;
-    }
+//     public RatingEngine(
+// // DateTime startAt, 
+//         ILogger<RatingEngine> logger)
+//     {
+//         // _lastRatingPeriodStart = startAt;
+//         _result = new();
+//         _calculator = new();
+//         _logger = logger;
+//     }
 
     private Rating RatingFromRatingData(PlayerRatingData ratingData)
     {
@@ -76,7 +80,7 @@ public class RatingEngine
     }
 
     // 
-    public async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings)> CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, DateTime endTime)
+    public (List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings) CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, List<UserRating> usersRatings, DateTime endTime)
     {
         if (winnerId == null)
         {
@@ -87,8 +91,8 @@ public class RatingEngine
             throw new InvalidOperationException("Can't calculate rating for games with board size other than 9, 13, 19");
         }
 
-        var users = await Task.WhenAll(players.Keys.Select(id => _userRepo.GetUserRatings(id)!).ToList());
-        var ratingGame = GetPlayerRatingsForGame(boardSize, timeStandard, users.ToList(), winnerId, players, endTime);
+        // var usersRatings = await Task.WhenAll(players.Keys.Select(id => _userRepo.GetUserRatings(id)!).ToList());
+        var ratingGame = GetPlayerRatingsForGame(boardSize, timeStandard, usersRatings, winnerId, players, endTime);
 
         var oldRatings = ratingGame.PlayersRatingData;
 
@@ -96,7 +100,7 @@ public class RatingEngine
         var result = new RatingPeriodResults();
 
         var winner = ratingGame.PlayersRatingData[(int)players[winnerId]!];
-        var loser = ratingGame.PlayersRatingData[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!];
+        var loser = ratingGame.PlayersRatingData[(int)players.GetOtherStoneFromPlayerId(winnerId)!];
 
         result.AddResult(
             winner: RatingFromRatingData(winner),
@@ -113,9 +117,9 @@ public class RatingEngine
             return ratingOf(next) - ratingOf(prev);
         }).ToList();
 
-        var newUsers = usersWithNewRatings(users.ToList(), newRatings, ratingGame);
+        var newUsers = usersWithNewRatings(usersRatings.ToList(), newRatings, ratingGame);
 
-        return (ratingDiffs, oldRatings, newRatings, users.ToList());
+        return (ratingDiffs, oldRatings, newRatings, usersRatings.ToList());
     }
 
     public double PreviewDeviation(PlayerRatingData data, DateTime ratingPeriodEndDate, bool reverse)

@@ -3,6 +3,8 @@
 // String key is user id
 public interface IPushNotifierGrain : IGrainWithStringKey
 {
-    ValueTask SendMessage(SignalRMessage message, string gameGroup, bool toMe = true);
+    public ValueTask SendMessageToMe(SignalRMessage message);
+    // public ValueTask SendMessageToAll(SignalRMessage message, string gameGroup);
+    public Task<string> GetConnectionId();
     ValueTask InitializeNotifier(string connectionId);
 }

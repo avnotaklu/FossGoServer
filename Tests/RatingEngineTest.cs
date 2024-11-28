@@ -34,7 +34,7 @@ public class RatingEngineTest
         userRepoMock.Setup(x => x.GetUserRatings("a")).ReturnsAsync(() => userRatings[0]);
         userRepoMock.Setup(x => x.GetUserRatings("b")).ReturnsAsync(() => userRatings[1]);
 
-        var engine = new RatingEngine(logger, userRepoMock.Object);
+        var engine = new RatingEngine(logger);
 
         var winnerId = "a";
         var boardSize = BoardSize.Nine;
@@ -45,16 +45,23 @@ public class RatingEngineTest
             ["b"] = StoneType.White
         };
 
-        var res = await engine.CalculateRatingAndPerfsAsync(winnerId, boardSize, timeStandard, players, DateTime.Now);
+        var res = engine.CalculateRatingAndPerfsAsync(
+                winnerId: winnerId,
+                boardSize: boardSize,
+                timeStandard: timeStandard,
+                players: players,
+                usersRatings: [.. (await Task.WhenAll(players.GetPlayerIdSortedByColor().Select(a => userRepoMock.Object.GetUserRatings(a))))],
+                endTime: DateTime.Now
+            );
 
         Assert.IsTrue(res.RatingDiffs[(int)players[winnerId]] > 0);
-        Assert.IsTrue(res.RatingDiffs[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!] < 0);
+        Assert.IsTrue(res.RatingDiffs[(int)players.GetOtherStoneFromPlayerId(winnerId)!] < 0);
 
         Assert.IsTrue(res.UserRatings[(int)players[winnerId]].Ratings[blitz_nine_by_nine_style].Glicko.Rating > 1500);
-        Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating < 1500);
+        Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerId(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating < 1500);
 
         Assert.IsTrue(res.UserRatings[(int)players[winnerId]].Ratings[blitz_style].Glicko.Rating > 1500);
-        Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerIdAlt(winnerId)!].Ratings[blitz_style].Glicko.Rating < 1500);
+        Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerId(winnerId)!].Ratings[blitz_style].Glicko.Rating < 1500);
     }
 
     [TestMethod]
@@ -66,7 +73,7 @@ public class RatingEngineTest
 
         var (logger, userRepoMock) = GetEngineConstructorParams();
 
-        var preview = new RatingEngine(logger, userRepoMock.Object).PreviewDeviation(rating, now, reverse);
+        var preview = new RatingEngine(logger).PreviewDeviation(rating, now, reverse);
 
         Assert.IsTrue(preview > 110);
     }

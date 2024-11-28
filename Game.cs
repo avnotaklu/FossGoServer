@@ -31,42 +31,60 @@ public static class GameHelpers
     }
 
 
-    public static StoneType? GetStoneFromPlayerId(this Game game, string id)
+    // public static StoneType? GetStoneFromPlayerId(this Game game, string id)
+    // {
+    //     if (!game.DidStart()) return null;
+    //     return game.Players[id];
+    // }
+
+
+    // public static StoneType? GetOtherStoneFromPlayerId(this Game game, string id)
+    // {
+    //     if (!game.DidStart()) return null;
+    //     return 1 - game.GetStoneFromPlayerId(id);
+    // }
+
+    // public static string? GetOtherPlayerIdFromPlayerId(this Game game, string id)
+    // {
+    //     var otherStone = game.GetOtherStoneFromPlayerId(id);
+    //     if (otherStone == null) return null;
+
+    //     return game.GetPlayerIdFromStoneType((StoneType)otherStone);
+    // }
+    // public static string? GetPlayerIdFromStoneType(this Game game, StoneType stone)
+    // {
+    //     if (!game.DidStart()) return null;
+    //     foreach (var item in game.Players)
+    //     {
+    //         if (item.Value == stone)
+    //         {
+    //             return item.Key;
+    //         }
+    //     }
+    //     // Player: {stone} has not yet joined the game
+    //     return null;
+    // }
+
+    public static StoneType? GetStoneFromPlayerId(this Dictionary<string, StoneType> players, string id)
     {
-        if (!game.DidStart()) return null;
-        return game.Players[id];
+        return players[id];
     }
 
-
-    public static StoneType? GetOtherStoneFromPlayerId(this Game game, string id)
-    {
-        if (!game.DidStart()) return null;
-        return 1 - game.GetStoneFromPlayerId(id);
-    }
-
-    public static string? GetOtherPlayerIdFromPlayerId(this Game game, string id)
-    {
-        var otherStone = game.GetOtherStoneFromPlayerId(id);
-        if (otherStone == null) return null;
-
-        return game.GetPlayerIdFromStoneType((StoneType)otherStone);
-    }
-
-    public static StoneType? GetOtherStoneFromPlayerIdAlt(this Dictionary<string, StoneType> players, string id)
+    public static StoneType? GetOtherStoneFromPlayerId(this Dictionary<string, StoneType> players, string id)
     {
         return 1 - players[id];
     }
 
-    public static string? GetOtherPlayerIdFromPlayerIdAlt(this Dictionary<string, StoneType> players, string id)
+    public static string? GetOtherPlayerIdFromPlayerId(this Dictionary<string, StoneType> players, string id)
     {
-        var otherStone = players.GetOtherStoneFromPlayerIdAlt(id);
+        var otherStone = players.GetOtherStoneFromPlayerId(id);
         if (otherStone == null) return null;
 
-        return players.GetPlayerIdFromStoneTypeAlt((StoneType)otherStone);
+        return players.GetPlayerIdFromStoneType((StoneType)otherStone);
     }
 
 
-    public static string? GetPlayerIdFromStoneTypeAlt(this Dictionary<string, StoneType> players, StoneType stone)
+    public static string? GetPlayerIdFromStoneType(this Dictionary<string, StoneType> players, StoneType stone)
     {
         foreach (var item in players)
         {
@@ -80,20 +98,16 @@ public static class GameHelpers
         return null;
     }
 
-
-    public static string? GetPlayerIdFromStoneType(this Game game, StoneType stone)
+    public static List<string> GetPlayerIdSortedByColor(this Dictionary<string, StoneType> players)
     {
-        if (!game.DidStart()) return null;
-        foreach (var item in game.Players)
+        var black = players.GetPlayerIdFromStoneType(StoneType.Black);
+        var white = players.GetPlayerIdFromStoneType(StoneType.White);
+        if (black == null || white == null)
         {
-            if (item.Value == stone)
-            {
-                return item.Key;
-            }
+            throw new UnreachableException("Both players should be present in the game");
         }
 
-        // Player: {stone} has not yet joined the game
-        return null;
+        return new List<string> { black, white };
     }
 
     public static BoardSize GetBoardSize(this Game game)

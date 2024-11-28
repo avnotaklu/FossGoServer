@@ -1,5 +1,6 @@
 using BadukServer;
 using BadukServer.Orleans.Grains;
+using BadukServer.Services;
 using Castle.DynamicProxy;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,8 +15,22 @@ namespace Tests;
 public class GameGrainTests
 {
     static public Mock<IDateTimeService> dateTimeMock = new Mock<IDateTimeService>();
+    static public Mock<IUsersService> userServicesMock = new Mock<IUsersService>();
+    static public Mock<IUserRatingService> userRatingsServicesMock = new Mock<IUserRatingService>();
+    static public Mock<IGameService> gameService = new Mock<IGameService>();
     static public Mock<ISignalRGameHubService> hubContextMock = new();
-    static public Mock<IPushNotifierGrain> journal = new Mock<IPushNotifierGrain>();
+    static public Mock<IRatingEngine> ratingEngineMock = new();
+
+    static List<User> users = new List<User>
+    {
+        new User("p1", false, "ph"),
+        new User("p2", false, "ph")
+    };
+
+    static List<UserRating> userRatings = [
+        new UserRating("p1", UserRatingService.GetInitialRatings()),
+        new UserRating("p2", UserRatingService.GetInitialRatings())
+    ];
 
     static public DateTime _1980Jan1_1_30PM = new DateTime(
         year: 1980,
@@ -50,7 +65,13 @@ public class GameGrainTests
 
         DateTime curTimeGetter() => curTime;
 
+        List<List<string>> userId = [];
+
+        userServicesMock.Setup(x => x.GetByIds(It.IsAny<List<string>>())).Returns(() => Task.FromResult(users));
+        userRatingsServicesMock.Setup(x => x.GetUserRatings(It.IsAny<string>())).Returns(() => Task.FromResult(userRatings.First()));
+
         dateTimeMock.Setup(x => x.Now()).Returns(curTimeGetter);
+
         dateTimeMock.Setup(x => x.NowFormatted()).Returns(() => dateTimeMock.Object.Now().ToString("o"));
 
         hubContextMock.Setup(x => x.SendToClient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()))
@@ -65,21 +86,45 @@ public class GameGrainTests
             mainTimeSeconds: 10,
             incrementSeconds: null,
             byoYomiTime: new ByoYomiTime(3, 3)
-            // timeStandard: TimeStandard.Blitz
+        // timeStandard: TimeStandard.Blitz
         );
 
         var gameId = await p1.CreateGame(rows, cols, timeControl, BadukServer.StoneSelectionType.Black, dateTimeMock.Object.NowFormatted());
 
         var gameGrain = cluster.GrainFactory.GetGrain<IGameGrain>(gameId);
 
+
+        gameService.Setup(x => x.SaveGame(It.IsAny<Game>())).Returns(async () => await gameGrain.GetGame());
+        gameService.Setup(x => x.GetGame(It.IsAny<string>())).Returns(async () => await gameGrain.GetGame());
+
+        ratingEngineMock.Setup(x => x.CalculateRatingAndPerfsAsync(
+            It.IsAny<string>(),
+            It.IsAny<BoardSize>(),
+            It.IsAny<TimeStandard>(),
+            It.IsAny<Dictionary<string, StoneType>>(),
+            It.IsAny<List<UserRating>>(),
+            It.IsAny<DateTime>()
+        )).Returns((
+            new List<int>(),
+            new List<PlayerRatingData>(),
+            new List<PlayerRatingData>(),
+            new List<UserRating>()
+        ));
+
+        ratingEngineMock.Setup(x => x.PreviewDeviation(
+            It.IsAny<PlayerRatingData>(),
+            It.IsAny<DateTime>(),
+            It.IsAny<bool>()
+        )).Returns(120);
+
+
         var game = await gameGrain.GetGame();
 
-        var stoneType = game.GetStoneFromPlayerId(p1Id);
 
-
-        Assert.IsTrue(game.Players.ContainsKey(p1Id));
+        Assert.IsTrue(!game.Players.ContainsKey(p1Id)); // Players should not be in the game yet
+        Assert.IsNotNull(game.GameCreator);
         Assert.AreEqual(GameState.WaitingForStart, game.GameState);
-        Assert.AreEqual(StoneType.Black, game.Players[p1Id]);
+        Assert.AreEqual(StoneSelectionType.Black, game.StoneSelectionType);
 
         curTime = curTime.AddSeconds(1);
 
@@ -178,6 +223,10 @@ public class GameGrainTests
             {
                 services.AddSingleton((a) => dateTimeMock.Object);
                 services.AddSingleton((a) => hubContextMock.Object);
+                services.AddSingleton((a) => userServicesMock.Object);
+                services.AddSingleton((a) => userRatingsServicesMock.Object);
+                services.AddSingleton((a) => gameService.Object);
+                services.AddSingleton((a) => ratingEngineMock.Object);
             });
 
             siloBuilder.Services.AddSerializer();

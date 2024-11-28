@@ -3,7 +3,7 @@ using BadukServer.Orleans.Grains;
 
 public class GameTimerGrain : Grain, IGameTimerGrain
 {
-    private IDisposable _timerHandle;
+    private IDisposable _timerHandle = null!;
     private bool _isTurnActive;
     private string gameId => this.GetPrimaryKeyString();
 
@@ -25,11 +25,7 @@ public class GameTimerGrain : Grain, IGameTimerGrain
             Timeout,
             this,
             TimeSpan.FromMilliseconds(durationInMilliseconds),
-            TimeSpan.FromMilliseconds(-1)); // Single-use timer
-        //     TurnExpired,
-        //     null,
-        //     TimeSpan.FromSeconds(durationInSeconds),
-        //     TimeSpan.FromMilliseconds(-1)); // Single-use timer
+            TimeSpan.FromMilliseconds(-1));
 
         return Task.CompletedTask;
     }

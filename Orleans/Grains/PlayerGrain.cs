@@ -7,7 +7,7 @@ namespace BadukServer.Orleans.Grains;
 
 public class PlayerGrain : Grain, IPlayerGrain
 {
-    private string _connectionId;
+    private string _connectionId = null!;
     private bool _isInitialized = false;
     public List<string> games = [];
 
@@ -47,14 +47,8 @@ public class PlayerGrain : Grain, IPlayerGrain
         // add ourselves to the game
         await gameGrain.CreateGame(rows, columns, timeControl, stone, userId);
 
-        // await _hubContext.Groups.AddToGroupAsync(_connectionId, gameId);
-        var game = await gameGrain.GetGame();
-
         _activeGameId = gameId;
         games.Add(gameId);
-
-        // var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
-        // await pairingGrain.AddGame(gameId);
 
         return gameId;
     }
@@ -65,7 +59,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return (await grain.GetGames()).Where(x => _activeGameId != x.GameId).ToArray();
     // }
 
-    public async Task<string> JoinGame(string gameId, string time)
+    public async Task<(Game game, PublicUserInfo creatorData)> JoinGame(string gameId, string time)
     {
         var userId = this.GetPrimaryKeyString(); // our player id
 
@@ -77,7 +71,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         _activeGameId = gameId;
 
-        return game.GameId;
+        return game;
     }
 
     public Task LeaveGame(string gameId)

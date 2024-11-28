@@ -10,6 +10,15 @@ public class UserFieldNames
     public const string GoogleSignIn = "gs";
 }
 
+public static class UserExtensions
+{
+    public static PublicUserInfo ToPublicInfo(this User user)
+    {
+        return new PublicUserInfo(user.Id!, user.Email);
+    }
+
+}
+
 [BsonIgnoreExtraElements]
 public class User
 {

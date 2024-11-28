@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using BadukServer.Services;
 using Microsoft.CodeAnalysis;
 using MongoDB.Bson.Serialization.Serializers;
 using Orleans.Concurrency;
@@ -46,13 +47,15 @@ public class GameGrain : Grain, IGameGrain
     private readonly ILogger<GameGrain> _logger;
     private readonly IDateTimeService _dateTimeService;
     private readonly IUserRatingService _userRatingService;
+    private readonly IUsersService _userService;
     private readonly IGameService _gameService;
+    private readonly ISignalRGameHubService _hubService;
 
 
     private BoardStateUtilities _boardStateUtilities;
-    private RatingEngine _ratingEngine;
+    private IRatingEngine _ratingEngine;
 
-    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUserRatingService userRatingService, IGameService gameService, RatingEngine ratingEngine)
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IGameService gameService, ISignalRGameHubService hubService, IRatingEngine ratingEngine)
     {
         _logger = logger;
         _dateTimeService = dateTimeService;
@@ -60,30 +63,32 @@ public class GameGrain : Grain, IGameGrain
         _gameService = gameService;
         _boardStateUtilities = new BoardStateUtilities();
         _ratingEngine = ratingEngine;
+        _hubService = hubService;
+        _userService = usersService;
     }
 
     public void SetState(
- int rows,
- int columns,
- TimeControl timeControl,
- List<PlayerTimeSnapshot> playerTimeSnapshots,
- List<MoveData> moves,
- Dictionary<string, StoneType> playgroundMap,
- Dictionary<string, StoneType> players,
- List<int> prisoners,
- string? startTime,
- GameState gameState,
- string? koPositionInLastMove,
- List<string> deadStones,
- string? winnerId,
- List<int> finalTerritoryScores,
- float komi,
- GameOverMethod? gameOverMethod,
- string? endTime,
- StoneSelectionType stoneSelectionType,
- string? gameCreator,
- List<int>? playersRatings,
- List<int>? playersRatingsDiff
+        int rows,
+        int columns,
+        TimeControl timeControl,
+        List<PlayerTimeSnapshot> playerTimeSnapshots,
+        List<MoveData> moves,
+        Dictionary<string, StoneType> playgroundMap,
+        Dictionary<string, StoneType> players,
+        List<int> prisoners,
+        string? startTime,
+        GameState gameState,
+        string? koPositionInLastMove,
+        List<string> deadStones,
+        string? winnerId,
+        List<int> finalTerritoryScores,
+        float komi,
+        GameOverMethod? gameOverMethod,
+        string? endTime,
+        StoneSelectionType stoneSelectionType,
+        string? gameCreator,
+        List<int>? playersRatings,
+        List<int>? playersRatingsDiff
     )
     {
         _rows = rows;
@@ -142,19 +147,25 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    public Task<Game> JoinGame(string player, string time)
+    public async Task<(Game, PublicUserInfo)> JoinGame(string player, string time)
     {
+
         if (_players.Keys.Contains(player))
         {
-            // TODO: this condition should never happen, Check whether i can throw here?? 
-            var premature_game = _GetGame();
-            return Task.FromResult(premature_game);
+            var otherPlayerDataAlreadyStart = (await _userService.GetByIds([GetOtherPlayerIdFromPlayerId(player)])).First();
+            var oldGame = _GetGame();
+            return (oldGame, otherPlayerDataAlreadyStart.ToPublicInfo());
         }
 
         StartGame(time, [_gameCreator, player]);
 
+        var otherPlayerData = (await _userService.GetByIds([GetOtherPlayerIdFromPlayerId(player)])).First();
+
         var game = _GetGame();
-        return Task.FromResult(game);
+
+        SendJoinMessage(player, time.DeserializedDate(), otherPlayerData.ToPublicInfo());
+
+        return (game, otherPlayerData.ToPublicInfo());
     }
 
     public Task<Dictionary<string, StoneType>> GetPlayers()
@@ -232,14 +243,7 @@ public class GameGrain : Grain, IGameGrain
         {
             // Send message to player with current turn
             var currentTurnPlayer = GetPlayerIdWithTurn();
-            var pushNotifier = GrainFactory.GetGrain<IPushNotifierGrain>(currentTurnPlayer);
-            await pushNotifier.SendMessage(
-                new SignalRMessage(
-                    type: SignalRMessageType.newMove,
-                    data: new NewMoveMessage(game: game)
-                ), game.GameId, toMe: true
-            );
-
+            SendNewMoveMessage(currentTurnPlayer);
         }
 
         return (true, game);
@@ -253,12 +257,9 @@ public class GameGrain : Grain, IGameGrain
         _scoresAcceptedBy.Clear();
 
         var game = await GetGame();
-        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId)));
+        var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
 
-        await pushNotifierGrain.SendMessage(new SignalRMessage(
-            type: SignalRMessageType.continueGame,
-            data: new ContinueGameMessage(game)
-        ), gameId, toMe: true);
+        SendContinueGameMessage(otherPlayer);
 
         return game;
     }
@@ -268,27 +269,16 @@ public class GameGrain : Grain, IGameGrain
         Debug.Assert(_gameState == GameState.ScoreCalculation);
         _scoresAcceptedBy.Add(playerId);
 
-        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId)));
-
+        var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
         if (_scoresAcceptedBy.Count == 2)
         {
             // Game is over
             EndGame(GameOverMethod.Score);
-
-            await pushNotifierGrain.SendMessage(new SignalRMessage(
-                type: SignalRMessageType.gameOver,
-                data: new GameOverMessage(
-                    GameOverMethod.Score,
-                    _GetGame()
-                )
-            ), gameId, toMe: false);
+            SendGameOverMessage(otherPlayer, GameOverMethod.Score);
         }
         else
         {
-            await pushNotifierGrain.SendMessage(new SignalRMessage(
-                type: SignalRMessageType.acceptedScores,
-                data: null
-            ), gameId, toMe: true);
+            SendAcceptedScoresMessage(otherPlayer);
         }
 
         var game = await GetGame();
@@ -297,52 +287,31 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ResignGame(string playerId)
     {
-        var otherPlayerId = GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerId));
+        var otherPlayerId = GetOtherPlayerIdFromPlayerId(playerId);
 
         EndGame(GameOverMethod.Resign, otherPlayerId);
 
         var game = await GetGame();
-        var pushNotifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(otherPlayerId);
 
-        await pushNotifierGrain.SendMessage(new SignalRMessage(
-            type: SignalRMessageType.gameOver,
-            data: new GameOverMessage(
-                GameOverMethod.Resign,
-                game
-            )
-        ), gameId, toMe: true);
+        SendGameOverMessage(otherPlayerId, GameOverMethod.Resign);
 
         return game;
     }
 
-    public async Task<PlayerTimeSnapshot?> TimeoutCurrentPlayer()
+    public Task<PlayerTimeSnapshot> TimeoutCurrentPlayer()
     {
         var playerWithTurn = GetPlayerIdWithTurn();
         var otherPlayerId = GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerWithTurn));
 
-        var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-
         var curPlayerTime = RecalculateTurnPlayerTimeSnapshots(_moves, _playerTimeSnapshots, _timeControl);
-
 
         if (curPlayerTime.MainTimeMilliseconds <= 0)
         {
             EndGame(GameOverMethod.Timeout, otherPlayerId);
 
-            var game = _GetGame();
-
             foreach (var playerId in _players.Keys)
             {
-                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(playerId);
-
-                await pushGrain.SendMessage(
-                    new SignalRMessage(
-                        SignalRMessageType.gameOver,
-                        new GameOverMessage(game: game, method: GameOverMethod.Timeout)
-                    ),
-                    gameId,
-                    toMe: true
-                );
+                SendGameOverMessage(playerId, GameOverMethod.Timeout);
             }
 
             Console.WriteLine("Game timeout");
@@ -351,22 +320,10 @@ public class GameGrain : Grain, IGameGrain
         {
             foreach (var playerId in _players.Keys)
             {
-                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(playerId);
-
-                await pushGrain.SendMessage(
-                    new SignalRMessage(
-                        SignalRMessageType.gameTimerUpdate,
-                        new GameTimerUpdateMessage(
-                            currentPlayerTime: curPlayerTime,
-                            player: GetStoneFromPlayerId(playerWithTurn)
-                        )
-                    ),
-                    gameId,
-                    toMe: true
-                );
+                SendGameTimerUpdateMessage(playerId, curPlayerTime);
             }
         }
-        return curPlayerTime;
+        return Task.FromResult(curPlayerTime);
     }
 
     private async void EndGame(GameOverMethod method, string? winnerId = null)
@@ -417,15 +374,13 @@ public class GameGrain : Grain, IGameGrain
         }
     }
 
-    public Task<Game> EditDeadStone(Position position, DeadStoneState state)
+    public Task<Game> EditDeadStone(RawPosition rawPosition, DeadStoneState state, string editorPlayer)
     {
         Debug.Assert(_gameState == GameState.ScoreCalculation);
         _scoresAcceptedBy.Clear();
-        if (_stoneStates.ContainsKey(position) && _stoneStates[position] == state)
-        {
-            return GetGame();
-        }
-        else
+
+        var position = rawPosition.ToGamePosition();
+        if (!(_stoneStates.ContainsKey(position) && _stoneStates[position] == state))
         {
             var boardState = _boardStateUtilities.BoardStateFromGame(_GetGame());
             var cluster = boardState.playgroundMap[position].cluster;
@@ -434,8 +389,11 @@ public class GameGrain : Grain, IGameGrain
                 _stoneStates[pos] = state;
             }
 
-            return GetGame();
         }
+
+        SendEditDeadStoneMessage(GetOtherPlayerIdFromPlayerId(editorPlayer), rawPosition, state);
+
+        return GetGame();
     }
 
     public Task<Game> GetGame()
@@ -478,6 +436,40 @@ public class GameGrain : Grain, IGameGrain
 
         return GetGame();
     }
+
+    public Task<Game> StartMatch(Match match, string matchedPlayerId)
+    {
+        throw new NotImplementedException();
+    }
+
+    private async Task SendMessageToClient(SignalRMessage message, string player)
+    {
+        try
+        {
+            _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
+            var connectionId = await GrainFactory.GetGrain<PushNotifierGrain>(player).GetConnectionId();
+            await _hubService.SendToClient(connectionId, "gameUpdate", message, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error broadcasting to host");
+        }
+    }
+
+
+    private async Task SendMessageToAll(SignalRMessage message)
+    {
+        try
+        {
+            _logger.LogInformation("Notification sent to <group>{gameGroup}<group>, <message>{message}<message>", gameId, message);
+            await _hubService.SendToAll("gameUpdate", message, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error broadcasting to host");
+        }
+    }
+
     // Grain Overrides //
 
 
@@ -680,11 +672,12 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
 
-        var res = await _ratingEngine.CalculateRatingAndPerfsAsync(
+        var res = _ratingEngine.CalculateRatingAndPerfsAsync(
             winnerId: _winnerId!,
             boardSize: game.GetBoardSize(),
             timeStandard: game.TimeControl.TimeStandard,
             players: game.Players,
+            usersRatings: [.. (await Task.WhenAll(GetPlayerIdSortedByColor().Select(a => _userRatingService.GetUserRatings(a))))],
             endTime: (DateTime)_endTime!
         );
 
@@ -701,11 +694,8 @@ public class GameGrain : Grain, IGameGrain
         var playerWithTurn = GetPlayerIdWithTurn();
 
         _gameState = GameState.ScoreCalculation;
-        var pushNotifier = GrainFactory.GetGrain<IPushNotifierGrain>(playerWithTurn);
-        pushNotifier.SendMessage(new SignalRMessage(
-            SignalRMessageType.scoreCaculationStarted,
-            null
-        ), gameId);
+
+        SendScoreCalculationStartedMessage(playerWithTurn);
     }
 
     private bool HasPassedTwice()
@@ -748,6 +738,84 @@ public class GameGrain : Grain, IGameGrain
         );
     }
 
+    // Push Messages
+
+    private async void SendJoinMessage(string toPlayer, DateTime time, PublicUserInfo otherPlayerData)
+    {
+        var game = _GetGame();
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.gameJoin,
+            new GameJoinResult(
+                game,
+                otherPlayerData,
+                time.SerializedDate()
+            )
+        ), toPlayer);
+    }
+
+    private async void SendNewMoveMessage(string toPlayer)
+    {
+        var game = _GetGame();
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.newMove,
+            new NewMoveMessage(game)
+        ), toPlayer);
+    }
+
+    private async void SendScoreCalculationStartedMessage(string toPlayer)
+    {
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.scoreCaculationStarted,
+            null
+        ), toPlayer);
+    }
+
+    private async void SendEditDeadStoneMessage(string toPlayer, RawPosition position, DeadStoneState state)
+    {
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.editDeadStone,
+            new EditDeadStoneMessage(position, state, _GetGame())
+        ), toPlayer);
+    }
+
+    private async void SendContinueGameMessage(string toPlayer)
+    {
+        var game = _GetGame();
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.continueGame,
+            new ContinueGameMessage(game)
+        ), toPlayer);
+    }
+
+    private async void SendAcceptedScoresMessage(string toPlayer)
+    {
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.acceptedScores,
+            null
+        ), toPlayer);
+    }
+
+    private async void SendGameOverMessage(string toPlayer, GameOverMethod method)
+    {
+        var game = _GetGame();
+        await SendMessageToAll(new SignalRMessage(
+            SignalRMessageType.gameOver,
+            new GameOverMessage(method, game)
+        ));
+    }
+
+    private async void SendGameTimerUpdateMessage(string toPlayer, PlayerTimeSnapshot playerTime)
+    {
+        var playerWithTurn = GetPlayerIdWithTurn();
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.gameTimerUpdate,
+            new GameTimerUpdateMessage(
+                playerTime,
+                GetStoneFromPlayerId(playerWithTurn)
+            )
+        ), toPlayer);
+    }
+
     // Helpers
 
     private bool DidStart()
@@ -766,20 +834,33 @@ public class GameGrain : Grain, IGameGrain
     private StoneType GetStoneFromPlayerId(string id)
     {
         Debug.Assert(DidStart());
-        return (StoneType)_GetGame().GetStoneFromPlayerId(id)!;
+        return (StoneType)_GetGame().Players.GetStoneFromPlayerId(id)!;
     }
 
 
     private StoneType GetOtherStoneFromPlayerId(string id)
     {
         Debug.Assert(DidStart());
-        return (StoneType)_GetGame().GetOtherStoneFromPlayerId(id)!;
+        return (StoneType)_GetGame().Players.GetOtherStoneFromPlayerId(id)!;
     }
 
 
     private string GetPlayerIdFromStoneType(StoneType stone)
     {
         Debug.Assert(DidStart());
-        return _GetGame().GetPlayerIdFromStoneType(stone)!;
+        return _GetGame().Players.GetPlayerIdFromStoneType(stone)!;
+    }
+
+    public string GetOtherPlayerIdFromPlayerId(string id)
+    {
+        Debug.Assert(DidStart());
+        return _GetGame().Players.GetOtherPlayerIdFromPlayerId(id)!;
+    }
+
+
+    public List<string> GetPlayerIdSortedByColor()
+    {
+        Debug.Assert(DidStart());
+        return _GetGame().Players.GetPlayerIdSortedByColor();
     }
 }

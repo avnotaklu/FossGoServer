@@ -12,12 +12,12 @@ using System.Runtime.ConstrainedExecution;
 public class AuthenticationController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
-    private readonly UsersService _usersService;
+    private readonly IUsersService _usersService;
     private readonly IUserRatingService _userRatingService;
     private readonly AuthenticationService _authenticationService;
 
     [ActivatorUtilitiesConstructorAttribute]
-    public AuthenticationController(ILogger<AuthenticationController> logger, UsersService usersService, IUserRatingService userRatingService, AuthenticationService authenticationService)
+    public AuthenticationController(ILogger<AuthenticationController> logger, IUsersService usersService, IUserRatingService userRatingService, AuthenticationService authenticationService)
     {
         _logger = logger;
         _authenticationService = authenticationService;

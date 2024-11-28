@@ -15,9 +15,9 @@ public interface IUserRatingService
 public class UserRatingService : IUserRatingService
 {
     private readonly IMongoCollection<UserRating> _ratingsCollection;
-    private readonly RatingEngine _ratingEngine;
+    private readonly IRatingEngine _ratingEngine;
     private readonly IDateTimeService _dateTimeService;
-    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserRating>> ratingsCollection, RatingEngine ratingEngine, IDateTimeService dateTimeService)
+    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserRating>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService)
     {
         var mongoClient = new MongoClient(
             userDatabaseSettings.Value.ConnectionString);

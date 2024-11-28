@@ -15,12 +15,12 @@ using Microsoft.CodeAnalysis.Differencing;
 public class GameController : ControllerBase
 {
     private readonly ILogger<AuthenticationController> _logger;
-    private readonly UsersService _usersService;
+    private readonly IUsersService _usersService;
     private readonly IGameService _gameService;
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructorAttribute]
-    public GameController(ILogger<AuthenticationController> logger, UsersService usersService, IGrainFactory grainFactory, IGameService gameService)
+    public GameController(ILogger<AuthenticationController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
     {
         _logger = logger;
         _usersService = usersService;
@@ -106,23 +106,8 @@ public class GameController : ControllerBase
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
 
-        var position = new Position(data.Position.X, data.Position.Y);
-
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        var game = await gameGrain.EditDeadStone(position, data.State);
-
-        var otherPlayerId = game.GetOtherPlayerIdFromPlayerId(userId);
-
-        var pushNotifier = _grainFactory.GetGrain<IPushNotifierGrain>(otherPlayerId);
-
-        await pushNotifier.SendMessage(new SignalRMessage(
-            type: SignalRMessageType.editDeadStone,
-            data: new EditDeadStoneMessage(
-                position: data.Position,
-                state: data.State,
-                game: game
-            )
-        ), GameId, toMe: true);
+        var game = await gameGrain.EditDeadStone(data.Position, data.State, userId);
 
         await SaveGame(GameId);
         return Ok(game);
