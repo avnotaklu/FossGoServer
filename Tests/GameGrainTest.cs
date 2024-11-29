@@ -18,7 +18,7 @@ public class GameGrainTests
     static public Mock<IUsersService> userServicesMock = new Mock<IUsersService>();
     static public Mock<IUserRatingService> userRatingsServicesMock = new Mock<IUserRatingService>();
     static public Mock<IGameService> gameService = new Mock<IGameService>();
-    static public Mock<ISignalRGameHubService> hubContextMock = new();
+    static public Mock<ISignalRHubService> hubContextMock = new();
     static public Mock<IRatingEngine> ratingEngineMock = new();
 
     static List<User> users = new List<User>

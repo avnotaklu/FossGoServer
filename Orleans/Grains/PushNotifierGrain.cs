@@ -9,14 +9,11 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 {
     private readonly Queue<SignalRMessage> _messageQueue = new();
     private readonly ILogger<PushNotifierGrain> _logger;
-    private string? _connectionId;
-    private string ConnectionId => _connectionId ?? throw new NullReferenceException("_connectionId is not set");
-    // private readonly HubReference _hub;
-    private readonly ISignalRGameHubService _hubService;
+    private string ConnectionId => this.GetPrimaryKeyString();
+    private string _player = null!;
+    private readonly ISignalRHubService _hubService;
 
-    // private List<(SiloAddress Host, IRemoteLocationHub Hub)> _hubs = new();
-    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRGameHubService hub)
-
+    public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRHubService hub)
     {
         _logger = logger;
         _hubService = hub;
@@ -30,18 +27,26 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         await base.OnActivateAsync(cancellationToken);
     }
 
+    public ValueTask InitializeNotifier(string playerId)
+    {
+        _player = playerId;
+        return new ValueTask();
+    }
+
+    public Task<string> GetPlayerId()
+    {
+        return Task.FromResult(_player);
+    }
+
+
     public override async Task OnDeactivateAsync(DeactivationReason deactivationReason,
         CancellationToken cancellationToken)
     {
         await base.OnDeactivateAsync(deactivationReason, cancellationToken);
     }
-    public ValueTask InitializeNotifier(string connectionId)
-    {
-        _connectionId = connectionId ?? throw new ArgumentNullException(nameof(connectionId));
-        return new ValueTask();
-    }
 
-    public Task<string> GetConnectionId() {
+    public Task<string> GetConnectionId()
+    {
         return Task.FromResult(ConnectionId);
     }
 
@@ -58,13 +63,4 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
             return ValueTask.CompletedTask;
         }
     }
-
-
-    // public ValueTask _SendUpdateToClient(SignalRMessage messages, string connectionId)
-    // {
-    // }
-
-    // public ValueTask _SendUpdatesAll(SignalRMessage messages, string gameGroup)
-    // {
-    // }
 }

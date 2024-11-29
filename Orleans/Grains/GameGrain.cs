@@ -15,7 +15,7 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<string, StoneType> _players = [];
     private GameState _gameState;
     private string? _winnerId;
-    private List<MoveData> _moves = [];
+    private List<GameMove> _moves = [];
     private int _rows;
     private int _columns;
     private TimeControl _timeControl = null!;
@@ -49,13 +49,13 @@ public class GameGrain : Grain, IGameGrain
     private readonly IUserRatingService _userRatingService;
     private readonly IUsersService _userService;
     private readonly IGameService _gameService;
-    private readonly ISignalRGameHubService _hubService;
+    private readonly ISignalRHubService _hubService;
 
 
     private BoardStateUtilities _boardStateUtilities;
     private IRatingEngine _ratingEngine;
 
-    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IGameService gameService, ISignalRGameHubService hubService, IRatingEngine ratingEngine)
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IGameService gameService, ISignalRHubService hubService, IRatingEngine ratingEngine)
     {
         _logger = logger;
         _dateTimeService = dateTimeService;
@@ -72,7 +72,7 @@ public class GameGrain : Grain, IGameGrain
         int columns,
         TimeControl timeControl,
         List<PlayerTimeSnapshot> playerTimeSnapshots,
-        List<MoveData> moves,
+        List<GameMove> moves,
         Dictionary<string, StoneType> playgroundMap,
         Dictionary<string, StoneType> players,
         List<int> prisoners,
@@ -173,7 +173,7 @@ public class GameGrain : Grain, IGameGrain
         return Task.FromResult(_players);
     }
 
-    public Task<List<MoveData>> GetMoves()
+    public Task<List<GameMove>> GetMoves()
     {
         return Task.FromResult(_moves);
     }
@@ -215,7 +215,7 @@ public class GameGrain : Grain, IGameGrain
             }
         }
 
-        var lastMove = new MoveData(
+        var lastMove = new GameMove(
             move.X,
             move.Y,
             now
@@ -447,7 +447,7 @@ public class GameGrain : Grain, IGameGrain
         try
         {
             _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
-            var connectionId = await GrainFactory.GetGrain<PushNotifierGrain>(player).GetConnectionId();
+            var connectionId = await GrainFactory.GetGrain<PlayerGrain>(player).GetConnectionId();
             await _hubService.SendToClient(connectionId, "gameUpdate", message, CancellationToken.None);
         }
         catch (Exception ex)
@@ -509,7 +509,7 @@ public class GameGrain : Grain, IGameGrain
         );
     }
 
-    private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<MoveData> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
+    private PlayerTimeSnapshot RecalculateTurnPlayerTimeSnapshots(List<GameMove> moves, List<PlayerTimeSnapshot> playerTimes, TimeControl timeControl)
     {
         var curTime = now;
         var turn = moves.Count;
@@ -686,7 +686,7 @@ public class GameGrain : Grain, IGameGrain
         return res;
     }
 
-    private void SetScoreCalculationState(MoveData lastMove)
+    private void SetScoreCalculationState(GameMove lastMove)
     {
         Debug.Assert(HasPassedTwice());
         Debug.Assert(lastMove.IsPass());
@@ -700,7 +700,7 @@ public class GameGrain : Grain, IGameGrain
 
     private bool HasPassedTwice()
     {
-        MoveData? prev = null;
+        GameMove? prev = null;
         bool hasPassedTwice = false;
         var reversedMoves = _moves.AsEnumerable().Reverse();
 

@@ -13,4 +13,6 @@ public interface IPlayerGrain : IGrainWithStringKey
     Task<(Game game, PublicUserInfo creatorData)> JoinGame(string gameId, string time);
     Task LeaveGame(string gameId);
 
+    public Task<string> GetConnectionId();
+
 }

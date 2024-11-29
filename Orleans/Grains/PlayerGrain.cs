@@ -11,6 +11,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     private bool _isInitialized = false;
     public List<string> games = [];
 
+
     public PlayerGrain()
     {
     }
@@ -21,8 +22,8 @@ public class PlayerGrain : Grain, IPlayerGrain
     {
         _connectionId = connectionId;
         _isInitialized = true;
-        var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(this.GetPrimaryKeyString());
-        await notifierGrain.InitializeNotifier(connectionId);
+        var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
+        // await notifierGrain.InitializeNotifier(connectionId);
     }
 
     // public async Task<bool> IsInitializedByOtherDevice(string connectionId)
@@ -72,6 +73,11 @@ public class PlayerGrain : Grain, IPlayerGrain
         _activeGameId = gameId;
 
         return game;
+    }
+
+    public Task<string> GetConnectionId()
+    {
+        return Task.FromResult(_connectionId);
     }
 
     public Task LeaveGame(string gameId)

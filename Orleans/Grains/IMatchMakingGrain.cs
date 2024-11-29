@@ -3,5 +3,5 @@ using Orleans;
 
 public interface IMatchMakingGrain : IGrainWithIntegerKey
 {
-    public Task FindMatch(string finderId, PlayerRatingData finderRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards);
+    public Task FindMatch(string finderId, UserRating finderRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards);
 }

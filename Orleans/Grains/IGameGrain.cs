@@ -7,7 +7,7 @@ public interface IGameGrain : IGrainWithStringKey
     Task<Game> GetGame();
     Task<Dictionary<string, StoneType>> GetPlayers();
     Task<GameState> GetState();
-    Task<List<MoveData>> GetMoves();
+    Task<List<GameMove>> GetMoves();
     Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId);
     Task<Game> ContinueGame(string playerId);
     Task<Game> AcceptScores(string playerId);

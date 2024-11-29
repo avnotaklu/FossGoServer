@@ -4,7 +4,7 @@
 public interface IPushNotifierGrain : IGrainWithStringKey
 {
     public ValueTask SendMessageToMe(SignalRMessage message);
-    // public ValueTask SendMessageToAll(SignalRMessage message, string gameGroup);
     public Task<string> GetConnectionId();
-    ValueTask InitializeNotifier(string connectionId);
+    public Task<string> GetPlayerId();
+    ValueTask InitializeNotifier(string playerId);
 }

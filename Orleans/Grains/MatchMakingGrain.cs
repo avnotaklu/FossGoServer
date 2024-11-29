@@ -7,24 +7,20 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
 {
     Dictionary<int, Dictionary<int, List<Match>>> _matchesByBoardAndTime = [];
 
-    public async Task FindMatch(string finderId, PlayerRatingData finderRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards)
+    public async Task FindMatch(string finderId, UserRating finderRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards)
     {
         var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime[(int)b][(int)t])).SelectMany(m => m).SelectMany(m => m).ToList();
 
-        var ratingRange = finderRating.GetRatingRange();
-
-        var match = matchingMatches.FirstOrDefault(m => m.CreatorRating.RatingRangeOverlap(finderRating));
+        var match = matchingMatches.FirstOrDefault(m => m.CreatorRating.RatingRangeOverlap(finderRating.GetRatingData(m.BoardSize, m.TimeStandard)));
 
         if (match == null)
         {
-            match = new Match(
+            boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][(int)t].Add(new Match(
                 finderId,
-                finderRating,
-                boardSizes,
-                timeStandards
-            );
-
-            boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][(int)t].Add(match)));
+                finderRating.GetRatingData(b, t),
+                b,
+                t
+            ))));
         }
         else
         {
@@ -33,7 +29,8 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
 
             foreach (var player in game.Players.Keys)
             {
-                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(player);
+                var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
                 await pushGrain.SendMessageToMe(
                     new SignalRMessage(
                         SignalRMessageType.matchFound,
@@ -57,20 +54,23 @@ public class Match
     [Id(1)]
     public PlayerRatingData CreatorRating { get; set; }
     [Id(2)]
-    public List<BoardSize> BoardSizes { get; set; }
+    public BoardSize BoardSize { get; set; }
     [Id(3)]
-    public List<TimeStandard> TimeStandards { get; set; }
+    public TimeStandard TimeStandard { get; set; }
     public StoneSelectionType StoneType => StoneSelectionType.Auto;
 
-    public Match(string creatorId, PlayerRatingData creatorRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards)
+    public Match(string creatorId, PlayerRatingData creatorRating, BoardSize boardSizes, TimeStandard timeStandards)
     {
         CreatorId = creatorId;
         CreatorRating = creatorRating;
-        BoardSizes = boardSizes;
-        TimeStandards = timeStandards;
+        BoardSize = boardSizes;
+        TimeStandard = timeStandards;
     }
 }
 
+
+[Immutable, GenerateSerializer]
+[Alias("FindMatchDto")]
 public class FindMatchDto
 {
     [Id(0)]
@@ -85,6 +85,9 @@ public class FindMatchDto
     }
 }
 
+
+[Immutable, GenerateSerializer]
+[Alias("FindMatchResult")]
 public class FindMatchResult
 {
     [Id(0)]

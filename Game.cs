@@ -127,6 +127,7 @@ public static class GameHelpers
     }
 }
 
+[GenerateSerializer]
 public enum BoardSize
 {
     Nine = 0,
@@ -171,6 +172,11 @@ public class GameFieldNames
     public const string ByoYomisLeft = "byl";
     public const string ByoYomiActive = "bya";
     public const string TimeActive = "ta";
+
+    // GameMove
+    public const string Time = "t";
+    public const string X = "x";
+    public const string Y = "y";
 }
 
 [Immutable, GenerateSerializer]
@@ -178,7 +184,7 @@ public class GameFieldNames
 [BsonIgnoreExtraElements]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<MoveData> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, List<int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
+    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<GameMove> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, List<int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
 StoneSelectionType stoneSelectionType,
 string? gameCreator,
 List<int>? playersRatings,
@@ -230,7 +236,7 @@ List<int>? playersRatingsDiff
     public Dictionary<string, StoneType> PlaygroundMap { get; set; }
     [BsonElement(GameFieldNames.Moves)]
     [Id(7)]
-    public List<MoveData> Moves { get; set; }
+    public List<GameMove> Moves { get; set; }
     [BsonElement(GameFieldNames.Players)]
     [Id(8)]
     public Dictionary<string, StoneType> Players { get; set; }
@@ -308,6 +314,7 @@ public enum GameState
     Ended = 4
 }
 
+[GenerateSerializer]
 public enum TimeStandard
 {
     Blitz = 0,

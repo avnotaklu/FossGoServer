@@ -87,7 +87,7 @@ public class PlayerController : ControllerBase
 
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
-        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(userId);
+        var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(await player.GetConnectionId());
         await notifierGrain.SendMessageToMe(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
 
         await SaveGame(gameId);

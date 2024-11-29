@@ -1,13 +1,12 @@
+using BadukServer;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-[Immutable, GenerateSerializer]
-[Alias("UserRating")]
+public class UserRatingFieldNames
+{
+    public const string Ratings = "rts";
 
-public class UserRatingFieldNames {
-    public const string Ratings ="rts";
-
-    public const string Glicko ="g";
+    public const string Glicko = "g";
     public const string NB = "nb";
     public const string Recent = "rc";
     public const string Latest = "lt";
@@ -17,6 +16,16 @@ public class UserRatingFieldNames {
     public const string Volatility = "si"; // sigma
 }
 
+public static class UserRatingExtensions
+{
+    public static PlayerRatingData GetRatingData(this UserRating rating, BoardSize boardSize, TimeStandard timeStandard)
+    {
+        return rating.Ratings[RatingEngine.RatingKey(boardSize, timeStandard)];
+    }
+}
+
+[Immutable, GenerateSerializer]
+[Alias("UserRating")]
 public class UserRating
 {
     [BsonId]
@@ -35,6 +44,21 @@ public class UserRating
     }
 }
 
+public static class PlayerRatingDataExtensions
+{
+    public static (double min, double max) GetRatingRange(this PlayerRatingData playerRatingData)
+    {
+        return (playerRatingData.Glicko.Rating - playerRatingData.Glicko.Deviation, playerRatingData.Glicko.Rating + playerRatingData.Glicko.Deviation);
+    }
+
+    public static bool RatingRangeOverlap(this PlayerRatingData playerRatingData, PlayerRatingData otherPlayerRatingData)
+    {
+        var (min, max) = playerRatingData.GetRatingRange();
+        var (otherMin, otherMax) = otherPlayerRatingData.GetRatingRange();
+
+        return min <= otherMax && max >= otherMin;
+    }
+}
 
 [Immutable, GenerateSerializer]
 [Alias("PlayerRatingData")]
@@ -65,21 +89,6 @@ public class PlayerRatingData
     }
 }
 
-public static class GlickoRatingExtensions
-{
-    public static (double min, double max) GetRatingRange(this PlayerRatingData playerRatingData)
-    {
-        return (playerRatingData.Glicko.Rating - playerRatingData.Glicko.Deviation, playerRatingData.Glicko.Rating + playerRatingData.Glicko.Deviation);
-    }
-
-    public static bool RatingRangeOverlap(this PlayerRatingData playerRatingData, PlayerRatingData otherPlayerRatingData)
-    {
-        var (min, max) = playerRatingData.GetRatingRange();
-        var (otherMin, otherMax) = otherPlayerRatingData.GetRatingRange();
-
-        return min <= otherMax && max >= otherMin;
-    }
-}
 
 
 [Immutable, GenerateSerializer]

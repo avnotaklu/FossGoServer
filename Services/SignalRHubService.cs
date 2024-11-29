@@ -1,18 +1,19 @@
 using BadukServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
-public interface ISignalRGameHubService
+public interface ISignalRHubService
 {
     public ValueTask SendToClient(string connectionId, string methodName, object data, CancellationToken cancellationToken);
     public ValueTask SendToAll(string methodName, object data, CancellationToken cancellationToken);
+    public ValueTask SendToGroup(string methodName, string group, object data, CancellationToken cancellationToken);
 }
 
-public class SignalRGameHubService : ISignalRGameHubService
+public class SignalRHubService : ISignalRHubService 
 {
-    private readonly IHubContext<GameHub> _hubContext;
-    private readonly ILogger<SignalRGameHubService> _logger;
+    private readonly IHubContext<MainHub> _hubContext;
+    private readonly ILogger<SignalRHubService> _logger;
 
-    public SignalRGameHubService(IHubContext<GameHub> hubContext, ILogger<SignalRGameHubService> logger)
+    public SignalRHubService(IHubContext<MainHub> hubContext, ILogger<SignalRHubService> logger)
     {
         _hubContext = hubContext;
         _logger = logger;
@@ -22,7 +23,13 @@ public class SignalRGameHubService : ISignalRGameHubService
     {
         return new(_hubContext.Clients.Client(connectionId).SendAsync(methodName, data, cancellationToken));
     }
-    public ValueTask SendToAll(string methodName, object data, CancellationToken cancellationToken) {
+    public ValueTask SendToAll(string methodName, object data, CancellationToken cancellationToken)
+    {
         return new(_hubContext.Clients.All.SendAsync(methodName, data, cancellationToken));
+    }
+
+    public ValueTask SendToGroup(string methodName, string group, object data, CancellationToken cancellationToken)
+    {
+        return new(_hubContext.Clients.Group(group).SendAsync(methodName, data, cancellationToken));
     }
 }

@@ -43,7 +43,7 @@ public class Startup
         services.AddSingleton<IGameService, GameService>();
         services.AddSingleton<IRatingEngine,RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
-        services.AddSingleton<ISignalRGameHubService, SignalRGameHubService>();
+        services.AddSingleton<ISignalRHubService, SignalRHubService>();
 
         services.AddEndpointsApiExplorer();
 
@@ -136,7 +136,7 @@ public class Startup
         app.UseEndpoints(e =>
         {
             e.MapControllers();
-            e.MapHub<GameHub>("/gameHub");
+            e.MapHub<MainHub>("/mainHub");
         });
     }
 

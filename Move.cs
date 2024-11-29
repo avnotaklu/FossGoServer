@@ -35,8 +35,8 @@ namespace BadukServer;
 
 
 [Immutable, GenerateSerializer]
-[Alias("MoveData")]
-public class MoveData
+[Alias("GameMove")]
+public class GameMove
 {
     [BsonElement("x")]
     [Id(0)]
@@ -46,11 +46,11 @@ public class MoveData
     [Id(1)]
     public int? Y { get; set; }
 
-    [BsonElement("time")]
+    [BsonElement("t")]
     [Id(2)]
     public string Time { get; set; }
 
-    public MoveData(int? x, int? y, string time)
+    public GameMove(int? x, int? y, string time)
     {
         Debug.Assert((x == null && y == null) || (x != null && y != null));
         Time = time;
