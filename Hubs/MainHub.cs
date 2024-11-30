@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BadukServer.Orleans.Grains;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -11,12 +12,13 @@ namespace BadukServer.Hubs;
 /// </summary>
 public sealed class MainHub : Hub
 {
-    private readonly ILogger<AuthenticationController> _logger;
+    private readonly ILogger<MainHub> _logger;
     private readonly IGrainFactory _grainFactory;
     private readonly IUserRatingService _userRatingService;
 
     [ActivatorUtilitiesConstructor]
-    public MainHub(ILogger<AuthenticationController> logger, IGrainFactory grainFactory, IUserRatingService userRatingService) {
+    public MainHub(ILogger<MainHub> logger, IGrainFactory grainFactory, IUserRatingService userRatingService)
+    {
         _logger = logger;
         _grainFactory = grainFactory;
         _userRatingService = userRatingService;
@@ -29,20 +31,31 @@ public sealed class MainHub : Hub
 
     public async Task FindMatch(FindMatchDto findMatchDto)
     {
-        _logger.LogInformation("User {user} is looking for a match", Context.ConnectionId);
+        try
+        {
 
-        var matchGrain = _grainFactory.GetGrain<IMatchMakingGrain>(0);
-        var pushGrain = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
-        var playerId = await pushGrain.GetPlayerId();
+            _logger.LogInformation("User {user} is looking for a match", Context.ConnectionId);
 
-        var playerRating = await _userRatingService.GetUserRatings(playerId);
+            Debug.Assert(findMatchDto.BoardSizes.Count > 0);
+            Debug.Assert(findMatchDto.TimeStandards.Count > 0);
 
-        await matchGrain.FindMatch(
-            playerId,
-            playerRating,
-            findMatchDto.BoardSizes,
-            findMatchDto.TimeStandards
-        );
+            var matchGrain = _grainFactory.GetGrain<IMatchMakingGrain>(0);
+            var pushGrain = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
+            var playerId = await pushGrain.GetPlayerId();
+
+            var playerRating = await _userRatingService.GetUserRatings(playerId);
+
+            await matchGrain.FindMatch(
+                playerId,
+                playerRating,
+                findMatchDto.BoardSizes,
+                findMatchDto.TimeStandards
+            );
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error finding match");
+        }
     }
-    
+
 }

@@ -1,5 +1,6 @@
 using BadukServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using MongoDB.Bson;
 using MongoDB.Driver.Core.Clusters.ServerSelectors;
 using Orleans.Concurrency;
 
@@ -9,6 +10,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 {
     private string _connectionId = null!;
     private bool _isInitialized = false;
+    private string PlayerId => this.GetPrimaryKeyString();
     public List<string> games = [];
 
 
@@ -23,7 +25,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         _connectionId = connectionId;
         _isInitialized = true;
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
-        // await notifierGrain.InitializeNotifier(connectionId);
+        await notifierGrain.InitializeNotifier(PlayerId);
     }
 
     // public async Task<bool> IsInitializedByOtherDevice(string connectionId)
@@ -37,9 +39,9 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    public async Task<string> CreateGame(int rows, int columns, TimeControlData timeControl,  StoneSelectionType stone, string time)
+    public async Task<string> CreateGame(int rows, int columns, TimeControlDto timeControl, StoneSelectionType stone, string time)
     {
-        var gameId = Guid.NewGuid().ToString();
+        var gameId = ObjectId.GenerateNewId().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id
 
         Console.WriteLine("Creating new game: " + gameId + " By player " + userId);

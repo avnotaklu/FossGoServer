@@ -34,14 +34,15 @@ public class Startup
         services.AddCors(options =>
         {
             options.AddPolicy(MyAllowSpecificOrigins,
-                            policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()); 
+                            policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
         });
 
         services.AddSingleton<AuthenticationService>();
-        services.AddSingleton<IUsersService,  UsersService>();
+        services.AddSingleton<IUsersService, UsersService>();
         services.AddSingleton<IUserRatingService, UserRatingService>();
         services.AddSingleton<IGameService, GameService>();
-        services.AddSingleton<IRatingEngine,RatingEngine>();
+        services.AddSingleton<IPublicUserInfoService, PublicUserInfoService>();
+        services.AddSingleton<IRatingEngine, RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();
 

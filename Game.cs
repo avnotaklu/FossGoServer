@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using BadukServer;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -127,6 +128,20 @@ public static class GameHelpers
     }
 }
 
+public static class BoardSizeExtensions
+{
+    public static BoardSizeParams GetBoardSizeParams(this BoardSize boardSize)
+    {
+        return boardSize switch
+        {
+            BoardSize.Nine => new BoardSizeParams(9, 9),
+            BoardSize.Thirteen => new BoardSizeParams(13, 13),
+            BoardSize.Nineteen => new BoardSizeParams(19, 19),
+            _ => throw new UnreachableException("Board size not supported")
+        };
+    }
+}
+
 [GenerateSerializer]
 public enum BoardSize
 {
@@ -139,7 +154,7 @@ public enum BoardSize
 public class GameFieldNames
 {
     public const string Rows = "r";
-    public const string Cols = "c";
+    public const string Columns = "c";
     public const string TimeControl = "tc";
     public const string PlayerTimeSnapshots = "ts";
     public const string PlaygroundMap = "map";
@@ -222,7 +237,7 @@ List<int>? playersRatingsDiff
     [BsonElement(GameFieldNames.Rows)]
     [Id(2)]
     public int Rows { get; set; }
-    [BsonElement(GameFieldNames.Cols)]
+    [BsonElement(GameFieldNames.Columns)]
     [Id(3)]
     public int Columns { get; set; }
     [BsonElement(GameFieldNames.TimeControl)]
@@ -321,7 +336,7 @@ public enum TimeStandard
     Rapid = 1,
     Classical = 2,
     Correspondence = 3,
-    Unknown = 4
+    Other = 4
 }
 
 
@@ -359,12 +374,12 @@ public class TimeControl
         TimeStandard = timeStandard;
     }
 
-    public TimeControl(TimeControlData data)
+    public TimeControl(TimeControlDto data)
     {
         ByoYomiTime = data.ByoYomiTime;
         IncrementSeconds = data.IncrementSeconds;
         MainTimeSeconds = data.MainTimeSeconds;
-        TimeStandard = data.GetTimeStandard();
+        TimeStandard = data.GetStandard();
     }
 }
 

@@ -2,8 +2,8 @@ using BadukServer;
 
 public interface IGameGrain : IGrainWithStringKey
 {
-    Task CreateGame(int rows, int columns, TimeControlData timeControl, StoneSelectionType stoneSelectionType, string gameCreator);
-    Task<(Game, PublicUserInfo)> JoinGame(String player, string time);
+    Task CreateGame(int rows, int columns, TimeControlDto timeControl, StoneSelectionType stoneSelectionType, string? gameCreator);
+    Task<(Game game, PublicUserInfo otherPlayerInfo)> JoinGame(String player, string time);
     Task<Game> GetGame();
     Task<Dictionary<string, StoneType>> GetPlayers();
     Task<GameState> GetState();

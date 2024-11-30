@@ -49,13 +49,14 @@ public class GameGrain : Grain, IGameGrain
     private readonly IUserRatingService _userRatingService;
     private readonly IUsersService _userService;
     private readonly IGameService _gameService;
+    private readonly IPublicUserInfoService _publicUserInfo;
     private readonly ISignalRHubService _hubService;
 
 
     private BoardStateUtilities _boardStateUtilities;
     private IRatingEngine _ratingEngine;
 
-    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IGameService gameService, ISignalRHubService hubService, IRatingEngine ratingEngine)
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IGameService gameService, ISignalRHubService hubService, IRatingEngine ratingEngine, IPublicUserInfoService publicUserInfo)
     {
         _logger = logger;
         _dateTimeService = dateTimeService;
@@ -65,6 +66,7 @@ public class GameGrain : Grain, IGameGrain
         _ratingEngine = ratingEngine;
         _hubService = hubService;
         _userService = usersService;
+        _publicUserInfo = publicUserInfo;
     }
 
     public void SetState(
@@ -117,7 +119,7 @@ public class GameGrain : Grain, IGameGrain
 
     // Grain overrides
 
-    public Task CreateGame(int rows, int columns, TimeControlData timeControl, StoneSelectionType stoneSelectionType, string gameCreator)
+    public Task CreateGame(int rows, int columns, TimeControlDto timeControl, StoneSelectionType stoneSelectionType, string? gameCreator)
     {
         SetState(
             rows: rows,
@@ -147,14 +149,14 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    public async Task<(Game, PublicUserInfo)> JoinGame(string player, string time)
+    public async Task<(Game game, PublicUserInfo otherPlayerInfo)> JoinGame(string player, string time)
     {
 
         if (_players.Keys.Contains(player))
         {
             var otherPlayerDataAlreadyStart = (await _userService.GetByIds([GetOtherPlayerIdFromPlayerId(player)])).First();
             var oldGame = _GetGame();
-            return (oldGame, otherPlayerDataAlreadyStart.ToPublicInfo());
+            return (oldGame, await _publicUserInfo.GetPublicUserInfo(otherPlayerDataAlreadyStart.GetUserId()));
         }
 
         StartGame(time, [_gameCreator, player]);
@@ -163,9 +165,11 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
 
-        SendJoinMessage(player, time.DeserializedDate(), otherPlayerData.ToPublicInfo());
+        var otherPlayerInfo = await _publicUserInfo.GetPublicUserInfo(otherPlayerData.GetUserId());
 
-        return (game, otherPlayerData.ToPublicInfo());
+        // SendJoinMessage(player, time.DeserializedDate(), otherPlayerInfo);
+
+        return (game, otherPlayerInfo);
     }
 
     public Task<Dictionary<string, StoneType>> GetPlayers()
@@ -437,9 +441,19 @@ public class GameGrain : Grain, IGameGrain
         return GetGame();
     }
 
-    public Task<Game> StartMatch(Match match, string matchedPlayerId)
+    public async Task<Game> StartMatch(Match match, string matchedPlayerId)
     {
-        throw new NotImplementedException();
+        await CreateGame(
+            rows: match.BoardSize.ToBoardSizeData().Rows,
+            columns: match.BoardSize.ToBoardSizeData().Columns,
+            timeControl: match.TimeControl,
+            stoneSelectionType: match.StoneType,
+            gameCreator: null
+        );
+
+        StartGame(now, [match.CreatorId, matchedPlayerId]);
+
+        return _GetGame();
     }
 
     private async Task SendMessageToClient(SignalRMessage message, string player)
@@ -447,7 +461,7 @@ public class GameGrain : Grain, IGameGrain
         try
         {
             _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
-            var connectionId = await GrainFactory.GetGrain<PlayerGrain>(player).GetConnectionId();
+            var connectionId = await GrainFactory.GetGrain<IPlayerGrain>(player).GetConnectionId();
             await _hubService.SendToClient(connectionId, "gameUpdate", message, CancellationToken.None);
         }
         catch (Exception ex)
@@ -586,11 +600,11 @@ public class GameGrain : Grain, IGameGrain
         var stoneSelectionType = _stoneSelectionType;
         var firstPlayerToAssignStone = _gameCreator ?? players.First();
 
+        var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)(int)stoneSelectionType;
+        var secondPlayerStone = 1 - firstPlayerStone;
+
         foreach (var player in players)
         {
-            var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)stoneSelectionType;
-            var secondPlayerStone = 1 - firstPlayerStone;
-
             if (player == firstPlayerToAssignStone)
             {
                 _players[player] = firstPlayerStone;

@@ -1,43 +1,92 @@
+using System.Runtime.CompilerServices;
 using BadukServer;
 using BadukServer.Orleans.Grains;
+using MongoDB.Bson;
 using Orleans;
 using Tests;
 
 public class MatchMakingGrain : Grain, IMatchMakingGrain
 {
-    Dictionary<int, Dictionary<int, List<Match>>> _matchesByBoardAndTime = [];
+    private readonly ILogger<MatchMakingGrain> _logger;
+    private readonly IPublicUserInfoService _publicUserInfoService;
 
-    public async Task FindMatch(string finderId, UserRating finderRating, List<BoardSize> boardSizes, List<TimeStandard> timeStandards)
+    public MatchMakingGrain(ILogger<MatchMakingGrain> logger, IPublicUserInfoService publicUserInfoService)
     {
-        var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime[(int)b][(int)t])).SelectMany(m => m).SelectMany(m => m).ToList();
+        _publicUserInfoService = publicUserInfoService;
+        _logger = logger;
+    }
 
-        var match = matchingMatches.FirstOrDefault(m => m.CreatorRating.RatingRangeOverlap(finderRating.GetRatingData(m.BoardSize, m.TimeStandard)));
+    Dictionary<int, Dictionary<string, List<Match>>> _matchesByBoardAndTime = [];
+
+    private void InitializeMatches()
+    {
+        foreach (var boardSize in Enum.GetValues(typeof(MatchableBoardSize)).Cast<BoardSize>())
+        {
+            _matchesByBoardAndTime[(int)boardSize] = new Dictionary<string, List<Match>>();
+            foreach (var timeStandard in Constants.timeControlsForMatch)
+            {
+                _matchesByBoardAndTime[(int)boardSize][timeStandard.SimpleRepr()] = new List<Match>();
+            }
+        }
+    }
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        InitializeMatches();
+        await base.OnActivateAsync(cancellationToken);
+    }
+
+    public async ValueTask FindMatch(string finderId, UserRating finderRating, List<MatchableBoardSize> boardSizes, List<TimeControlDto> timeStandards)
+    {
+        var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime.GetOrNull((int)b)?.GetOrNull(t.SimpleRepr()))).SelectMany(m => m).SelectMany(m => m ?? []).ToList();
+
+        // var match = matchingMatches.FirstOrDefault(m => m.CreatorRating.RatingRangeOverlap(finderRating.GetRatingData(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard())));
+        var match = matchingMatches.FirstOrDefault();
 
         if (match == null)
         {
-            boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][(int)t].Add(new Match(
+            boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][t.SimpleRepr()].Add(new Match(
                 finderId,
-                finderRating.GetRatingData(b, t),
+                finderRating.GetRatingData(b.ToBoardSize(), t.GetStandard()),
                 b,
                 t
             ))));
         }
-        else
+        else if (match.CreatorId != finderId)
         {
-            var gameGrain = GrainFactory.GetGrain<IGameGrain>(Guid.NewGuid().ToString());
+            _matchesByBoardAndTime[(int)match.BoardSize.ToBoardSize()][match.TimeControl.SimpleRepr()].Remove(match);
+            var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
+
             var game = await gameGrain.StartMatch(match, finderId);
 
-            foreach (var player in game.Players.Keys)
+            // await gameGrain.CreateGame(
+            //     rows: match.BoardSize.ToBoardSizeData().Rows,
+            //     columns: match.BoardSize.ToBoardSizeData().Columns,
+            //     timeControl: match.TimeControl,
+            //     stoneSelectionType: match.StoneType,
+            //     gameCreator: null
+            // );
+
+            // var (game, otherPlayerInfos) = await gameGrain.JoinGame(finderId, DateTime.Now.SerializedDate());
+
+            var publicInfos = (await Task.WhenAll(game.Players.Keys.Select(async p => await _publicUserInfoService.GetPublicUserInfo(p) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
+
+            if (publicInfos == null) throw new Exception("Public info was null");
+            else
             {
-                var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
-                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
-                await pushGrain.SendMessageToMe(
-                    new SignalRMessage(
-                        SignalRMessageType.matchFound,
-                        new FindMatchResult(match, true, game)
-                    )
-                );
+                foreach (var player in game.Players.Keys)
+                {
+                    var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+                    var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
+                    await pushGrain.SendMessageToMe(
+                        new SignalRMessage(
+                            SignalRMessageType.matchFound,
+                            new FindMatchResult(publicInfos, game)
+                        )
+                    );
+                }
             }
+
 
             // return new FindMatchResult(match, true, game);
         }
@@ -54,17 +103,17 @@ public class Match
     [Id(1)]
     public PlayerRatingData CreatorRating { get; set; }
     [Id(2)]
-    public BoardSize BoardSize { get; set; }
+    public MatchableBoardSize BoardSize { get; set; }
     [Id(3)]
-    public TimeStandard TimeStandard { get; set; }
+    public TimeControlDto TimeControl { get; set; }
     public StoneSelectionType StoneType => StoneSelectionType.Auto;
 
-    public Match(string creatorId, PlayerRatingData creatorRating, BoardSize boardSizes, TimeStandard timeStandards)
+    public Match(string creatorId, PlayerRatingData creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl)
     {
         CreatorId = creatorId;
         CreatorRating = creatorRating;
         BoardSize = boardSizes;
-        TimeStandard = timeStandards;
+        TimeControl = timeControl;
     }
 }
 
@@ -74,11 +123,11 @@ public class Match
 public class FindMatchDto
 {
     [Id(0)]
-    public List<BoardSize> BoardSizes { get; set; }
+    public List<MatchableBoardSize> BoardSizes { get; set; }
     [Id(1)]
-    public List<TimeStandard> TimeStandards { get; set; }
+    public List<TimeControlDto> TimeStandards { get; set; }
 
-    public FindMatchDto(List<BoardSize> boardSizes, List<TimeStandard> timeStandards)
+    public FindMatchDto(List<MatchableBoardSize> boardSizes, List<TimeControlDto> timeStandards)
     {
         BoardSizes = boardSizes;
         TimeStandards = timeStandards;
@@ -91,17 +140,56 @@ public class FindMatchDto
 public class FindMatchResult
 {
     [Id(0)]
-    public Match Match { get; set; }
-    [Id(1)]
-    public Game? Game { get; set; }
-    [Id(2)]
-    public bool MatchFound { get; set; }
+    public List<PublicUserInfo> JoinedPlayers { get; set; }
 
-    public FindMatchResult(Match match, bool matchFound, Game? game)
+    [Id(1)]
+    public Game Game { get; set; }
+
+    public FindMatchResult(List<PublicUserInfo> joinedUsers, Game game)
     {
-        Match = match;
-        MatchFound = matchFound;
+        JoinedPlayers = joinedUsers;
         Game = game;
     }
 
 }
+
+public static class MatchableBoardSizeExt
+{
+    public static BoardSize ToBoardSize(this MatchableBoardSize size) => (BoardSize)size;
+    public static BoardSizeParams ToBoardSizeData(this MatchableBoardSize size)
+    {
+        return size switch
+        {
+            MatchableBoardSize.Nine => new BoardSizeParams(9, 9),
+            MatchableBoardSize.Thirteen => new BoardSizeParams(13, 13),
+            MatchableBoardSize.Nineteen => new BoardSizeParams(19, 19),
+            _ => throw new Exception("Invalid matchable board size")
+        };
+    }
+
+}
+
+
+[GenerateSerializer]
+public enum MatchableBoardSize
+{
+    Nine = 0,
+    Thirteen = 1,
+    Nineteen = 2,
+}
+
+
+// public static class MatchableTimeStandardExt
+// {
+//     public static TimeStandard ToTimeStandard(this MatchableTimeStandard standard) => (TimeStandard)standard;
+// }
+
+
+// [GenerateSerializer]
+// public enum MatchableTimeStandard
+// {
+//     Blitz = 0,
+//     Rapid = 1,
+//     Classical = 2,
+//     Correspondence = 3,
+// }

@@ -82,7 +82,7 @@ public class GameGrainTests
 
         var rows = 9;
         var cols = 9;
-        var timeControl = new TimeControlData(
+        var timeControl = new TimeControlDto(
             mainTimeSeconds: 10,
             incrementSeconds: null,
             byoYomiTime: new ByoYomiTime(3, 3)

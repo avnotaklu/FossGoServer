@@ -44,7 +44,14 @@ public class UserRatingService : IUserRatingService
 
     public async Task<UserRating> GetUserRatings(string userId)
     {
-        return UpdateUserRatingToCurrent(await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync());
+        var oldRating = await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync();
+
+        if (oldRating == null)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        return UpdateUserRatingToCurrent(oldRating);
     }
 
     public async Task<UserRating?> CreateUserRatings(string userId)

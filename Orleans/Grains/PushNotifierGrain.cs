@@ -50,17 +50,16 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return Task.FromResult(ConnectionId);
     }
 
-    public ValueTask SendMessageToMe(SignalRMessage message)
+    public async ValueTask SendMessageToMe(SignalRMessage message)
     {
         try
         {
             _logger.LogInformation("Notification sent to <user>{user}<user>, <message>{message}<message>", ConnectionId, message);
-            return _hubService.SendToClient(ConnectionId, "userUpdate", message, CancellationToken.None);
+            await _hubService.SendToClient(ConnectionId, "userUpdate", message, CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error broadcasting to host");
-            return ValueTask.CompletedTask;
         }
     }
 }

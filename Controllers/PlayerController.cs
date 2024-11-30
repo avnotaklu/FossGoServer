@@ -12,13 +12,14 @@ namespace BadukServer.Controllers;
 [Route("[controller]")]
 public class PlayerController : ControllerBase
 {
-    private readonly ILogger<AuthenticationController> _logger;
+    private readonly ILogger<PlayerController> _logger;
     private readonly IUsersService _usersService;
+    private readonly IUserRatingService _userRatingService;
     private readonly IGameService _gameService;
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructor]
-    public PlayerController(ILogger<AuthenticationController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
+    public PlayerController(ILogger<PlayerController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
     {
         _logger = logger;
         _usersService = usersService;
@@ -82,8 +83,11 @@ public class PlayerController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
         var game = await gameGrain.GetGame();
-        var creatorData = _usersService.GetByIds([userId]).Result;
-        var creatorPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email);
+
+        var creatorData = await _usersService.GetByIds([userId]);
+        var creatorRating = await _userRatingService.GetUserRatings(userId);
+
+        var creatorPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email, rating: creatorRating);
 
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
@@ -100,7 +104,8 @@ public class PlayerController : ControllerBase
         if (otherPlayer != null)
         {
             var otherPlayerData = await _usersService.GetByIds([otherPlayer]);
-            return new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
+            var otherRating = await _userRatingService.GetUserRatings(otherPlayer);
+            return new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email, rating: otherRating);
         }
         return null;
     }
@@ -168,12 +173,16 @@ public class PlayerController : ControllerBase
 
         var availableGames = games.Where(a => !a.DidStart());
 
-        var result = availableGames.Select(g =>
+        var result = (await Task.WhenAll(
+availableGames.Select(async g =>
         {
-            var creatorData = _usersService.GetByIds([g.GameCreator]).Result;
-            var createPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email);
+            var creatorData = await _usersService.GetByIds([g.GameCreator]);
+            var creatorRating = await _userRatingService.GetUserRatings(g.GameCreator!);
+
+            var createPublicData = new PublicUserInfo(id: creatorData[0].Id!, email: creatorData[0].Email, rating: creatorRating);
             return new AvailableGameData(game: g, creatorInfo: createPublicData);
-        }).ToList();
+        })
+        )).ToList();
 
         return Ok(new AvailableGamesResult(games: [.. (result ?? [])]));
     }
@@ -193,17 +202,17 @@ public class PlayerController : ControllerBase
 
         var myGames = games.Where(a => a.Players.ContainsKey(userId));
 
-        var result = games.Select(g =>
+        var result = (await Task.WhenAll(
+games.Select(async g =>
         {
             PublicUserInfo? otherPlayerPublicData = null;
             if (g.DidStart())
             {
-                var otherPlayerId = g.Players.GetOtherPlayerIdFromPlayerId(userId);
-                var otherPlayerData = _usersService.GetByIds([otherPlayerId]).Result;
-                otherPlayerPublicData = new PublicUserInfo(id: otherPlayerData[0].Id!, email: otherPlayerData[0].Email);
+                otherPlayerPublicData = await GetOtherPlayerData(g, userId);
             }
             return new MyGameData(game: g, opposingPlayer: otherPlayerPublicData);
-        }).ToList();
+        })
+        )).ToList();
 
         return Ok(new MyGamesResult(games: [.. (result ?? [])]));
     }

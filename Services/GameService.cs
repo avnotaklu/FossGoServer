@@ -32,7 +32,9 @@ public class GameService : IGameService
     {
         try
         {
-            var res = await _gameCollection.UpdateOneAsync(Builders<Game>.Filter.Eq(a => a.GameId, game.GameId), Builders<Game>.Update.Set(a => a, game));
+            var updateOptions = new ReplaceOptions { IsUpsert = true };
+
+            var res = await _gameCollection.ReplaceOneAsync(Builders<Game>.Filter.Eq(a => a.GameId, game.GameId), game, updateOptions);
 
             return game;
         }

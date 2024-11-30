@@ -12,11 +12,10 @@ public class UserFieldNames
 
 public static class UserExtensions
 {
-    public static PublicUserInfo ToPublicInfo(this User user)
+    public static string GetUserId(this User user)
     {
-        return new PublicUserInfo(user.Id!, user.Email);
+        return user.Id ?? throw new ArgumentNullException(nameof(user.Id));
     }
-
 }
 
 [BsonIgnoreExtraElements]
