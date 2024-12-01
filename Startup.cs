@@ -44,6 +44,7 @@ public class Startup
         services.AddSingleton<IPublicUserInfoService, PublicUserInfoService>();
         services.AddSingleton<IRatingEngine, RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
+        services.AddSingleton<ITimeCalculator, TimeCalculator>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();
 
         services.AddEndpointsApiExplorer();
