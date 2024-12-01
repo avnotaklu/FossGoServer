@@ -278,8 +278,8 @@ public class GameGrain : Grain, IGameGrain
         if (_scoresAcceptedBy.Count == 2)
         {
             // Game is over
-            EndGame(GameOverMethod.Score);
-            SendGameOverMessage(otherPlayer, GameOverMethod.Score);
+            await EndGame(GameOverMethod.Score);
+            SendGameOverMessage(GameOverMethod.Score);
         }
         else
         {
@@ -294,16 +294,16 @@ public class GameGrain : Grain, IGameGrain
     {
         var otherPlayerId = GetOtherPlayerIdFromPlayerId(playerId);
 
-        EndGame(GameOverMethod.Resign, otherPlayerId);
+        await EndGame(GameOverMethod.Resign, otherPlayerId);
 
         var game = await GetGame();
 
-        SendGameOverMessage(otherPlayerId, GameOverMethod.Resign);
+        SendGameOverMessage(GameOverMethod.Resign);
 
         return game;
     }
 
-    public Task<PlayerTimeSnapshot> TimeoutCurrentPlayer()
+    public async Task<PlayerTimeSnapshot> TimeoutCurrentPlayer()
     {
         var playerWithTurn = GetPlayerIdWithTurn();
         var otherPlayerId = GetPlayerIdFromStoneType(GetOtherStoneFromPlayerId(playerWithTurn));
@@ -312,13 +312,8 @@ public class GameGrain : Grain, IGameGrain
 
         if (curPlayerTime.MainTimeMilliseconds <= 0)
         {
-            EndGame(GameOverMethod.Timeout, otherPlayerId);
-
-            foreach (var playerId in _players.Keys)
-            {
-                SendGameOverMessage(playerId, GameOverMethod.Timeout);
-            }
-
+            await EndGame(GameOverMethod.Timeout, otherPlayerId, true);
+            SendGameOverMessage(GameOverMethod.Timeout);
             Console.WriteLine("Game timeout");
         }
         else
@@ -328,10 +323,10 @@ public class GameGrain : Grain, IGameGrain
                 SendGameTimerUpdateMessage(playerId, curPlayerTime);
             }
         }
-        return Task.FromResult(curPlayerTime);
+        return curPlayerTime;
     }
 
-    private async void EndGame(GameOverMethod method, string? winnerId = null)
+    private async Task EndGame(GameOverMethod method, string? winnerId = null, bool timeStopped = false)
     {
         _gameState = GameState.Ended;
 
@@ -352,9 +347,6 @@ public class GameGrain : Grain, IGameGrain
             )
         ];
 
-        var gameTimerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
-
-        await gameTimerGrain.StopTurnTimer();
 
         if (winnerId != null)
         {
@@ -376,6 +368,12 @@ public class GameGrain : Grain, IGameGrain
         foreach (var rating in res.UserRatings)
         {
             await _userRatingService.SaveUserRatings(rating);
+        }
+
+        if (!timeStopped)
+        {
+            var gameTimerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+            await gameTimerGrain.StopTurnTimer();
         }
     }
 
@@ -452,7 +450,11 @@ public class GameGrain : Grain, IGameGrain
             gameCreator: null
         );
 
-        StartGame(now, [match.CreatorId, matchedPlayerId]);
+        List<string> players = [match.CreatorId, matchedPlayerId];
+
+        StartGame(now, players);
+
+        await JoinPlayersToPushGroup();
 
         return _GetGame();
     }
@@ -477,7 +479,7 @@ public class GameGrain : Grain, IGameGrain
         try
         {
             _logger.LogInformation("Notification sent to <group>{gameGroup}<group>, <message>{message}<message>", gameId, message);
-            await _hubService.SendToAll("gameUpdate", message, CancellationToken.None);
+            await _hubService.SendToGroup("gameUpdate", gameId, message, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -490,11 +492,11 @@ public class GameGrain : Grain, IGameGrain
 
     private string gameId => this.GetPrimaryKeyString();
 
-    private async Task<Game?> SaveGame()
-    {
-        var game = _GetGame();
-        return await _gameService.SaveGame(game);
-    }
+    // private async Task<Game?> SaveGame()
+    // {
+    //     var game = _GetGame();
+    //     return await _gameService.SaveGame(game);
+    // }
 
     private Game _GetGame()
     {
@@ -546,9 +548,6 @@ public class GameGrain : Grain, IGameGrain
 
         var applicableIncrement = (timeControl.IncrementSeconds ?? 0) * 1000;
 
-
-        Console.WriteLine("Calculated Player Times");
-        Debug.Write("Calculated Player Times");
         _logger.LogInformation("Calculated Player Times");
 
         playerTimes[activePlayerIdx] = new PlayerTimeSnapshot(
@@ -758,7 +757,9 @@ public class GameGrain : Grain, IGameGrain
     {
         foreach (var player in _players.Keys)
         {
-            await _hubService.AddToGroup(player, gameId, CancellationToken.None);
+            var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+            var conId = await playerGrain.GetConnectionId();
+            await _hubService.AddToGroup(conId, gameId, CancellationToken.None);
         }
     }
 
@@ -817,7 +818,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendGameOverMessage(string toPlayer, GameOverMethod method)
+    private async void SendGameOverMessage(GameOverMethod method)
     {
         var game = _GetGame();
         await SendMessageToAll(new SignalRMessage(

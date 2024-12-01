@@ -1,26 +1,24 @@
-
-using BadukServer.Orleans.Grains;
-
+namespace BadukServer.Orleans.Grains;
 public class GameTimerGrain : Grain, IGameTimerGrain
 {
     private IDisposable _timerHandle = null!;
-    private bool _isTurnActive;
+    private bool _isTimerActive;
     private string gameId => this.GetPrimaryKeyString();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _isTurnActive = false;
+        _isTimerActive = false;
         return base.OnActivateAsync(cancellationToken);
     }
 
     public Task StartTurnTimer(int durationInMilliseconds)
     {
-        if (_isTurnActive)
+        if (_isTimerActive)
         {
             return Task.CompletedTask; // Timer already active
         }
 
-        _isTurnActive = true;
+        _isTimerActive = true;
         _timerHandle = this.RegisterGrainTimer(
             Timeout,
             this,
@@ -32,26 +30,28 @@ public class GameTimerGrain : Grain, IGameTimerGrain
 
     private async Task Timeout(object state)
     {
-        _isTurnActive = false;
+        _isTimerActive = false;
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
-        var res = await gameGrain.TimeoutCurrentPlayer();
         await StopTurnTimer();
+        var res = await gameGrain.TimeoutCurrentPlayer();
 
         if (res != null && res.MainTimeMilliseconds > 0)
         {
             await StartTurnTimer(res.MainTimeMilliseconds);
         }
-
-        return;
+        // return;
     }
 
-    public Task StopTurnTimer()
+    public ValueTask StopTurnTimer()
     {
-        _timerHandle?.Dispose();
-        _isTurnActive = false;
-        return Task.CompletedTask;
+        if (_isTimerActive)
+        {
+            _timerHandle?.Dispose();
+            _isTimerActive = false;
+        }
+        return new();
     }
 
-    public Task<bool> IsTurnActive() => Task.FromResult(_isTurnActive);
+    public Task<bool> IsTimerActive() => Task.FromResult(_isTimerActive);
 }
