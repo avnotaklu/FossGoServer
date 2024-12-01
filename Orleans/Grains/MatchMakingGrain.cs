@@ -69,19 +69,27 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
 
             // var (game, otherPlayerInfos) = await gameGrain.JoinGame(finderId, DateTime.Now.SerializedDate());
 
-            var publicInfos = (await Task.WhenAll(game.Players.Keys.Select(async p => await _publicUserInfoService.GetPublicUserInfo(p) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
 
-            if (publicInfos == null) throw new Exception("Public info was null");
-            else
+            // else
             {
                 foreach (var player in game.Players.Keys)
                 {
+
+                    var otherInfo = await _publicUserInfoService.GetPublicUserInfo(game.Players.GetOtherPlayerIdFromPlayerId(player)!);
+                    if (otherInfo == null) throw new Exception("Public info was null");
+                    // var publicInfos = (await Task.WhenAll(game.Players.Keys.Select(async p => await _publicUserInfoService.GetPublicUserInfo(p) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
+                    // if (player == finderId) continue;
                     var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
                     var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
-                    await pushGrain.SendMessageToMe(
+                    pushGrain.SendMessageToMe(
                         new SignalRMessage(
-                            SignalRMessageType.matchFound,
-                            new FindMatchResult(publicInfos, game)
+                            SignalRMessageType.gameJoin,
+                            new GameJoinResult(
+                                game,
+                                otherInfo,
+                                game.StartTime!
+                            )
+                        // new FindMatchResult(publicInfos, game)
                         )
                     );
                 }

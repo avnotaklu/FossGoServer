@@ -26,6 +26,7 @@ public sealed class MainHub : Hub
     public override Task OnConnectedAsync()
     {
         _logger.LogInformation("User connected : {id}", Context.ConnectionId);
+        Groups.AddToGroupAsync(Context.ConnectionId, "Users");
         return base.OnConnectedAsync();
     }
 

@@ -167,7 +167,8 @@ public class GameGrain : Grain, IGameGrain
 
         var otherPlayerInfo = await _publicUserInfo.GetPublicUserInfo(otherPlayerData.GetUserId());
 
-        // SendJoinMessage(player, time.DeserializedDate(), otherPlayerInfo);
+        await JoinPlayersToPushGroup();
+        await SendJoinMessage(otherPlayerInfo.Id, time.DeserializedDate(), otherPlayerInfo);
 
         return (game, otherPlayerInfo);
     }
@@ -753,8 +754,15 @@ public class GameGrain : Grain, IGameGrain
     }
 
     // Push Messages
+    private async Task JoinPlayersToPushGroup()
+    {
+        foreach (var player in _players.Keys)
+        {
+            await _hubService.AddToGroup(player, gameId, CancellationToken.None);
+        }
+    }
 
-    private async void SendJoinMessage(string toPlayer, DateTime time, PublicUserInfo otherPlayerData)
+    private async Task SendJoinMessage(string toPlayer, DateTime time, PublicUserInfo otherPlayerData)
     {
         var game = _GetGame();
         await SendMessageToClient(new SignalRMessage(

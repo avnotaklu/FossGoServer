@@ -6,9 +6,10 @@ public interface ISignalRHubService
     public ValueTask SendToClient(string connectionId, string methodName, object data, CancellationToken cancellationToken);
     public ValueTask SendToAll(string methodName, object data, CancellationToken cancellationToken);
     public ValueTask SendToGroup(string methodName, string group, object data, CancellationToken cancellationToken);
+    public ValueTask AddToGroup(string connectionId, string group, CancellationToken cancellationToken);
 }
 
-public class SignalRHubService : ISignalRHubService 
+public class SignalRHubService : ISignalRHubService
 {
     private readonly IHubContext<MainHub> _hubContext;
     private readonly ILogger<SignalRHubService> _logger;
@@ -31,5 +32,10 @@ public class SignalRHubService : ISignalRHubService
     public ValueTask SendToGroup(string methodName, string group, object data, CancellationToken cancellationToken)
     {
         return new(_hubContext.Clients.Group(group).SendAsync(methodName, data, cancellationToken));
+    }
+
+    public ValueTask AddToGroup(string connectionId, string group, CancellationToken cancellationToken)
+    {
+        return new(_hubContext.Groups.AddToGroupAsync(connectionId, group, cancellationToken));
     }
 }

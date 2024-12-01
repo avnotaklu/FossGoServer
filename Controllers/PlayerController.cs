@@ -19,13 +19,16 @@ public class PlayerController : ControllerBase
     private readonly IGrainFactory _grainFactory;
 
     [ActivatorUtilitiesConstructor]
-    public PlayerController(ILogger<PlayerController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
+    public PlayerController(ILogger<PlayerController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService,
+        IUserRatingService userRatingService)
     {
         _logger = logger;
         _usersService = usersService;
         _grainFactory = grainFactory;
         _gameService = gameService;
+        _userRatingService = userRatingService;
     }
+
 
 
     [HttpPost("RegisterPlayer")]
@@ -92,7 +95,7 @@ public class PlayerController : ControllerBase
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(await player.GetConnectionId());
-        await notifierGrain.SendMessageToMe(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
+        notifierGrain.SendMessageToAllUsers(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
 
         await SaveGame(gameId);
         return Ok(game);
@@ -200,10 +203,10 @@ availableGames.Select(async g =>
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        var myGames = games.Where(a => a.Players.ContainsKey(userId));
+        var myGames = games.Where(a => a.Players.ContainsKey(userId) || a.GameCreator == userId);
 
         var result = (await Task.WhenAll(
-games.Select(async g =>
+        myGames.Select(async g =>
         {
             PublicUserInfo? otherPlayerPublicData = null;
             if (g.DidStart())
