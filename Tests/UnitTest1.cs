@@ -45,20 +45,6 @@ public class StoneLogicTest
         return board;
     }
 
-    // [TestMethod]
-    // public void TestGetFreedomsFromBoard()
-    // {
-    //     int[,] actualFreedoms = {
-    //         { 0, 0, 0, 2, 0, },
-    //         { 0, 0, 3, 0, 2, },
-    //         { 0, 0, 0, 3, 0, },
-    //         { 0, 0, 0, 0, 0, },
-    //         { 0, 0, 0, 0, 0, },
-    //     };
-
-    //     Assert.IsTrue(_2DArrayEqual(actualFreedoms, new BoardConstructor(5, 5).GetFreedomsFromBoard(_5x5BasicBoard())));
-    // }
-
     [TestMethod]
     public void TestGetClusters()
     {
@@ -208,5 +194,4 @@ public class StoneLogicTest
 
         return true;
     }
-
 }

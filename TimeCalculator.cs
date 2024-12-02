@@ -25,7 +25,7 @@ public class TimeCalculator : ITimeCalculator
 
         var activePlayerTimeLeft = activePlayerSnap.MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(activePlayerSnap.SnapshotTimestamp)).TotalMilliseconds;
 
-        var newByoYomi = activePlayerSnap.ByoYomisLeft - ((activePlayerSnap.ByoYomiActive && activePlayerTimeLeft <= 0) ? 1 : 0);
+        var newByoYomi = (activePlayerSnap.ByoYomisLeft ?? 0) - ((activePlayerSnap.ByoYomiActive && activePlayerTimeLeft <= 0) ? 1 : 0);
 
         var applicableByoYomiTime = (newByoYomi > 0) ? (byoYomiMS ?? 0) : 0;
 
@@ -34,7 +34,7 @@ public class TimeCalculator : ITimeCalculator
         newTimes[activePlayerIdx] = new PlayerTimeSnapshot(
                     snapshotTimestamp: curTime,
                     mainTimeMilliseconds: activePlayerTimeLeft > 0 ? activePlayerTimeLeft + applicableIncrement : applicableByoYomiTime,
-                    byoYomisLeft: newByoYomi,
+                    byoYomisLeft: (int)MathF.Max(newByoYomi, 0),
                     byoYomiActive: activePlayerTimeLeft <= 0,
                     timeActive: newTimes[activePlayerIdx].TimeActive
                 );
