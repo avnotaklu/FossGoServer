@@ -56,15 +56,15 @@ public class RatingEngine : IRatingEngine
     }
 
 
-//     public RatingEngine(
-// // DateTime startAt, 
-//         ILogger<RatingEngine> logger)
-//     {
-//         // _lastRatingPeriodStart = startAt;
-//         _result = new();
-//         _calculator = new();
-//         _logger = logger;
-//     }
+    //     public RatingEngine(
+    // // DateTime startAt, 
+    //         ILogger<RatingEngine> logger)
+    //     {
+    //         // _lastRatingPeriodStart = startAt;
+    //         _result = new();
+    //         _calculator = new();
+    //         _logger = logger;
+    //     }
 
     private Rating RatingFromRatingData(PlayerRatingData ratingData)
     {
@@ -254,7 +254,7 @@ public class RatingEngine : IRatingEngine
 
     public static IEnumerable<TimeStandard> RateableTimeStandards()
     {
-        return Enum.GetValues(typeof(TimeStandard)).Cast<TimeStandard>();
+        return Enum.GetValues(typeof(TimeStandard)).Cast<TimeStandard>().Where(a => a != TimeStandard.Other);
     }
 
 
