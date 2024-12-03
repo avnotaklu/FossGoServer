@@ -5,6 +5,7 @@ using BadukServer.Dto;
 using BadukServer.Services;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.ConstrainedExecution;
+using MongoDB.Bson;
 
 [ApiController]
 [Authorize]
@@ -82,6 +83,23 @@ public class AuthenticationController : ControllerBase
         }
     }
 
+    [AllowAnonymous]
+    [HttpPost("GuestLogin")]
+    public async Task<ActionResult<GuestUser>> GuestLogin()
+    {
+        try
+        {
+            var newGuest = new GuestUser(ObjectId.GenerateNewId().ToString());
+            var token = _authenticationService.GenerateJSONWebTokenGuestUser(newGuest);
+            return Ok(new GuestAuthenticationModel(newGuest, token));
+        }
+        catch (Exception e)
+        {
+            return BadRequest(e.ToString());
+        }
+    }
+
+
     private async Task<ActionResult<UserAuthenticationModel>> Login(UserDetailsDto request)
     {
         var user = await _usersService.GetByEmail(request.Email);
@@ -103,7 +121,7 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", request.Email);
-        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebToken(user.Id!)));
+        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
     }
 
     private async Task<ActionResult<UserAuthenticationModel>> SignUp(UserDetailsDto request)
@@ -139,7 +157,7 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", newUser.Email);
-        return Ok(new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebToken(newUser.Id!)));
+        return Ok(new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebTokenForNormalUser(newUser)));
     }
 
 
@@ -160,6 +178,6 @@ public class AuthenticationController : ControllerBase
 
         var user = users.First();
 
-        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebToken(user.Id!)));
+        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
     }
 }

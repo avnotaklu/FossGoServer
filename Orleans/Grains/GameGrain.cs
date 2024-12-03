@@ -609,60 +609,6 @@ public class GameGrain : Grain, IGameGrain
         await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
     }
 
-
-    // public async Task<List<TimeSpan>> CalculatePlayerTimesOfDiscreteSections(Game game)
-    // {
-    //     Debug.Assert(DidStart());
-    //     var mainTimeSpan = TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-    //     // var mainTimeSpan =TimeSpan.FromSeconds(game.TimeControl.MainTimeSeconds);
-    //     var raw_times = new List<string> { game.StartTime! };
-    //     raw_times.AddRange(game.Moves.Select(move => move.Time));
-
-    //     var times = raw_times.Select(time => DateTime.Parse(time)).ToList();
-
-    //     // Calculate first player's duration
-    //     // var firstPlayerDuration = times
-    //     //     .Select((time, index) => (time, index))
-    //     //     .Where(pair => pair.index % 2 == 1)
-    //     //     .Aggregate(TimeSpan.Zero, (duration, pair) => duration + (pair.time - times[pair.index - 1]));
-
-    //     var firstPlayerDuration = TimeSpan.Zero;
-
-    //     var firstPlayerArrangedTimes = times.SkipLast(times.Count % 2);
-    //     var firstPlayerTimesBeforeCorrespondingMoveMade = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-    //     var firstPlayerMoveMadeTimes = firstPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
-
-    //     for (int i = 0; i < MathF.Floor(firstPlayerArrangedTimes.Count() / 2); i++)
-    //     {
-    //         firstPlayerDuration += firstPlayerMoveMadeTimes[i] - firstPlayerTimesBeforeCorrespondingMoveMade[i];
-    //     }
-
-    //     var player0Time = mainTimeSpan - firstPlayerDuration;
-
-
-    //     var secondPlayerDuration = TimeSpan.Zero;
-    //     var secondPlayerArrangedTimes = times.Skip(1).SkipLast(times.Count % 2);
-    //     var secondPlayerTimesBeforeCorrespondingMoveMade = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 0).ToList();
-    //     var secondPlayerMoveMadeTimes = secondPlayerArrangedTimes.Where((time, index) => index % 2 == 1).ToList();
-
-    //     for (int i = 0; i < MathF.Floor(secondPlayerArrangedTimes.Count() / 2); i++)
-    //     {
-    //         secondPlayerDuration += secondPlayerMoveMadeTimes[i] - secondPlayerTimesBeforeCorrespondingMoveMade[i];
-    //     }
-    //     var player1Time = mainTimeSpan - secondPlayerDuration;
-
-
-    //     var playerTimes = new List<TimeSpan> { player0Time, player1Time };
-
-    //     // If the game has ended, apply the end time to the player with the turn
-    //     if (game.GameState == GameState.Ended)
-    //     {
-    //         playerTimes[(int)GetStoneFromPlayerId(GetPlayerIdWithTurn()!)] -= DateTime.Parse(game.EndTime!) - times.Last();
-    //     }
-
-    //     return playerTimes;
-    // }
-
     private async Task<(List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings)> UpdateRatingsOnResult()
     {
         Debug.Assert(_gameState == GameState.Ended, "Game must be ended to update ratings");

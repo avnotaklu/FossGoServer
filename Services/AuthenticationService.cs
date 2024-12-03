@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using BadukServer;
 using BadukServer.Models;
 using Google.Apis.Auth;
 using Microsoft.AspNetCore.Identity.Data;
@@ -17,12 +18,36 @@ public class AuthenticationService
         JwtSettings = jwtSettings.Value;
     }
 
-    public string GenerateJSONWebToken(String user_id)
+
+    public string GenerateJSONWebTokenForNormalUser(User user)
+    {
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new ClaimsIdentity(new[] {
+            new Claim("user_id", user.GetUserId()),
+            new Claim("user_type", "normal_user"),
+            new Claim("role", "player")
+        });
+
+        var token = new JwtSecurityToken(JwtSettings.Issuer,
+          JwtSettings.Issuer,
+          claims.Claims,
+          expires: DateTime.Now.AddMinutes(120),
+          signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+
+    public string GenerateJSONWebTokenGuestUser(GuestUser user)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
         var claims = new ClaimsIdentity(new[] {
-            new Claim("user_id", user_id)
+            new Claim("user_id", user.Id),
+            new Claim("user_type", "guest_user"),
+            new Claim("role", "player")
         });
 
         var token = new JwtSecurityToken(JwtSettings.Issuer,

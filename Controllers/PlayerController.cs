@@ -124,7 +124,6 @@ public class PlayerController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
         var oldGame = await gameGrain.GetGame();
 
-
         if (oldGame.GameCreator == userId)
         {
             return new GameJoinResult(
