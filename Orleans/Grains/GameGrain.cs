@@ -36,8 +36,8 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
     private GameOverMethod? _gameOverMethod;
 
-    private List<int>? _playersRatings = [];
-    private List<int>? _playersRatingsDiff = [];
+    private List<int> _playersRatings = [];
+    private List<int> _playersRatingsDiff = [];
 
     private DateTime? _endTime;
     private string? _gameCreator;
@@ -93,8 +93,8 @@ public class GameGrain : Grain, IGameGrain
         string? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
-        List<int>? playersRatings,
-        List<int>? playersRatingsDiff
+        List<int> playersRatings,
+        List<int> playersRatingsDiff
     )
     {
         _rows = rows;

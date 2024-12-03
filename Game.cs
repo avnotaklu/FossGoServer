@@ -296,11 +296,11 @@ List<int>? playersRatingsDiff
 
     [BsonElement(GameFieldNames.PlayersRatings)]
     [Id(21)]
-    public List<int>? PlayersRatings { get; set; }
+    public List<int> PlayersRatings { get; set; }
 
     [BsonElement(GameFieldNames.PlayersRatingsDiff)]
     [Id(22)]
-    public List<int>? PlayersRatingsDiff { get; set; }
+    public List<int> PlayersRatingsDiff { get; set; }
 }
 
 [GenerateSerializer]

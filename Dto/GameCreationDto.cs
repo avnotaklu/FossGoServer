@@ -48,9 +48,9 @@ public static class TimeControlDtoExt
     }
 
     public static Dictionary<TimeStandard, (TimeSpan min, TimeSpan max)> Times = new Dictionary<TimeStandard, (TimeSpan min, TimeSpan max)> {
-        { TimeStandard.Blitz, (TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(20)) },
-        { TimeStandard.Rapid, (TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(40)) },
-        { TimeStandard.Classical, (TimeSpan.FromMinutes(40), TimeSpan.FromMinutes(120)) },
+        { TimeStandard.Blitz, (TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(5)) },
+        { TimeStandard.Rapid, (TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(20)) },
+        { TimeStandard.Classical, (TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(120)) },
         { TimeStandard.Correspondence, (TimeSpan.FromDays(1), TimeSpan.FromDays(7)) },
     };
 
