@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using BadukServer;
 using BadukServer.Orleans.Grains;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using Orleans;
 using Tests;
@@ -8,12 +10,14 @@ using Tests;
 public class MatchMakingGrain : Grain, IMatchMakingGrain
 {
     private readonly ILogger<MatchMakingGrain> _logger;
-    private readonly IPublicUserInfoService _publicUserInfoService;
+    private readonly IPlayerInfoService _publicUserInfoService;
+    private readonly IDateTimeService _dateTimeService;
 
-    public MatchMakingGrain(ILogger<MatchMakingGrain> logger, IPublicUserInfoService publicUserInfoService)
+    public MatchMakingGrain(ILogger<MatchMakingGrain> logger, IPlayerInfoService publicUserInfoService, IDateTimeService dateTimeService)
     {
         _publicUserInfoService = publicUserInfoService;
         _logger = logger;
+        _dateTimeService = dateTimeService;
     }
 
     Dictionary<int, Dictionary<string, List<Match>>> _matchesByBoardAndTime = [];
@@ -36,69 +40,58 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         await base.OnActivateAsync(cancellationToken);
     }
 
-    public async ValueTask FindMatch(string finderId, UserRating finderRating, List<MatchableBoardSize> boardSizes, List<TimeControlDto> timeStandards)
+    public async ValueTask FindMatch(PlayerInfo playerInfo, List<MatchableBoardSize> boardSizes, List<TimeControlDto> timeStandards)
     {
-        var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime.GetOrNull((int)b)?.GetOrNull(t.SimpleRepr()))).SelectMany(m => m).SelectMany(m => m ?? []).ToList();
+        var wantedGameType = playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated);
 
-        // var match = matchingMatches.FirstOrDefault(m => m.CreatorRating.RatingRangeOverlap(finderRating.GetRatingData(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard())));
-        var match = matchingMatches.FirstOrDefault();
+        var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime.GetOrNull((int)b)?.GetOrNull(t.SimpleRepr()))).SelectMany(m => m).SelectMany(m => m ?? []).Where(m => m.GameType.IsAllowedPlayerType(playerInfo.PlayerType)).ToList();
+
+        Match? match;
+        if (wantedGameType == GameType.Rated)
+        {
+            if (playerInfo.Rating == null) throw new InvalidOperationException("Unrated Player can't play a rated game");
+            match = matchingMatches.FirstOrDefault(m => m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard())));
+        }
+        else
+        {
+            match = matchingMatches.FirstOrDefault();
+        }
+
+        var finderId = playerInfo.Id;
+        var finderRating = playerInfo.Rating;
 
         if (match == null)
         {
             boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][t.SimpleRepr()].Add(new Match(
                 finderId,
-                finderRating.GetRatingData(b.ToBoardSize(), t.GetStandard()),
+                finderRating?.GetRatingData(b.ToBoardSize(), t.GetStandard()),
                 b,
-                t
+                t,
+                playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated)
             ))));
+
+            return;
         }
-        else if (match.CreatorId != finderId)
+
+        if (match.CreatorId == finderId)
         {
-            _matchesByBoardAndTime[(int)match.BoardSize.ToBoardSize()][match.TimeControl.SimpleRepr()].Remove(match);
-            var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
-
-            var game = await gameGrain.StartMatch(match, finderId);
-
-            // await gameGrain.CreateGame(
-            //     rows: match.BoardSize.ToBoardSizeData().Rows,
-            //     columns: match.BoardSize.ToBoardSizeData().Columns,
-            //     timeControl: match.TimeControl,
-            //     stoneSelectionType: match.StoneType,
-            //     gameCreator: null
-            // );
-
-            // var (game, otherPlayerInfos) = await gameGrain.JoinGame(finderId, DateTime.Now.SerializedDate());
-
-
-            // else
-            {
-                foreach (var player in game.Players.Keys)
-                {
-
-                    var otherInfo = await _publicUserInfoService.GetPublicUserInfo(game.Players.GetOtherPlayerIdFromPlayerId(player)!);
-                    if (otherInfo == null) throw new Exception("Public info was null");
-                    // var publicInfos = (await Task.WhenAll(game.Players.Keys.Select(async p => await _publicUserInfoService.GetPublicUserInfo(p) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
-                    // if (player == finderId) continue;
-                    var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
-                    var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
-                    pushGrain.SendMessageToMe(
-                        new SignalRMessage(
-                            SignalRMessageType.gameJoin,
-                            new GameJoinResult(
-                                game,
-                                otherInfo,
-                                game.StartTime!
-                            )
-                        // new FindMatchResult(publicInfos, game)
-                        )
-                    );
-                }
-            }
-
-
-            // return new FindMatchResult(match, true, game);
+            // What to do here?? 
+            return;
         }
-        // return new FindMatchResult(match, false, null);
+
+        _matchesByBoardAndTime[(int)match.BoardSize.ToBoardSize()][match.TimeControl.SimpleRepr()].Remove(match);
+        var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
+
+        // REVIEW: Getting match creator info using finder type, i'm assuming that the creator is the same type as finder
+        var publicInfos = (await Task.WhenAll(new List<string>([match.CreatorId, finderId]).Select(async p => await _publicUserInfoService.GetPublicUserInfoForPlayer(p, playerInfo.PlayerType) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
+
+        var game = await gameGrain.StartMatch(match, publicInfos);
+
+        foreach (var player in game.Players.Keys)
+        {
+            var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+            await playerGrain.JoinGame(game.GameId, _dateTimeService.Now().SerializedDate());
+        }
     }
 }
 
@@ -109,19 +102,22 @@ public class Match
     [Id(0)]
     public string CreatorId { get; set; }
     [Id(1)]
-    public PlayerRatingData CreatorRating { get; set; }
+    public PlayerRatingData? CreatorRating { get; set; }
     [Id(2)]
     public MatchableBoardSize BoardSize { get; set; }
     [Id(3)]
     public TimeControlDto TimeControl { get; set; }
+    [Id(4)]
+    public GameType GameType { get; set; }
     public StoneSelectionType StoneType => StoneSelectionType.Auto;
 
-    public Match(string creatorId, PlayerRatingData creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl)
+    public Match(string creatorId, PlayerRatingData? creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl, GameType gameType)
     {
         CreatorId = creatorId;
         CreatorRating = creatorRating;
         BoardSize = boardSizes;
         TimeControl = timeControl;
+        GameType = gameType;
     }
 }
 
@@ -148,12 +144,12 @@ public class FindMatchDto
 public class FindMatchResult
 {
     [Id(0)]
-    public List<PublicUserInfo> JoinedPlayers { get; set; }
+    public List<PlayerInfo> JoinedPlayers { get; set; }
 
     [Id(1)]
     public Game Game { get; set; }
 
-    public FindMatchResult(List<PublicUserInfo> joinedUsers, Game game)
+    public FindMatchResult(List<PlayerInfo> joinedUsers, Game game)
     {
         JoinedPlayers = joinedUsers;
         Game = game;

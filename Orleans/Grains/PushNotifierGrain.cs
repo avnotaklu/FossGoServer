@@ -11,6 +11,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private readonly ILogger<PushNotifierGrain> _logger;
     private string ConnectionId => this.GetPrimaryKeyString();
     private string _player = null!;
+    private PlayerType? _playerType = null!;
     private readonly ISignalRHubService _hubService;
 
     public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRHubService hub)
@@ -27,9 +28,12 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         await base.OnActivateAsync(cancellationToken);
     }
 
-    public ValueTask InitializeNotifier(string playerId)
+    public ValueTask InitializeNotifier(string playerId, PlayerType playerType)
     {
         _player = playerId;
+        _playerType = playerType;
+        _hubService.AddToGroup(ConnectionId, playerType.ToTypeString(), CancellationToken.None);
+
         return new ValueTask();
     }
 
@@ -74,5 +78,10 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         {
             _logger.LogError(ex, "Error broadcasting to host");
         }
+    }
+
+    public async void SendMessageToSameType(SignalRMessage message)
+    {
+
     }
 }

@@ -4,9 +4,9 @@ using BadukServer;
 public class MyGameData
 {
     public Game Game { get; set; }
-    public PublicUserInfo? OpposingPlayer { get; set; }
+    public PlayerInfo? OpposingPlayer { get; set; }
 
-    public MyGameData(Game game, PublicUserInfo? opposingPlayer)
+    public MyGameData(Game game, PlayerInfo? opposingPlayer)
     {
         Game = game;
         OpposingPlayer = opposingPlayer;

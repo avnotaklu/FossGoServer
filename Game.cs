@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using BadukServer;
+using BadukServer.Orleans.Grains;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -174,6 +175,7 @@ public class GameFieldNames
     public const string GameCreator = "gc";
     public const string PlayersRatings = "rts";
     public const string PlayersRatingsDiff = "prd";
+    public const string GameType = "ty";
 
     public const string MainTimeSeconds = "mts";
     public const string IncrementSeconds = "is";
@@ -194,16 +196,57 @@ public class GameFieldNames
     public const string Y = "y";
 }
 
+
+public static class GameTypeExt
+{
+    public static bool IsAllowedPlayerType(this GameType type, PlayerType playerType)
+    {
+        return type switch
+        {
+            GameType.Anonymous => playerType == PlayerType.Guest,
+            GameType.Casual => playerType == PlayerType.Normal,
+            GameType.Rated => playerType == PlayerType.Normal,
+            _ => throw new Exception("Invalid game type")
+        };
+    }
+}
+
+public enum GameType
+{
+    Anonymous = 0,
+    Casual = 1,
+    Rated = 2
+}
+
 [Immutable, GenerateSerializer]
 [Alias("Game")]
 [BsonIgnoreExtraElements]
 public class Game
 {
-    public Game(string gameId, int rows, int columns, TimeControl timeControl, List<PlayerTimeSnapshot> playerTimeSnapshots, List<GameMove> moves, Dictionary<string, StoneType> playgroundMap, Dictionary<string, StoneType> players, List<int> prisoners, string? startTime, GameState gameState, string? koPositionInLastMove, List<string> deadStones, string? winnerId, List<int> finalTerritoryScores, float komi, GameOverMethod? gameOverMethod, string? endTime,
-StoneSelectionType stoneSelectionType,
-string? gameCreator,
-List<int>? playersRatings,
-List<int>? playersRatingsDiff
+    public Game(
+        string gameId,
+        int rows,
+        int columns,
+        TimeControl timeControl,
+        List<PlayerTimeSnapshot> playerTimeSnapshots,
+        List<GameMove> moves,
+        Dictionary<string, StoneType> playgroundMap,
+        Dictionary<string, StoneType> players,
+        List<int> prisoners,
+        string? startTime,
+        GameState gameState,
+        string? koPositionInLastMove,
+        List<string> deadStones,
+        string? winnerId,
+        List<int> finalTerritoryScores,
+        float komi,
+        GameOverMethod? gameOverMethod,
+        string? endTime,
+        StoneSelectionType stoneSelectionType,
+        string? gameCreator,
+        List<int> playersRatings,
+        List<int> playersRatingsDiff,
+        GameType gameType
     )
     {
         GameId = gameId;
@@ -228,6 +271,7 @@ List<int>? playersRatingsDiff
         GameCreator = gameCreator;
         PlayersRatings = playersRatings;
         PlayersRatingsDiff = playersRatingsDiff;
+        GameType = gameType;
     }
 
     [BsonId]
@@ -301,6 +345,9 @@ List<int>? playersRatingsDiff
     [BsonElement(GameFieldNames.PlayersRatingsDiff)]
     [Id(22)]
     public List<int> PlayersRatingsDiff { get; set; }
+    [Id(23)]
+    [BsonElement(GameFieldNames.GameType)]
+    public GameType GameType { get; set; }
 }
 
 [GenerateSerializer]

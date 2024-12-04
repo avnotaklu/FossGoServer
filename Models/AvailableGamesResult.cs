@@ -3,9 +3,9 @@ using BadukServer;
 public class AvailableGameData
 {
     public Game Game { get; set; }
-    public PublicUserInfo CreatorInfo { get; set; }
+    public PlayerInfo CreatorInfo { get; set; }
 
-    public AvailableGameData(Game game, PublicUserInfo creatorInfo)
+    public AvailableGameData(Game game, PlayerInfo creatorInfo)
     {
         Game = game;
         CreatorInfo = creatorInfo;

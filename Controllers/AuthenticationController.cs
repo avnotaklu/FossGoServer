@@ -167,6 +167,8 @@ public class AuthenticationController : ControllerBase
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
 
+        var userType = User.FindFirst("user_type")?.Value;
+        if (userType == null || userType == "guest_user") return Unauthorized();
 
         var users = await _usersService.GetByIds([userId]);
 

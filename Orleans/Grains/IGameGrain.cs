@@ -1,13 +1,14 @@
 using BadukServer;
+using BadukServer.Orleans.Grains;
 
 public interface IGameGrain : IGrainWithStringKey
 {
-    Task CreateGame(int rows, int columns, TimeControlDto timeControl, StoneSelectionType stoneSelectionType, string? gameCreator);
-    Task<(Game game, PublicUserInfo otherPlayerInfo)> JoinGame(String player, string time);
+    Task CreateGame(GameCreationData creationData, PlayerInfo? gameCreator, GameType gameType);
+    Task<(Game game, PlayerInfo? otherPlayerInfo, bool justJoined)> JoinGame(PlayerInfo player, string time);
     Task<Game> GetGame();
-    Task<Dictionary<string, StoneType>> GetPlayers();
-    Task<GameState> GetState();
-    Task<List<GameMove>> GetMoves();
+    // Task<Dictionary<string, StoneType>> GetPlayers();
+    // Task<GameState> GetState();
+    // Task<List<GameMove>> GetMoves();
     Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId);
     Task<Game> ContinueGame(string playerId);
     Task<Game> AcceptScores(string playerId);
@@ -22,5 +23,5 @@ public interface IGameGrain : IGrainWithStringKey
     /// <returns></returns>
     Task<Game> ResetGame(Game game);
 
-    Task<Game> StartMatch(Match match, string matchedPlayerId);
+    Task<Game> StartMatch(Match match, List<PlayerInfo> playerInfos);
 }

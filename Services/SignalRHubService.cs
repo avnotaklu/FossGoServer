@@ -36,6 +36,7 @@ public class SignalRHubService : ISignalRHubService
 
     public ValueTask AddToGroup(string connectionId, string group, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Adding {connectionId} to group {group}", connectionId, group);
         return new(_hubContext.Groups.AddToGroupAsync(connectionId, group, cancellationToken));
     }
 }

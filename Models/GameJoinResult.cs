@@ -4,14 +4,14 @@ using BadukServer;
 [GenerateSerializer]
 public class GameJoinResult
 {
-    public PublicUserInfo? OtherPlayerData { get; set; }
+    public PlayerInfo? OtherPlayerData { get; set; }
     public Game Game { get; set; }
-    public string Time { get; set; }
+    public string JoinTime { get; set; }
 
-    public GameJoinResult(Game game, PublicUserInfo? otherPlayerData,  string time)
+    public GameJoinResult(Game game, PlayerInfo? otherPlayerData,  string time)
     {
         Game = game;
         OtherPlayerData = otherPlayerData;
-        Time = time;
+        JoinTime = time;
     }
 }

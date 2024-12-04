@@ -4,20 +4,64 @@ using MongoDB.Bson.Serialization.Conventions;
 
 namespace BadukServer;
 
-public class GameCreationDto
+[GenerateSerializer]
+public enum RankedOrCasual
 {
-    public GameCreationDto(int rows, int columns, TimeControlDto timeControl, StoneSelectionType firstPlayerStone)
+    Rated = 0,
+    Casual = 1
+}
+
+[Immutable, GenerateSerializer]
+[Alias("GameCreationData")]
+public class GameCreationData
+{
+    public GameCreationData(int rows, int columns, TimeControlDto timeControl, StoneSelectionType firstPlayerStone)
     {
         Rows = rows;
         Columns = columns;
         TimeControl = timeControl;
         FirstPlayerStone = firstPlayerStone;
     }
-
+    [Id(0)]
     public int Rows { get; set; }
+    [Id(1)]
     public int Columns { get; set; }
+    [Id(2)]
     public StoneSelectionType FirstPlayerStone { get; set; }
+    [Id(3)]
     public TimeControlDto TimeControl { get; set; }
+}
+
+public static class GameCreationDtoExt {
+    public static GameCreationData ToData(this GameCreationDto dto)
+    {
+        return new GameCreationData(dto.Rows, dto.Columns, dto.TimeControl, dto.FirstPlayerStone);
+    }
+}
+
+
+[Immutable, GenerateSerializer]
+[Alias("GameCreationDto")]
+public class GameCreationDto
+{
+    public GameCreationDto(int rows, int columns, TimeControlDto timeControl, StoneSelectionType firstPlayerStone, RankedOrCasual rankedOrCasual)
+    {
+        Rows = rows;
+        Columns = columns;
+        TimeControl = timeControl;
+        FirstPlayerStone = firstPlayerStone;
+        RankedOrCasual = rankedOrCasual;
+    }
+    [Id(0)]
+    public int Rows { get; set; }
+    [Id(1)]
+    public int Columns { get; set; }
+    [Id(2)]
+    public StoneSelectionType FirstPlayerStone { get; set; }
+    [Id(3)]
+    public TimeControlDto TimeControl { get; set; }
+    [Id(4)]
+    public RankedOrCasual RankedOrCasual { get; set; }
 }
 
 public static class TimeControlDtoExt

@@ -28,22 +28,6 @@ public class GameController : ControllerBase
         _gameService = gameService;
     }
 
-    private async Task<Game> SaveGame(string gameId)
-    {
-        var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
-        var curGame = await gameGrain.GetGame();
-        var res = await _gameService.SaveGame(curGame);
-        if (res == null)
-        {
-            var oldGame = await _gameService.GetGame(gameId);
-            await gameGrain.ResetGame(oldGame);
-            throw new Exception("Failed to save game");
-        }
-        else
-        {
-            return res;
-        }
-    }
 
     [HttpPost("{gameId}/MakeMove")]
     public async Task<ActionResult<NewMoveResult>> MakeMove([FromBody] MovePosition move, string GameId)
@@ -54,9 +38,8 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var res = await gameGrain.MakeMove(move, userId);
 
-        var game = await SaveGame(GameId);
         return Ok(new NewMoveResult(
-            game: game,
+            game: res.game,
             result: res.moveSuccess
         ));
     }
@@ -70,7 +53,6 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.ContinueGame(userId);
 
-        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -83,7 +65,6 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.AcceptScores(userId);
 
-        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -96,7 +77,6 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.ResignGame(userId);
 
-        await SaveGame(GameId);
         return Ok(game);
     }
 
@@ -109,7 +89,6 @@ public class GameController : ControllerBase
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
         var game = await gameGrain.EditDeadStone(data.Position, data.State, userId);
 
-        await SaveGame(GameId);
         return Ok(game);
     }
 }

@@ -31,6 +31,11 @@ public class Startup
         services.AddSwaggerGen();
         services.AddControllers();
 
+        services.AddAuthorization(options =>
+            options.AddPolicy("PlayerOnly", policy =>
+                policy.RequireClaim("role", ["player"])
+        ));
+
         services.AddCors(options =>
         {
             options.AddPolicy(MyAllowSpecificOrigins,
@@ -41,7 +46,7 @@ public class Startup
         services.AddSingleton<IUsersService, UsersService>();
         services.AddSingleton<IUserRatingService, UserRatingService>();
         services.AddSingleton<IGameService, GameService>();
-        services.AddSingleton<IPublicUserInfoService, PublicUserInfoService>();
+        services.AddSingleton<IPlayerInfoService, PublicUserInfoService>();
         services.AddSingleton<IRatingEngine, RatingEngine>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ITimeCalculator, TimeCalculator>();

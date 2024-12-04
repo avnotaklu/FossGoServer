@@ -5,7 +5,7 @@ using MongoDB.Driver;
 
 public interface IGameService
 {
-    public Task<Game> GetGame(string gameId);
+    public Task<Game?> GetGame(string gameId);
     public Task<Game?> SaveGame(Game game);
 }
 public class GameService : IGameService
@@ -23,9 +23,10 @@ public class GameService : IGameService
             gameCollection.Value.Name);
     }
 
-    public Task<Game> GetGame(string gameId)
+    public async Task<Game?> GetGame(string gameId)
     {
-        return _gameCollection.Find(Builders<Game>.Filter.Eq(a => a.GameId, gameId)).FirstOrDefaultAsync();
+        var game = await _gameCollection.Find(Builders<Game>.Filter.Eq(a => a.GameId, gameId)).FirstOrDefaultAsync();
+        return game;
     }
 
     public async Task<Game?> SaveGame(Game game)

@@ -3,10 +3,10 @@ using Google.Apis.Http;
 
 public class RegisterPlayerResult
 {
-    public List<User> OtherActivePlayers { get; set; }
+    public PlayerInfo CurrentUser { get; set; }
 
-    public RegisterPlayerResult(List<User> otherActivePlayers)
+    public RegisterPlayerResult(PlayerInfo currentUser)
     {
-        OtherActivePlayers = otherActivePlayers;
+        CurrentUser = currentUser;
     }
 }
