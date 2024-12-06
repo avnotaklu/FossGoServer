@@ -2,19 +2,24 @@ using System.Diagnostics;
 using System.Text.Json.Serialization;
 using BadukServer;
 using BadukServer.Orleans.Grains;
+using Glicko2;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
-public static class GameHelpers
+public static class GameExt
 {
     public static bool DidStart(this Game game)
     {
         return game.GameState != GameState.WaitingForStart;
     }
 
+    public static bool DidEnd(this Game game)
+    {
+        return game.GameState == GameState.Ended;
+    }
 
     public static string? GetPlayerIdWithTurn(this Game game)
     {
@@ -32,40 +37,31 @@ public static class GameHelpers
         throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn once game has started");
     }
 
+    public static VariantType GetTopLevelVariant(this Game game)
+    {
+        return new VariantType(game.GetBoardSize(), game.TimeControl.TimeStandard);
+    }
 
-    // public static StoneType? GetStoneFromPlayerId(this Game game, string id)
-    // {
-    //     if (!game.DidStart()) return null;
-    //     return game.Players[id];
-    // }
+    public static VariantType GetBoardVariant(this Game game)
+    {
+        return new VariantType(game.GetBoardSize(), null);
+    }
+
+    public static VariantType GetTimeStandardVariant(this Game game)
+    {
+        return new VariantType(null, game.TimeControl.TimeStandard);
+    }
+
+    public static List<VariantType> GetRelevantVariants(this Game game)
+    {
+        return [
+            game.GetTopLevelVariant(),
+            game.GetBoardVariant(),
+            game.GetTimeStandardVariant()
+        ];
+    }
 
 
-    // public static StoneType? GetOtherStoneFromPlayerId(this Game game, string id)
-    // {
-    //     if (!game.DidStart()) return null;
-    //     return 1 - game.GetStoneFromPlayerId(id);
-    // }
-
-    // public static string? GetOtherPlayerIdFromPlayerId(this Game game, string id)
-    // {
-    //     var otherStone = game.GetOtherStoneFromPlayerId(id);
-    //     if (otherStone == null) return null;
-
-    //     return game.GetPlayerIdFromStoneType((StoneType)otherStone);
-    // }
-    // public static string? GetPlayerIdFromStoneType(this Game game, StoneType stone)
-    // {
-    //     if (!game.DidStart()) return null;
-    //     foreach (var item in game.Players)
-    //     {
-    //         if (item.Value == stone)
-    //         {
-    //             return item.Key;
-    //         }
-    //     }
-    //     // Player: {stone} has not yet joined the game
-    //     return null;
-    // }
 
     public static StoneType? GetStoneFromPlayerId(this Dictionary<string, StoneType> players, string id)
     {
@@ -127,29 +123,93 @@ public static class GameHelpers
     {
         return new BoardSizeParams(rows: game.Rows, columns: game.Columns);
     }
-}
 
-public static class BoardSizeExtensions
-{
-    public static BoardSizeParams GetBoardSizeParams(this BoardSize boardSize)
+    /// <summary>
+    /// Get my result
+    /// </summary>
+    /// <param name="game"></param>
+    /// <param name="myId"></param>
+    /// <returns>returns 1 for my win, -1 for op, 0 for draw, null for no result</returns>
+    /// <exception cref="UnreachableException"></exception>
+    public static int? MyResult(this Game game, string myId)
     {
-        return boardSize switch
+        if (game.Result == null)
         {
-            BoardSize.Nine => new BoardSizeParams(9, 9),
-            BoardSize.Thirteen => new BoardSizeParams(13, 13),
-            BoardSize.Nineteen => new BoardSizeParams(19, 19),
-            _ => throw new UnreachableException("Board size not supported")
+            return null;
+        }
+
+        return game.Result switch
+        {
+            GameResult.BlackWon => game.Players[myId] == StoneType.Black ? 1 : -1,
+            GameResult.WhiteWon => game.Players[myId] == StoneType.White ? 1 : -1,
+            GameResult.Draw => 0,
+            _ => throw new UnreachableException("Invalid game result")
         };
     }
-}
 
-[GenerateSerializer]
-public enum BoardSize
-{
-    Nine = 0,
-    Thirteen = 1,
-    Nineteen = 2,
-    Other = 3
+    public static bool DidIWin(this Game game, string myId)
+    {
+        return game.MyResult(myId) == 1;
+    }
+
+    public static bool DidILose(this Game game, string myId)
+    {
+        return game.MyResult(myId) == -1;
+    }
+    public static bool DidIDraw(this Game game, string myId)
+    {
+        return game.MyResult(myId) == 0;
+    }
+
+
+    public static StoneType? GetWinnerPlayer(this Game game)
+    {
+        if (game.Result == null) return null;
+
+        return game.Result switch
+        {
+            
+            GameResult.BlackWon => StoneType.Black,
+            GameResult.WhiteWon => StoneType.White,
+            _ => throw new UnreachableException("Invalid game result")
+        };
+    }
+
+
+    public static string? GetWinnerUser(this Game game)
+    {
+        if (game.Result == null) return null;
+
+        return game.Result switch
+        {
+            GameResult.BlackWon => game.Players.GetPlayerIdFromStoneType(StoneType.Black),
+            GameResult.WhiteWon => game.Players.GetPlayerIdFromStoneType(StoneType.White),
+            GameResult.Draw => null,
+            _ => throw new UnreachableException("Invalid game result")
+        };
+    }
+
+
+    /// <summary>
+    /// Get the running duration of the game
+    /// </summary>
+    /// <param name="game"></param>
+    /// <param name="playerId"></param>
+    /// <returns></returns>
+    public static TimeSpan? GetRunningDurationOfGame(this Game game, DateTime? forRunningGame = null)
+    {
+        if (game.StartTime == null)
+        {
+            return null;
+        }
+        if (!game.DidEnd() && forRunningGame == null)
+        {
+            // Game didn't end and current time hasn't been given
+            return null;
+        }
+        var latestDate = game.EndTime?.DeserializedDate() ?? forRunningGame;
+        return latestDate - DateTime.Parse(game.StartTime!);
+    }
 }
 
 public class GameFieldNames
@@ -167,7 +227,7 @@ public class GameFieldNames
     public const string KoPositionInLastMove = "ko";
     public const string GameState = "gs";
     public const string DeadStones = "ds";
-    public const string WinnerId = "wi";
+    public const string Result = "res";
     public const string FinalTerritoryScores = "fts";
     public const string Komi = "k";
     public const string GameOverMethod = "gom";
@@ -218,6 +278,31 @@ public enum GameType
     Rated = 2
 }
 
+public static class GameResultExt {
+    public static StoneType? GetWinnerStone(this GameResult result)
+    {
+        return result switch
+        {
+            GameResult.BlackWon => StoneType.Black,
+            GameResult.WhiteWon => StoneType.White,
+            GameResult.Draw => null,
+            _ => throw new UnreachableException("Invalid game result")
+        };
+    }
+
+    public static StoneType? GetLoserStone(this GameResult result)
+    {
+        return result.GetWinnerStone()?.GetOpposite();
+    }
+}
+
+public enum GameResult
+{
+    BlackWon,
+    WhiteWon,
+    Draw
+}
+
 [Immutable, GenerateSerializer]
 [Alias("Game")]
 [BsonIgnoreExtraElements]
@@ -237,7 +322,7 @@ public class Game
         GameState gameState,
         string? koPositionInLastMove,
         List<string> deadStones,
-        string? winnerId,
+        GameResult? result,
         List<int> finalTerritoryScores,
         float komi,
         GameOverMethod? gameOverMethod,
@@ -262,7 +347,7 @@ public class Game
         KoPositionInLastMove = koPositionInLastMove;
         GameState = gameState;
         DeadStones = deadStones;
-        WinnerId = winnerId;
+        Result = result;
         FinalTerritoryScores = finalTerritoryScores;
         Komi = komi;
         GameOverMethod = gameOverMethod;
@@ -314,9 +399,9 @@ public class Game
     [BsonElement(GameFieldNames.DeadStones)]
     [Id(13)]
     public List<string> DeadStones { get; set; }
-    [BsonElement(GameFieldNames.WinnerId)]
+    [BsonElement(GameFieldNames.Result)]
     [Id(14)]
-    public string? WinnerId { get; set; }
+    public GameResult? Result { get; set; }
     [BsonElement(GameFieldNames.FinalTerritoryScores)]
     [Id(15)]
     public List<int> FinalTerritoryScores { get; set; }
@@ -350,6 +435,34 @@ public class Game
     public GameType GameType { get; set; }
 }
 
+public static class StoneTypeExt
+{
+    public static StoneType GetOpposite(this StoneType stone)
+    {
+        return stone switch
+        {
+            StoneType.Black => StoneType.White,
+            StoneType.White => StoneType.Black,
+            _ => throw new UnreachableException("Invalid stone type")
+        };
+    }
+
+    public static GameResult ResultForIWon(this StoneType stone)
+    {
+        return stone switch
+        {
+            StoneType.Black => GameResult.BlackWon,
+            StoneType.White => GameResult.WhiteWon,
+            _ => throw new UnreachableException("Invalid stone type")
+        };
+    }
+
+    public static GameResult ResultForOtherWon(this StoneType stone)
+    {
+        return stone.GetOpposite().ResultForIWon();
+    }
+}
+
 [GenerateSerializer]
 public enum StoneType
 {
@@ -375,17 +488,6 @@ public enum GameState
     Paused = 3,
     Ended = 4
 }
-
-[GenerateSerializer]
-public enum TimeStandard
-{
-    Blitz = 0,
-    Rapid = 1,
-    Classical = 2,
-    Correspondence = 3,
-    Other = 4
-}
-
 
 [Immutable, GenerateSerializer]
 [Alias("TimeControl")]

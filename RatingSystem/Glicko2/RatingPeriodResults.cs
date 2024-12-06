@@ -8,7 +8,7 @@ namespace Glicko2
     public class RatingPeriodResults
     {
         private readonly List<Result> _results = new List<Result>();
-        private readonly HashSet<Rating> _participants = new ();
+        private readonly HashSet<Rating> _participants = new();
 
         /// <summary>
         /// Create an empty result set.
@@ -33,10 +33,23 @@ namespace Glicko2
         /// <param name="loser"></param>
         public void AddResult(Rating winner, Rating loser)
         {
-            var result = new Result(winner, loser);
+            var result = new Result(winner, loser, false);
 
             _results.Add(result);
         }
+
+        /// <summary>
+        /// Record a draw between two players and add to the set.
+        /// </summary>
+        /// <param name="player1"></param>
+        /// <param name="player2"></param>
+        public void AddDraw(Rating player1, Rating player2)
+        {
+            var result = new Result(player1, player2, true);
+
+            _results.Add(result);
+        }
+
 
         /// <summary>
         /// Get a list of the results for a given player.
@@ -67,8 +80,8 @@ namespace Glicko2
             // Run through the results and make sure all players have been pushed into the participants set.
             foreach (var result in _results)
             {
-                _participants.Add(result.GetWinner());
-                _participants.Add(result.GetLoser());
+                _participants.Add(result.GetPlayer1());
+                _participants.Add(result.GetPlayer2());
             }
 
             return _participants;

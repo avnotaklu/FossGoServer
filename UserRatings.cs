@@ -18,40 +18,39 @@ public class UserRatingFieldNames
 
 public static class UserRatingExtensions
 {
-    public static PlayerRatingData GetRatingData(this UserRating rating, BoardSize boardSize, TimeStandard timeStandard)
+    public static PlayerRatingsData GetRatingData(this PlayerRatings rating, BoardSize boardSize, TimeStandard timeStandard)
     {
-        return rating.Ratings[RatingEngine.RatingKey(boardSize, timeStandard)];
+        return rating.Ratings[new VariantType(boardSize, timeStandard).ToKey()];
     }
 }
 
 [Immutable, GenerateSerializer]
-[Alias("UserRating")]
-public class UserRating
+[Alias("PlayerRatings")]
+public class PlayerRatings
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     [Id(0)]
-    public string UserId { get; set; }
+    public string PlayerId { get; set; }
 
     [BsonElement(UserRatingFieldNames.Ratings)]
     [Id(1)]
-    public Dictionary<string, PlayerRatingData> Ratings { get; set; }
+    public Dictionary<string, PlayerRatingsData> Ratings { get; set; }
 
-    public UserRating(string userId, Dictionary<string, PlayerRatingData> ratings)
+    public PlayerRatings(string userId, Dictionary<string, PlayerRatingsData> ratings)
     {
-        UserId = userId;
+        PlayerId = userId;
         Ratings = ratings;
     }
 }
-
 public static class PlayerRatingDataExtensions
 {
-    public static (double min, double max) GetRatingRange(this PlayerRatingData playerRatingData)
+    public static (double min, double max) GetRatingRange(this PlayerRatingsData playerRatingData)
     {
         return (playerRatingData.Glicko.Rating - playerRatingData.Glicko.Deviation, playerRatingData.Glicko.Rating + playerRatingData.Glicko.Deviation);
     }
 
-    public static bool RatingRangeOverlap(this PlayerRatingData playerRatingData, PlayerRatingData otherPlayerRatingData)
+    public static bool RatingRangeOverlap(this PlayerRatingsData playerRatingData, PlayerRatingsData otherPlayerRatingData)
     {
         var (min, max) = playerRatingData.GetRatingRange();
         var (otherMin, otherMax) = otherPlayerRatingData.GetRatingRange();
@@ -61,8 +60,8 @@ public static class PlayerRatingDataExtensions
 }
 
 [Immutable, GenerateSerializer]
-[Alias("PlayerRatingData")]
-public class PlayerRatingData
+[Alias("PlayerRatingsData")]
+public class PlayerRatingsData
 {
     [BsonElement(UserRatingFieldNames.Glicko)]
     [Id(0)]
@@ -80,7 +79,7 @@ public class PlayerRatingData
     [Id(3)]
     public DateTime? Latest { get; set; } // last rating period end date
 
-    public PlayerRatingData(GlickoRating glicko, int nb, List<int> recent, DateTime? latest)
+    public PlayerRatingsData(GlickoRating glicko, int nb, List<int> recent, DateTime? latest)
     {
         Glicko = glicko;
         NB = nb;

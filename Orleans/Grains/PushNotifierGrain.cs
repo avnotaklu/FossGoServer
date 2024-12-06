@@ -7,12 +7,12 @@ namespace BadukServer.Orleans.Grains;
 // [StatelessWorker(maxLocalWorkers: 12)]
 public class PushNotifierGrain : Grain, IPushNotifierGrain
 {
-    private readonly Queue<SignalRMessage> _messageQueue = new();
     private readonly ILogger<PushNotifierGrain> _logger;
     private string ConnectionId => this.GetPrimaryKeyString();
     private string _player = null!;
     private PlayerType? _playerType = null!;
     private readonly ISignalRHubService _hubService;
+    private bool _isInitialized = false;
 
     public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRHubService hub)
     {
@@ -20,7 +20,6 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         _hubService = hub;
     }
 
-    private Task _flushTask = Task.CompletedTask;
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -33,6 +32,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         _player = playerId;
         _playerType = playerType;
         _hubService.AddToGroup(ConnectionId, playerType.ToTypeString(), CancellationToken.None);
+        _isInitialized = true;
 
         return new ValueTask();
     }
@@ -82,6 +82,15 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     public async void SendMessageToSameType(SignalRMessage message)
     {
-
+        try
+        {
+            var group = _playerType?.ToTypeString()!;
+            _logger.LogInformation("Notification sent to <group>{group}<group>, <message>{message}<message>", group, message);
+            await _hubService.SendToGroup("userUpdate", group, message, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error broadcasting to host");
+        }
     }
 }

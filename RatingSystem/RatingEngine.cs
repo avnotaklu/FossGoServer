@@ -31,8 +31,8 @@ using Moq;
 
 public interface IRatingEngine
 {
-    public (List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings) CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, List<UserRating> usersRatings, DateTime endTime);
-    public double PreviewDeviation(PlayerRatingData data, DateTime ratingPeriodEndDate, bool reverse);
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, VariantType gameVariant, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime);
+    public double PreviewDeviation(PlayerRatingsData data, DateTime ratingPeriodEndDate, bool reverse);
 }
 
 public class RatingEngine : IRatingEngine
@@ -66,7 +66,7 @@ public class RatingEngine : IRatingEngine
     //         _logger = logger;
     //     }
 
-    private Rating RatingFromRatingData(PlayerRatingData ratingData)
+    private Rating RatingFromRatingData(PlayerRatingsData ratingData)
     {
         var glicko = ratingData.Glicko;
         return new Rating(
@@ -80,40 +80,48 @@ public class RatingEngine : IRatingEngine
     }
 
     // 
-    public (List<int> RatingDiffs, List<PlayerRatingData> PrevPerfs, List<PlayerRatingData> NewPerfs, List<UserRating> UserRatings) CalculateRatingAndPerfsAsync(string winnerId, BoardSize boardSize, TimeStandard timeStandard, Dictionary<string, StoneType> players, List<UserRating> usersRatings, DateTime endTime)
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, VariantType variantType, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime)
     {
-        if (winnerId == null)
+        if (!variantType.RatingAllowed())
         {
-            throw new InvalidOperationException("Game is not over yet");
-        }
-        if (boardSize == BoardSize.Other)
-        {
-            throw new InvalidOperationException("Can't calculate rating for games with board size other than 9, 13, 19");
+            throw new InvalidOperationException($"Can't calculate rating for variants other than {RateableVariants().Aggregate("", (p, n) => p + ", " + n.ToString())}");
         }
 
         // var usersRatings = await Task.WhenAll(players.Keys.Select(id => _userRepo.GetUserRatings(id)!).ToList());
-        var ratingGame = GetPlayerRatingsForGame(boardSize, timeStandard, usersRatings, winnerId, players, endTime);
+        var ratingGame = GetPlayerRatingsForGame(variantType, usersRatings, gameResult, endTime);
 
         var oldRatings = ratingGame.PlayersRatingData;
 
         // var prevPlayers = prevPerfs.Select(perfs => perfs[perfKey].ToGlickoPlayer()).ToList();
         var result = new RatingPeriodResults();
 
-        var winner = ratingGame.PlayersRatingData[(int)players[winnerId]!];
-        var loser = ratingGame.PlayersRatingData[(int)players.GetOtherStoneFromPlayerId(winnerId)!];
+        var p1Stone = gameResult.GetWinnerStone() ?? StoneType.Black;
+        var p1 = ratingGame.PlayersRatingData[(int)p1Stone];
+        var p2Stone = gameResult.GetLoserStone() ?? StoneType.White;
+        var p2 = ratingGame.PlayersRatingData[(int)p2Stone];
 
-        result.AddResult(
-            winner: RatingFromRatingData(winner),
-            loser: RatingFromRatingData(loser)
-        );
+        if (gameResult == GameResult.Draw)
+        {
+            result.AddDraw(
+                player1: RatingFromRatingData(p1),
+                player2: RatingFromRatingData(p2)
+            );
+        }
+        else
+        {
+            result.AddResult(
+                winner: RatingFromRatingData(p1),
+                loser: RatingFromRatingData(p2)
+            );
+        }
 
-        var computedPlayers = ComputeGlickoAsync(result, ratingGame);
+        var computedPlayers = ComputeGlickoAsync(result, ratingGame, p1Stone, p2Stone);
 
         var newRatings = computedPlayers;
 
         var ratingDiffs = oldRatings.Zip(newRatings, (prev, next) =>
         {
-            int ratingOf(PlayerRatingData p) => (int)p.Glicko.Rating;
+            int ratingOf(PlayerRatingsData p) => (int)p.Glicko.Rating;
             return ratingOf(next) - ratingOf(prev);
         }).ToList();
 
@@ -122,12 +130,12 @@ public class RatingEngine : IRatingEngine
         return (ratingDiffs, oldRatings, newRatings, usersRatings.ToList());
     }
 
-    public double PreviewDeviation(PlayerRatingData data, DateTime ratingPeriodEndDate, bool reverse)
+    public double PreviewDeviation(PlayerRatingsData data, DateTime ratingPeriodEndDate, bool reverse)
     {
         return _calculator.PreviewDeviation(RatingFromRatingData(data), ratingPeriodEndDate, reverse);
     }
 
-    private List<PlayerRatingData> ComputeGlickoAsync(RatingPeriodResults results, UncalculatedRatingGame game)
+    private List<PlayerRatingsData> ComputeGlickoAsync(RatingPeriodResults results, UncalculatedRatingGame game, StoneType p1, StoneType p2)
     {
         Debug.Assert(results.GetParticipants().Count() == 2, "Only one result should be added at a time");
 
@@ -137,30 +145,35 @@ public class RatingEngine : IRatingEngine
 
             _calculator.UpdateRatings(results, skipDeviationIncrease: true);
 
-            List<PlayerRatingData> players = [null, null];
+            List<PlayerRatingsData> players = [null, null];
 
-            var winnerGlicko = new GlickoRating(
-                    rating: result.GetWinner().GetRating(),
-                    deviation: result.GetWinner().GetRatingDeviation(),
-                    volatility: result.GetWinner().GetVolatility()
+            var p1Glicko = new GlickoRating(
+                    rating: result.GetPlayer1().GetRating(),
+                    deviation: result.GetPlayer1().GetRatingDeviation(),
+                    volatility: result.GetPlayer1().GetVolatility()
                 );
-            players[game.Winner] = new PlayerRatingData(
-                glicko: winnerGlicko,
-                nb: game.PlayersRatingData[game.Winner].NB + 1,
-                recent: game.PlayersRatingData[game.Winner].UpdateRecentWith(winnerGlicko),
+
+            var p1Id = (int)p1;
+
+            players[p1Id] = new PlayerRatingsData(
+                glicko: p1Glicko,
+                nb: game.PlayersRatingData[p1Id].NB + 1,
+                recent: game.PlayersRatingData[p1Id].UpdateRecentWith(p1Glicko),
                 latest: DateTime.Now
             );
 
 
-            var loserGlicko = new GlickoRating(
-                    rating: result.GetLoser().GetRating(),
-                    deviation: result.GetLoser().GetRatingDeviation(),
-                    volatility: result.GetLoser().GetVolatility()
+            var p2Glicko = new GlickoRating(
+                    rating: result.GetPlayer2().GetRating(),
+                    deviation: result.GetPlayer2().GetRatingDeviation(),
+                    volatility: result.GetPlayer2().GetVolatility()
                 );
-            players[game.Loser] = new PlayerRatingData(
-                glicko: loserGlicko,
-                nb: game.PlayersRatingData[game.Loser].NB + 1,
-                recent: game.PlayersRatingData[game.Loser].UpdateRecentWith(loserGlicko),
+
+            var p2Id = (int)p2;
+            players[p2Id] = new PlayerRatingsData(
+                glicko: p2Glicko,
+                nb: game.PlayersRatingData[p2Id].NB + 1,
+                recent: game.PlayersRatingData[p2Id].UpdateRecentWith(p2Glicko),
                 latest: DateTime.Now
             );
 
@@ -178,28 +191,28 @@ public class RatingEngine : IRatingEngine
 
 
 
-    private UncalculatedRatingGame GetPlayerRatingsForGame(BoardSize boardSize, TimeStandard timeStandard, List<UserRating> userRating, string winnerId, Dictionary<string, StoneType> players, DateTime endTime)
+    private UncalculatedRatingGame GetPlayerRatingsForGame(VariantType variantType, List<PlayerRatings> userRating, GameResult res, DateTime endTime)
     {
-        var style = RatingKey(boardSize, timeStandard);
-        var userRatings = userRating.Select(u => u.Ratings[style]).ToList();
-        var winner = players[winnerId];
+        var key = variantType.ToKey();
+        var userRatings = userRating.Select(u => u.Ratings[key]).ToList();
 
-        return new UncalculatedRatingGame(userRatings, (int)winner, endTime, boardSize, timeStandard);
+        return new UncalculatedRatingGame(userRatings, res, endTime, variantType);
     }
 
-    private List<UserRating> usersWithNewRatings(List<UserRating> oldUsers, List<PlayerRatingData> newRatings, UncalculatedRatingGame ratingGame)
+    private List<PlayerRatings> usersWithNewRatings(List<PlayerRatings> oldUsers, List<PlayerRatingsData> newRatings, UncalculatedRatingGame ratingGame)
     {
-        var style = ratingGame.GameStyle;
+        var style = ratingGame.Variant.ToKey();
 
         var result = oldUsers.Zip(newRatings, (oldUser, rating) =>
         {
             oldUser.Ratings[style] = rating;
 
-            var (key, data) = RatingForTimeStandard(ratingGame.Standard, oldUser);
+            var (key, data) = RatingForTimeStandard(new VariantType(null, ratingGame.Variant.TimeStandard), oldUser);
+            
             oldUser.Ratings[key] = data;
 
-            return new UserRating(
-                oldUser.UserId,
+            return new PlayerRatings(
+                oldUser.PlayerId,
                 oldUser.Ratings
             );
         }).ToList();
@@ -207,12 +220,12 @@ public class RatingEngine : IRatingEngine
         return result;
     }
 
-    private (string standardKey, PlayerRatingData data) RatingForTimeStandard(TimeStandard timeStandard, UserRating p)
+    private (string standardKey, PlayerRatingsData data) RatingForTimeStandard(VariantType variant, PlayerRatings p)
     {
-        var timeStandardStyle = RatingKey(null, timeStandard);
+        var timeStandardStyle = variant.ToKey();
 
         // Collecting the sub-performances
-        var subs = RateableBoards().Select(boardSize => p.Ratings[RatingKey(boardSize, timeStandard)])
+        var subs = RateableBoards().Select(boardSize => p.Ratings[new VariantType(boardSize, variant.TimeStandard).ToKey()])
             .Where(perf => !IsRatingProvisional(perf))
             .ToList();
 
@@ -221,11 +234,11 @@ public class RatingEngine : IRatingEngine
         // .MaxByOption(perf => perf.Latest.HasValue ? perf.Latest.Value.Ticks : 0)
         // ?.Latest;
 
-        static int nbSelector(PlayerRatingData p) => p.NB;
+        static int nbSelector(PlayerRatingsData p) => p.NB;
 
         // Updating the standard performance
         var newStandard = (latestStyle?.Latest.HasValue ?? false)
-            ? new PlayerRatingData
+            ? new PlayerRatingsData
             (
                 glicko: new GlickoRating(
                     rating: subs.Sum(s => s.Glicko.Rating * (s.NB / subs.Sum(nbSelector))),
@@ -239,7 +252,7 @@ public class RatingEngine : IRatingEngine
             : p.Ratings[timeStandardStyle];
 
         // Returning a new UserPerfs instance with the updated Standard
-        return (timeStandardStyle, new PlayerRatingData(
+        return (timeStandardStyle, new PlayerRatingsData(
             glicko: newStandard.Glicko,
             nb: newStandard.NB,
             recent: newStandard.Recent,
@@ -249,79 +262,50 @@ public class RatingEngine : IRatingEngine
 
     public static IEnumerable<BoardSize> RateableBoards()
     {
-        return Enum.GetValues(typeof(BoardSize)).Cast<BoardSize>().Where(a => a != BoardSize.Other);
+        return Enum.GetValues(typeof(BoardSize)).Cast<BoardSize>().Where(a => a.RatingAllowed());
     }
 
     public static IEnumerable<TimeStandard> RateableTimeStandards()
     {
-        return Enum.GetValues(typeof(TimeStandard)).Cast<TimeStandard>().Where(a => a != TimeStandard.Other);
+        return Enum.GetValues(typeof(TimeStandard)).Cast<TimeStandard>().Where(a => a.RatingAllowed());
     }
 
 
-    public static bool IsRatingProvisional(PlayerRatingData rating)
+    public static IEnumerable<VariantType> RateableVariants()
+    {
+        return RateableBoards().Select(a => (BoardSize?)a).Append(null).SelectMany(a => RateableTimeStandards().Select(t => new VariantType(a, t)));
+    }
+
+
+    public static bool IsRatingProvisional(PlayerRatingsData rating)
     {
         return rating.Glicko.Deviation > ProvisionalDeviation;
-    }
-
-    public static string RatingKey(BoardSize? size, TimeStandard time)
-    {
-        if (size == null)
-        {
-            return $"S{(int)time}";
-        }
-        return $"B{(int)size}-S{(int)time}";
     }
 }
 
 public class UncalculatedRatingGame
 {
-    public List<PlayerRatingData> PlayersRatingData;
-    public string GameStyle => RatingEngine.RatingKey(Size, Standard);
-    public BoardSize Size;
-    public TimeStandard Standard;
-    public int Winner;
-    public int Loser => 1 - Winner;
+    public List<PlayerRatingsData> PlayersRatingData;
+    public VariantType Variant;
+    public GameResult Result;
     public DateTime EndTime;
 
-    public UncalculatedRatingGame(List<PlayerRatingData> players, int winner, DateTime endTime, BoardSize size, TimeStandard standard)
+    public UncalculatedRatingGame(List<PlayerRatingsData> players, GameResult res, DateTime endTime, VariantType variant)
     {
         PlayersRatingData = players;
-        Winner = winner;
+        Result = res;
         EndTime = endTime;
-        Size = size;
-        Standard = standard;
+        Variant = variant;
     }
 
 }
 
-// public class UserRatingForGame
-// {
-//     public string UserId => _user.UserId;
-//     public Dictionary<string, PlayerRatingData> _Ratings => ;
-//     private UserRating _user;
-//     private UserRating _user;
-
-//     public UserRatingForGame(Game game, UserRating rating)
-//     {
-//         UserId = userId;
-//         Ratings = ratings;
-//     }
-// }
-
-
-// public class PlayerRatingPerStyle
-// {
-//     public PlayerRatingData Rating;
-//     public BoardSize? BoardSize;
-//     public GameSpeed? GameSpeed;
-
-// }
 
 static class PlayerRatingDataExt
 {
     public static readonly int RecentMaxSize = 12;
 
-    public static List<int> UpdateRecentWith(this PlayerRatingData data, GlickoRating glicko)
+    public static List<int> UpdateRecentWith(this PlayerRatingsData data, GlickoRating glicko)
     {
         var p = data;
         if (p.NB < 10)

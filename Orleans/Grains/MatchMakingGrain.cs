@@ -102,7 +102,7 @@ public class Match
     [Id(0)]
     public string CreatorId { get; set; }
     [Id(1)]
-    public PlayerRatingData? CreatorRating { get; set; }
+    public PlayerRatingsData? CreatorRating { get; set; }
     [Id(2)]
     public MatchableBoardSize BoardSize { get; set; }
     [Id(3)]
@@ -111,7 +111,7 @@ public class Match
     public GameType GameType { get; set; }
     public StoneSelectionType StoneType => StoneSelectionType.Auto;
 
-    public Match(string creatorId, PlayerRatingData? creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl, GameType gameType)
+    public Match(string creatorId, PlayerRatingsData? creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl, GameType gameType)
     {
         CreatorId = creatorId;
         CreatorRating = creatorRating;

@@ -7,17 +7,17 @@ using MongoDB.Driver;
 
 public interface IUserRatingService
 {
-    public Task<UserRating> GetUserRatings(string userId);
-    public Task<UserRating?> CreateUserRatings(string userId);
-    public Task<UserRating?> SaveUserRatings(UserRating userRating);
+    public Task<PlayerRatings> GetUserRatings(string userId);
+    public Task<PlayerRatings?> CreateUserRatings(string userId);
+    public Task<PlayerRatings?> SaveUserRatings(PlayerRatings userRating);
 }
 
 public class UserRatingService : IUserRatingService
 {
-    private readonly IMongoCollection<UserRating> _ratingsCollection;
+    private readonly IMongoCollection<PlayerRatings> _ratingsCollection;
     private readonly IRatingEngine _ratingEngine;
     private readonly IDateTimeService _dateTimeService;
-    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserRating>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService)
+    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<PlayerRatings>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService)
     {
         var mongoClient = new MongoClient(
             userDatabaseSettings.Value.ConnectionString);
@@ -25,7 +25,7 @@ public class UserRatingService : IUserRatingService
         var mongoDatabase = mongoClient.GetDatabase(
             userDatabaseSettings.Value.DatabaseName);
 
-        _ratingsCollection = mongoDatabase.GetCollection<UserRating>(
+        _ratingsCollection = mongoDatabase.GetCollection<PlayerRatings>(
             ratingsCollection.Value.Name);
 
         _ratingEngine = ratingEngine;
@@ -33,18 +33,18 @@ public class UserRatingService : IUserRatingService
     }
 
 
-    public UserRating UpdateUserRatingToCurrent(UserRating oldRating)
+    public PlayerRatings UpdateUserRatingToCurrent(PlayerRatings oldRating)
     {
-        return new UserRating(oldRating.UserId, new Dictionary<string, PlayerRatingData>(oldRating.Ratings.Select(a =>
-        new KeyValuePair<string, PlayerRatingData>(a.Key, new PlayerRatingData(new GlickoRating(
+        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
+        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
             a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), false), a.Value.Glicko.Volatility
         ), a.Value.NB, a.Value.Recent, a.Value.Latest))
         )));
     }
 
-    public async Task<UserRating> GetUserRatings(string userId)
+    public async Task<PlayerRatings> GetUserRatings(string userId)
     {
-        var oldRating = await _ratingsCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync();
+        var oldRating = await _ratingsCollection.Find(a => a.PlayerId == userId).FirstOrDefaultAsync();
 
         if (oldRating == null)
         {
@@ -54,11 +54,11 @@ public class UserRatingService : IUserRatingService
         return UpdateUserRatingToCurrent(oldRating);
     }
 
-    public async Task<UserRating?> CreateUserRatings(string userId)
+    public async Task<PlayerRatings?> CreateUserRatings(string userId)
     {
         try
         {
-            var rating = new UserRating(userId, GetInitialRatings());
+            var rating = new PlayerRatings(userId, GetInitialRatings());
             await _ratingsCollection.InsertOneAsync(rating);
             return rating;
         }
@@ -68,11 +68,11 @@ public class UserRatingService : IUserRatingService
         }
     }
 
-    public async Task<UserRating?> SaveUserRatings(UserRating userRating)
+    public async Task<PlayerRatings?> SaveUserRatings(PlayerRatings userRating)
     {
         try
         {
-            var res = await _ratingsCollection.UpdateOneAsync(Builders<UserRating>.Filter.Eq(a => a.UserId, userRating.UserId), Builders<UserRating>.Update.Set(a => a.Ratings, userRating.Ratings));
+            var res = await _ratingsCollection.UpdateOneAsync(Builders<PlayerRatings>.Filter.Eq(a => a.PlayerId, userRating.PlayerId), Builders<PlayerRatings>.Update.Set(a => a.Ratings, userRating.Ratings));
 
             return userRating;
         }
@@ -82,16 +82,18 @@ public class UserRatingService : IUserRatingService
         }
     }
 
-    public static Dictionary<string, PlayerRatingData> GetInitialRatings()
+    public static Dictionary<string, PlayerRatingsData> GetInitialRatings()
     {
-        return new Dictionary<string, PlayerRatingData>(
-        RatingEngine.RateableBoards().Select(a => (BoardSize?)a).Append(null).Select(b => RatingEngine.RateableTimeStandards().Select(t => new KeyValuePair<string, PlayerRatingData>(RatingEngine.RatingKey(b, t), GetInitialRatingData()))).SelectMany(a => a)
-                    );
+        return new Dictionary<string, PlayerRatingsData>(
+            RatingEngine.RateableVariants().Select(
+                t => new KeyValuePair<string, PlayerRatingsData>(t.ToKey(), GetInitialRatingData())
+            )
+        );
     }
 
-    private static PlayerRatingData GetInitialRatingData()
+    private static PlayerRatingsData GetInitialRatingData()
     {
-        return new PlayerRatingData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
+        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
     }
 }
 

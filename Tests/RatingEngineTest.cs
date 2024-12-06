@@ -26,10 +26,10 @@ public class RatingEngineTest
     {
         var (logger, userRepoMock) = GetEngineConstructorParams();
 
-        var blitz_nine_by_nine_style = "B0-S0";
-        var blitz_style = "S0";
+        var blitz_nine_by_nine_style = "B0_S0";
+        var blitz_style = "_S0";
 
-        List<UserRating> userRatings = GetSimpleUserRatings();
+        List<PlayerRatings> userRatings = GetSimpleUserRatings();
 
         userRepoMock.Setup(x => x.GetUserRatings("a")).ReturnsAsync(() => userRatings[0]);
         userRepoMock.Setup(x => x.GetUserRatings("b")).ReturnsAsync(() => userRatings[1]);
@@ -37,8 +37,12 @@ public class RatingEngineTest
         var engine = new RatingEngine(logger);
 
         var winnerId = "a";
+
         var boardSize = BoardSize.Nine;
         var timeStandard = TimeStandard.Blitz;
+
+        var variant = new VariantType(boardSize, timeStandard);
+
         var players = new Dictionary<string, StoneType>
         {
             ["a"] = StoneType.Black,
@@ -46,9 +50,8 @@ public class RatingEngineTest
         };
 
         var res = engine.CalculateRatingAndPerfsAsync(
-                winnerId: winnerId,
-                boardSize: boardSize,
-                timeStandard: timeStandard,
+                gameResult: GameResult.BlackWon,
+                variantType: variant,
                 players: players,
                 usersRatings: [.. (await Task.WhenAll(players.GetPlayerIdSortedByColor().Select(a => userRepoMock.Object.GetUserRatings(a))))],
                 endTime: DateTime.Now
@@ -78,30 +81,34 @@ public class RatingEngineTest
         Assert.IsTrue(preview > 110);
     }
 
-    private static List<UserRating> GetSimpleUserRatings()
+    private static List<PlayerRatings> GetSimpleUserRatings()
     {
-        return new List<UserRating>
+        return new List<PlayerRatings>
         {
-            new UserRating("winner", GetInitialTestRatings()),
-            new UserRating("loser", GetInitialTestRatings())
+            new PlayerRatings("winner", GetInitialTestRatings()),
+            new PlayerRatings("loser", GetInitialTestRatings())
         };
     }
 
 
-    public static Dictionary<string, PlayerRatingData> GetInitialTestRatings()
+    public static Dictionary<string, PlayerRatingsData> GetInitialTestRatings()
     {
-        return new Dictionary<string, PlayerRatingData>(
-        RatingEngine.RateableBoards().Select(a => (BoardSize?)a).Append(null).Select(b => RatingEngine.RateableTimeStandards().Select(t => new KeyValuePair<string, PlayerRatingData>(RatingEngine.RatingKey(b, t), GetRatingDataWithAlmostGoodDeviation()))).SelectMany(a => a)
-                    );
+
+        return new Dictionary<string, PlayerRatingsData>(
+            RatingEngine.RateableVariants().Select(
+                t => new KeyValuePair<string, PlayerRatingsData>(t.ToKey(), GetRatingDataWithAlmostGoodDeviation())
+            )
+        );
+
     }
 
-    private static PlayerRatingData GetRatingDataWithAlmostGoodDeviation()
+    private static PlayerRatingsData GetRatingDataWithAlmostGoodDeviation()
     {
-        return new PlayerRatingData(new GlickoRating(1500, 111, 0.06), nb: 0, recent: [], latest: null);
+        return new PlayerRatingsData(new GlickoRating(1500, 111, 0.06), nb: 0, recent: [], latest: null);
     }
 
-    private static PlayerRatingData GetRatingDataWithWithYearOldRatingPeriod()
+    private static PlayerRatingsData GetRatingDataWithWithYearOldRatingPeriod()
     {
-        return new PlayerRatingData(new GlickoRating(1500, 80, 0.06), nb: 0, recent: [], latest: DateTime.Now.AddYears(-1));
+        return new PlayerRatingsData(new GlickoRating(1500, 80, 0.06), nb: 0, recent: [], latest: DateTime.Now.AddYears(-1));
     }
 }

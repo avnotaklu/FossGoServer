@@ -14,7 +14,7 @@ public class UserController : ControllerBase
     }
 
     [HttpGet("GetUserRatings")]
-    public async Task<ActionResult<UserRating>> GetUserRatings([FromQuery] string userId)
+    public async Task<ActionResult<PlayerRatings>> GetUserRatings([FromQuery] string userId)
     {
         _logger.LogInformation("Getting user ratings for user {userId}", userId);
         var res = await _ratingService.GetUserRatings(userId);

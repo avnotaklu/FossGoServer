@@ -109,7 +109,8 @@ public static class TimeControlDtoExt
                 return standard;
             }
         }
-        return TimeStandard.Other;
+
+        throw new Exception("Invalid time control");
     }
 
     public static TimeControlDto FromRepr(string repr)

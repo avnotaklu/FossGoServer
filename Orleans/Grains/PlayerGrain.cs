@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BadukServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using MongoDB.Bson;
@@ -6,50 +7,13 @@ using Orleans.Concurrency;
 
 namespace BadukServer.Orleans.Grains;
 
-public static class PlayerTypeExt
-{
-    public static PlayerType FromString(string type)
-    {
-        return type switch
-        {
-            "normal_user" => PlayerType.Normal,
-            "guest_user" => PlayerType.Guest,
-            _ => throw new Exception("Invalid player type")
-        };
-    }
-    public static string ToTypeString(this PlayerType type)
-    {
-        return type switch
-        {
-            PlayerType.Normal => "normal_user",
-            PlayerType.Guest => "guest_user",
-            _ => throw new Exception("Invalid player type")
-        };
-    }
-
-    public static GameType GetGameType(this PlayerType type, RankedOrCasual rankedOrCasual)
-    {
-        return type switch
-        {
-            PlayerType.Normal => rankedOrCasual switch
-            {
-                RankedOrCasual.Rated => GameType.Rated,
-                RankedOrCasual.Casual => GameType.Casual,
-                _ => throw new Exception("Invalid game type")
-            },
-            PlayerType.Guest => GameType.Anonymous,
-            _ => throw new Exception("Invalid player type")
-        };
-    }
-}
-
 public class PlayerGrain : Grain, IPlayerGrain
 {
     // Injected
     private readonly IPlayerInfoService _publicUserInfoService;
     private readonly ISignalRHubService _hubService;
 
-    private string _connectionId = null!;
+    private string? _connectionId;
     private bool _isInitialized = false;
     private string PlayerId => this.GetPrimaryKeyString();
     private PlayerType PlayerType;
@@ -89,6 +53,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
     public async Task<string> CreateGame(GameCreationDto creationData, string time)
     {
+        Debug.Assert(_isInitialized, "Can't create game if not initialized");
         var gameId = ObjectId.GenerateNewId().ToString();
         var userId = this.GetPrimaryKeyString(); // our player id
 
@@ -103,7 +68,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         // add ourselves to the game
         await gameGrain.CreateGame(creationData.ToData(), publicUserInfo, gameType);
 
-        await _hubService.AddToGroup(_connectionId, gameId, CancellationToken.None);
+        await _hubService.AddToGroup(_connectionId!, gameId, CancellationToken.None);
 
         _activeGameId = gameId;
         games.Add(gameId);
@@ -119,6 +84,8 @@ public class PlayerGrain : Grain, IPlayerGrain
 
     public async Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, string time)
     {
+        Debug.Assert(_isInitialized, "Can't create game if not initialized");
+        _logger.LogInformation("Trying to join game");
         var userId = this.GetPrimaryKeyString(); // our player id
 
         _logger.LogInformation("Joining game " + gameId + " By player " + userId);
@@ -129,7 +96,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var (game, otherPlayerData, justJoined) = await gameGrain.JoinGame(publicUserInfo, time);
 
-        await _hubService.AddToGroup(_connectionId, gameId, CancellationToken.None);
+        await _hubService.AddToGroup(_connectionId!, gameId, CancellationToken.None);
 
         if (otherPlayerData != null)
         {
@@ -155,22 +122,21 @@ public class PlayerGrain : Grain, IPlayerGrain
         return (game, otherPlayerData);
     }
 
-    public Task<string> GetConnectionId()
+    public Task<string?> GetConnectionId()
     {
-        return Task.FromResult(_connectionId);
+        if (!_isInitialized)
+        {
+            return Task.FromResult<string?>(null);
+        }
+        else
+        {
+            return Task.FromResult(_connectionId);
+        }
     }
 
     public Task LeaveGame(string gameId)
     {
-        // manage game list
         _activeGameId = null;
-
-        // manage running total
-        // _ = outcome switch {
-        //     GameOutcome.Win => _wins++,
-        //     GameOutcome.Lose => _loses++,
-        //     _ => 0
-        // };
 
         return Task.CompletedTask;
     }

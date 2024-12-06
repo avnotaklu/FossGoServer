@@ -29,9 +29,9 @@ public class GameGrainTests
         new User("p2@p2.com", false, "ph") {Id = "p2" },
     };
 
-    static List<UserRating> userRatings = [
-        new UserRating("p1", UserRatingService.GetInitialRatings()),
-        new UserRating("p2", UserRatingService.GetInitialRatings())
+    static List<PlayerRatings> userRatings = [
+        new PlayerRatings("p1", UserRatingService.GetInitialRatings()),
+        new PlayerRatings("p2", UserRatingService.GetInitialRatings())
     ];
 
     static public DateTime _1980Jan1_1_30PM = new DateTime(

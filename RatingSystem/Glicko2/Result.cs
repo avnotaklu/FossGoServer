@@ -9,25 +9,29 @@ namespace Glicko2
     {
         private const double PointsForWin = 1.0;
         private const double PointsForLoss = 0.0;
+        private const double PointsForDraw = 0.5;
 
-        private readonly Rating _winner;
-        private readonly Rating _loser;
+        private readonly bool _isDraw;
+
+        private readonly Rating _p1;
+        private readonly Rating _p2;
 
         /// <summary>
         /// Record a new result from a match between two players.
         /// </summary>
-        /// <param name="winner"></param>
-        /// <param name="loser"></param>
+        /// <param name="p1"></param>
+        /// <param name="p2"></param>
         /// <param name="isDraw"></param>
-        public Result(Rating winner, Rating loser)
+        public Result(Rating p1, Rating p2, bool isDraw)
         {
-            if (!ValidPlayers(winner, loser))
+            if (!ValidPlayers(p1, p2))
             {
                 throw new ArgumentException("Players winner and loser are the same player");
             }
 
-            _winner = winner;
-            _loser = loser;
+            _p1 = p1;
+            _p2 = p2;
+            _isDraw = isDraw;
         }
 
         /// <summary>
@@ -48,7 +52,7 @@ namespace Glicko2
         /// <returns></returns>
         public bool Participated(Rating player)
         {
-            return player == _winner || player == _loser;
+            return player == _p1 || player == _p2;
         }
 
         /// <summary>
@@ -60,11 +64,11 @@ namespace Glicko2
         {
             double score;
 
-            if (_winner == player)
+            if (_p1 == player)
             {
                 score = PointsForWin;
             }
-            else if (_loser == player)
+            else if (_p2 == player)
             {
                 score = PointsForLoss;
             }
@@ -85,13 +89,13 @@ namespace Glicko2
         {
             Rating opponent;
 
-            if (_winner == player)
+            if (_p1 == player)
             {
-                opponent = _loser;
+                opponent = _p2;
             }
-            else if (_loser == player)
+            else if (_p2 == player)
             {
-                opponent = _winner;
+                opponent = _p1;
             }
             else
             {
@@ -101,14 +105,14 @@ namespace Glicko2
             return opponent;
         }
 
-        public Rating GetWinner()
+        public Rating GetPlayer1()
         {
-            return _winner;
+            return _p1;
         }
 
-        public Rating GetLoser()
+        public Rating GetPlayer2()
         {
-            return _loser;
+            return _p2;
         }
     }
 }

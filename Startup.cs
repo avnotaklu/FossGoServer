@@ -30,6 +30,13 @@ public class Startup
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddControllers();
+        services.AddLogging(logging =>
+            logging.AddSimpleConsole(options =>
+                {
+                    options.SingleLine = true;
+                    options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss]";
+                })
+        );
 
         services.AddAuthorization(options =>
             options.AddPolicy("PlayerOnly", policy =>
@@ -60,7 +67,7 @@ public class Startup
         services.Configure<MongodbCollectionParams<User>>(
             Configuration.GetSection("UserCollection"));
 
-        services.Configure<MongodbCollectionParams<UserRating>>(
+        services.Configure<MongodbCollectionParams<PlayerRatings>>(
             Configuration.GetSection("UserRatingsCollection"));
 
         services.Configure<MongodbCollectionParams<Game>>(

@@ -396,12 +396,14 @@ namespace BadukServer
         public int Cols;
         public float Komi;
 
-        public int GetWinner()
+        public GameResult GetResult()
         {
             var blackScore = _territoryScores[0] + Prisoners[0];
             var whiteScore = _territoryScores[1] + Prisoners[1] + Komi;
-            var winner = (blackScore > whiteScore) ? 0 : 1;
-            return winner;
+
+            if(blackScore == whiteScore) return GameResult.Draw;
+
+            return (blackScore > whiteScore) ? GameResult.BlackWon : GameResult.WhiteWon;
         }
 
         // GETTERS

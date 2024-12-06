@@ -21,6 +21,11 @@ public class TimeCalculator : ITimeCalculator
         var byoYomiMS = timeControl.ByoYomiTime?.ByoYomiSeconds * 1000;
 
         var activePlayerIdx = newTimes.FindIndex((snap) => snap.TimeActive);
+
+        if(activePlayerIdx == -1) {
+            return newTimes;
+        }
+
         var activePlayerSnap = newTimes[activePlayerIdx];
 
         var activePlayerTimeLeft = activePlayerSnap.MainTimeMilliseconds - (int)(DateTime.Parse(curTime) - DateTime.Parse(activePlayerSnap.SnapshotTimestamp)).TotalMilliseconds;
