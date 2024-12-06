@@ -30,8 +30,8 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
     private GameOverMethod? _gameOverMethod;
 
-    private List<int> _playersRatings = [];
-    private List<int> _playersRatingsDiff = [];
+    private List<string> _playersRatingsBefore = [];
+    private List<string> _playersRatingsAfter = [];
 
     private GameResult? _gameResult;
     private DateTime? _endTime;
@@ -111,8 +111,8 @@ public class GameGrain : Grain, IGameGrain
         string? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
-        List<int> playersRatings,
-        List<int> playersRatingsDiff
+        List<string> playersRatings,
+        List<string> playersRatingsDiff
     )
     {
         _rows = rows;
@@ -134,8 +134,8 @@ public class GameGrain : Grain, IGameGrain
         _endTime = endTime?.DeserializedDate();
         _stoneSelectionType = stoneSelectionType;
         _gameCreator = gameCreator;
-        _playersRatings = playersRatings;
-        _playersRatingsDiff = playersRatingsDiff;
+        _playersRatingsBefore = playersRatings;
+        _playersRatingsAfter = playersRatingsDiff;
         _initialized = true;
     }
 
@@ -506,8 +506,8 @@ public class GameGrain : Grain, IGameGrain
             endTime: game.EndTime,
             stoneSelectionType: game.StoneSelectionType,
             gameCreator: game.GameCreator,
-            playersRatings: game.PlayersRatings,
-            playersRatingsDiff: game.PlayersRatingsDiff
+            playersRatings: game.PlayersRatingsBefore,
+            playersRatingsDiff: game.PlayersRatingsAfter
         );
 
         return GetGame();
@@ -601,8 +601,8 @@ public class GameGrain : Grain, IGameGrain
             gameOverMethod: _gameOverMethod,
             endTime: _endTime?.SerializedDate(),
             gameCreator: _gameCreator,
-            playersRatings: _playersRatings,
-            playersRatingsDiff: _playersRatingsDiff,
+            playersRatingsBefore: _playersRatingsBefore,
+            playersRatingsAfter: _playersRatingsAfter,
             gameType: _gameType
         );
     }
@@ -672,12 +672,26 @@ public class GameGrain : Grain, IGameGrain
         _prisoners = [0, 0];
 
 
-        var ratingKey = new VariantType(_GetGame().GetBoardSize(), _timeControl.TimeStandard).ToKey();
+        var variant = new VariantType(_GetGame().GetBoardSize(), _timeControl.TimeStandard);
 
-        _playersRatings = GetPlayerIdSortedByColor().Select(a => (int?)PlayerInfos[a].Rating?.Ratings[ratingKey].Glicko.Rating).ToList().Where(a => a.HasValue).Select(a => a!.Value).ToList();
+        _playersRatingsBefore = GetPlayerIdSortedByColor().Select(a =>
+        {
+            var ratD = PlayerInfos[a].Rating?.GetRatingData(variant);
+            return MinifiedRating(time.DeserializedDate(), ratD);
+        }).ToList();
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
+    }
+
+    private string MinifiedRating(DateTime time, PlayerRatingsData? ratD)
+    {
+        if (ratD == null)
+        {
+            return "?";
+        }
+
+        return new MinimalRating((int)ratD.Glicko.Rating, _ratingEngine.IsRatingProvisional(ratD, time)).Stringify();
     }
 
     private async Task TrySaveGame()
@@ -731,7 +745,7 @@ public class GameGrain : Grain, IGameGrain
             endTime: (DateTime)_endTime!
         );
 
-        _playersRatingsDiff = res.RatingDiffs;
+        _playersRatingsAfter = res.NewPerfs.Select(a => MinifiedRating((DateTime)_endTime!, a)).ToList();
 
         foreach (var rating in res.UserRatings)
         {

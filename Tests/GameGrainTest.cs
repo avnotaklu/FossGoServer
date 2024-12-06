@@ -34,14 +34,7 @@ public class GameGrainTests
         new PlayerRatings("p2", UserRatingService.GetInitialRatings())
     ];
 
-    static public DateTime _1980Jan1_1_30PM = new DateTime(
-        year: 1980,
-        month: 1,
-        day: 1,
-        hour: 13,
-        minute: 30,
-        second: 0
-    );
+
 
     [TestMethod]
     public async Task GameGrainTest()

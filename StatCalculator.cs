@@ -7,12 +7,12 @@ using MongoDB.Bson.Serialization.Conventions;
 public interface IStatCalculator
 {
 
-    public UserStat CalculateUserStat(UserStat oldUserStats, PlayerRatings newRatings, Game game);
+    public UserStat CalculateUserStat(UserStat oldUserStats, Game game);
 }
 public class StatCalculator : IStatCalculator
 {
 
-    public UserStat CalculateUserStat(UserStat oldUserStats, PlayerRatings newRatings, Game game)
+    public UserStat CalculateUserStat(UserStat oldUserStats, Game game)
     {
         Debug.Assert(game.DidEnd(), "Can't calculate user stat for ongoing game");
         Debug.Assert(game.Players.Keys.Contains(oldUserStats.userId), "User not in game");
@@ -21,24 +21,24 @@ public class StatCalculator : IStatCalculator
 
         statKeys.ForEach(key =>
         {
-            UserStatForVariant? userStat;
-            if (oldUserStats.stats.ContainsKey(key))
-            {
-                userStat = null;
-            }
-            else
-            {
-                userStat = oldUserStats.stats[key];
-            }
+            oldUserStats.stats.TryGetValue(key, out UserStatForVariant? userStat);
+            // if (!oldUserStats.stats.ContainsKey(key))
+            // {
+            //     userStat = null;
+            // }
+            // else
+            // {
+            //     userStat = oldUserStats.stats[key];
+            // }
 
+            var uid = oldUserStats.userId;
             var newUserStat = new UserStatForVariant(
-                highestRating: GetHighestRating(userStat, newRatings, game, key),
-                lowestRating: GetLowestRating(userStat, newRatings, game, key),
-                resultStreakData: GetResultStreakData(userStat, newRatings, game, key, oldUserStats.userId),
+                highestRating: GetHighestRating(userStat, game, key, uid),
+                lowestRating: GetLowestRating(userStat, game, key, uid),
+                resultStreakData: GetResultStreakData(userStat, game, key, uid),
                 playTime: GetPlayTime(userStat, game),
-                greatestWins: GetGreatestWinningResult(userStat, game, oldUserStats.userId),
-                greatestLosses: GetGreatestLosingResult(userStat, game, oldUserStats.userId),
-                statCounts: GetUpdatedTotalStatCounts(userStat, game, oldUserStats.userId)
+                greatestWins: GetGreatestWinningResult(userStat, game, uid),
+                statCounts: GetUpdatedTotalStatCounts(userStat, game, uid)
             );
 
             oldUserStats.stats[key] = newUserStat;
@@ -65,6 +65,8 @@ public class StatCalculator : IStatCalculator
         if (game.DidIWin(userId))
         {
             var newResultStat = GameResultStatExt.New(game, userId)!;
+            if(newResultStat == null) return currentWinningResult;
+
             return currentWinningResult?.TryAdd(newResultStat) ?? [newResultStat];
         }
 
@@ -72,52 +74,64 @@ public class StatCalculator : IStatCalculator
     }
 
 
+    // Greatest losses is not implemented in the right now
 
-    private GameResultStatList? GetGreatestLosingResult(UserStatForVariant? userStat, Game game, string userId)
-    {
-        var currentLosingResult = userStat?.GreatestWins;
+    // private GameResultStatList? GetGreatestLosingResult(UserStatForVariant? userStat, Game game, string userId)
+    // {
+    //     var currentLosingResult = userStat?.GreatestWins;
 
-        if (game.DidILose(userId))
-        {
-            var newResultStat = GameResultStatExt.New(game, userId)!;
-            return currentLosingResult?.TryAdd(newResultStat) ?? [newResultStat];
-        }
+    //     if (game.DidILose(userId))
+    //     {
+    //         var newResultStat = GameResultStatExt.New(game, userId)!;
+    //         return currentLosingResult?.TryAdd(newResultStat) ?? [newResultStat];
+    //     }
 
-        return currentLosingResult;
-    }
+    //     return currentLosingResult;
+    // }
 
     private double GetPlayTime(UserStatForVariant? userStat, Game game)
     {
         return (userStat?.PlayTimeSeconds ?? 0) + (double)game.GetRunningDurationOfGame()?.TotalSeconds!;
     }
 
-    private double? GetHighestRating(UserStatForVariant? stat, PlayerRatings rats, Game game, string key)
+    private double? GetHighestRating(UserStatForVariant? stat, Game game, string key, string userId)
     {
         var variant = VariantTypeExt.FromKey(key); ;
+        var rating = MinimalRatingExt.FromString(game.PlayersRatingsAfter[(int)game.Players.GetStoneFromPlayerId(userId)!]);
+
+        if (rating == null || rating.Provisional)
+        {
+            return stat?.HighestRating;
+        }
 
         if (variant.RatingAllowed())
         {
-            return Math.Max(stat?.HighestRating ?? 0, rats.Ratings[key].Glicko.Rating);
+            return Math.Max(stat?.HighestRating ?? 0, rating.Rating);
         }
 
         return null;
     }
 
-    private double? GetLowestRating(UserStatForVariant? stat, PlayerRatings rats, Game game, string key)
+    private double? GetLowestRating(UserStatForVariant? stat, Game game, string key, string userId)
     {
         var variant = VariantTypeExt.FromKey(key); ;
+        var rating = MinimalRatingExt.FromString(game.PlayersRatingsAfter[(int)game.Players.GetStoneFromPlayerId(userId)!]);
+
+        if (rating == null || rating.Provisional)
+        {
+            return stat?.LowestRating;
+        }
 
         if (variant.RatingAllowed())
         {
-            return Math.Min(stat?.LowestRating ?? double.MaxValue, rats.Ratings[key].Glicko.Rating);
+            return Math.Min(stat?.LowestRating ?? double.MaxValue, rating.Rating);
         }
 
         return null;
     }
 
-    private ResultStreakData? GetResultStreakData(UserStatForVariant? stat, PlayerRatings rats, Game game, string key, string userId)
+    private ResultStreakData? GetResultStreakData(UserStatForVariant? stat, Game game, string key, string userId)
     {
-        var variant = VariantTypeExt.FromKey(key); ;
         var streakData = stat?.ResultStreakData;
 
         if (streakData == null)

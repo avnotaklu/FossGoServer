@@ -33,7 +33,7 @@ public class UserRatingService : IUserRatingService
     }
 
 
-    public PlayerRatings UpdateUserRatingToCurrent(PlayerRatings oldRating)
+    public PlayerRatings UpdateUserRatingToCurrentRead(PlayerRatings oldRating)
     {
         return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
         new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
@@ -41,6 +41,16 @@ public class UserRatingService : IUserRatingService
         ), a.Value.NB, a.Value.Recent, a.Value.Latest))
         )));
     }
+
+    public PlayerRatings UpdateUserRatingToCurrentWrite(PlayerRatings oldRating)
+    {
+        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
+        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
+            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), true), a.Value.Glicko.Volatility
+        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
+        )));
+    }
+
 
     public async Task<PlayerRatings> GetUserRatings(string userId)
     {
@@ -51,7 +61,7 @@ public class UserRatingService : IUserRatingService
             throw new UserNotFoundException(userId);
         }
 
-        return UpdateUserRatingToCurrent(oldRating);
+        return UpdateUserRatingToCurrentRead(oldRating);
     }
 
     public async Task<PlayerRatings?> CreateUserRatings(string userId)
@@ -72,7 +82,8 @@ public class UserRatingService : IUserRatingService
     {
         try
         {
-            var res = await _ratingsCollection.UpdateOneAsync(Builders<PlayerRatings>.Filter.Eq(a => a.PlayerId, userRating.PlayerId), Builders<PlayerRatings>.Update.Set(a => a.Ratings, userRating.Ratings));
+            var newRat = UpdateUserRatingToCurrentWrite(userRating);
+            var res = await _ratingsCollection.UpdateOneAsync(Builders<PlayerRatings>.Filter.Eq(a => a.PlayerId, userRating.PlayerId), Builders<PlayerRatings>.Update.Set(a => a.Ratings, newRat.Ratings));
 
             return userRating;
         }

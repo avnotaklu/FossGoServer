@@ -32,7 +32,10 @@ using Moq;
 public interface IRatingEngine
 {
     public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, VariantType gameVariant, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime);
+
     public double PreviewDeviation(PlayerRatingsData data, DateTime ratingPeriodEndDate, bool reverse);
+
+    public bool IsRatingProvisional(PlayerRatingsData rating, DateTime ratingPeriodEndDate);
 }
 
 public class RatingEngine : IRatingEngine
@@ -190,7 +193,6 @@ public class RatingEngine : IRatingEngine
     }
 
 
-
     private UncalculatedRatingGame GetPlayerRatingsForGame(VariantType variantType, List<PlayerRatings> userRating, GameResult res, DateTime endTime)
     {
         var key = variantType.ToKey();
@@ -208,7 +210,7 @@ public class RatingEngine : IRatingEngine
             oldUser.Ratings[style] = rating;
 
             var (key, data) = RatingForTimeStandard(new VariantType(null, ratingGame.Variant.TimeStandard), oldUser);
-            
+
             oldUser.Ratings[key] = data;
 
             return new PlayerRatings(
@@ -226,7 +228,7 @@ public class RatingEngine : IRatingEngine
 
         // Collecting the sub-performances
         var subs = RateableBoards().Select(boardSize => p.Ratings[new VariantType(boardSize, variant.TimeStandard).ToKey()])
-            .Where(perf => !IsRatingProvisional(perf))
+            .Where(perf => perf.Latest == null ? false : !IsRatingProvisional(perf, (DateTime)perf.Latest))
             .ToList();
 
         // Determining the latest date
@@ -277,9 +279,9 @@ public class RatingEngine : IRatingEngine
     }
 
 
-    public static bool IsRatingProvisional(PlayerRatingsData rating)
+    public bool IsRatingProvisional(PlayerRatingsData rating, DateTime periodEnd)
     {
-        return rating.Glicko.Deviation > ProvisionalDeviation;
+        return PreviewDeviation(rating, periodEnd, false) > ProvisionalDeviation;
     }
 }
 

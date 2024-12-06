@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using BadukServer;
 using System.Diagnostics;
 using System.CodeDom;
+using MongoDB.Driver;
 
 public static class UserStatFieldNames
 {
@@ -73,7 +74,6 @@ public static class UserStatForVariantExt
 [Alias("UserStatData")]
 public class UserStatForVariant
 {
-
     [Id(0)]
     [BsonElement(UserStatFieldNames.HighestRating)]
     public double? HighestRating { get; set; }
@@ -94,16 +94,20 @@ public class UserStatForVariant
     [BsonElement(UserStatFieldNames.GreatestWins)]
     public GameResultStatList? GreatestWins { get; set; }
 
-    [Id(5)]
-    [BsonElement(UserStatFieldNames.GreatestLosses)]
-    public GameResultStatList? GreatestLosses { get; set; }
 
-    [Id(6)]
+    [Id(5)]
     [BsonElement(UserStatFieldNames.StatCounts)]
     public GameStatCounts StatCounts { get; set; }
 
 
-    
+
+    // Not sure whether i need all this
+    // The losses are not really useful, but the wins are
+    // [Id(5)]
+    // [BsonElement(UserStatFieldNames.GreatestLosses)]
+    // public GameResultStatList? GreatestLosses { get; set; }
+
+
 
 
     // Not sure whether i need all this
@@ -118,7 +122,7 @@ public class UserStatForVariant
     // [BsonElement(UserStatFieldNames.LastTweleveCounts)]
     // public GameStatCounts LastTweleveCounts { get; set; }
 
-    
+
     // Not sure whether i need this field as well, and also
     // I Should store a list of last 12 results to accurately keep a rating diff
 
@@ -127,14 +131,13 @@ public class UserStatForVariant
     // public double LastTweleveRatingDiff { get; set; }
 
 
-    public UserStatForVariant(double? highestRating, double? lowestRating, ResultStreakData? resultStreakData, double playTime, GameResultStatList? greatestWins, GameResultStatList? greatestLosses, GameStatCounts statCounts)
+    public UserStatForVariant(double? highestRating, double? lowestRating, ResultStreakData? resultStreakData, double playTime, GameResultStatList? greatestWins, GameStatCounts statCounts)
     {
         HighestRating = highestRating;
         LowestRating = lowestRating;
         ResultStreakData = resultStreakData;
         PlayTimeSeconds = playTime;
         GreatestWins = greatestWins;
-        GreatestLosses = greatestLosses;
         StatCounts = statCounts;
     }
 }
@@ -210,7 +213,7 @@ public class ResultStreakData
 
     public ResultStreakData(StreakData? winningStreaks, StreakData? losingStreaks)
     {
-        Debug.Assert(WinningStreaks != null || LosingStreaks != null);
+        Debug.Assert(winningStreaks != null || losingStreaks != null);
         WinningStreaks = winningStreaks;
         LosingStreaks = losingStreaks;
     }
@@ -270,7 +273,7 @@ public class StreakData
 
     public StreakData(Streak? greatestStreak, Streak? currentStreak)
     {
-        Debug.Assert(GreatestStreak != null || CurrentStreak != null);
+        Debug.Assert(greatestStreak != null || currentStreak != null);
 
         GreatestStreak = greatestStreak;
         CurrentStreak = currentStreak;
@@ -373,7 +376,7 @@ public static class GameResultStatListExt
     public static GameResultStatList TryAdd(this GameResultStatList list, GameResultStat item)
     {
         list.Add(item);
-        list.Sort();
+        list.Sort((a, b) => b.OpponentRating.CompareTo(a.OpponentRating));
 
         if (list.Count > MaxGameResultStats)
         {
@@ -403,9 +406,21 @@ public static class GameResultStatExt
             return null;
         }
 
+        var minRating = MinimalRatingExt.FromString(game.PlayersRatingsBefore[(int)game.Players.GetOtherStoneFromPlayerId(userId)!]);
+
+        if (minRating == null)
+        {
+            return null;
+        }
+
+        if (minRating!.Provisional)
+        {
+            return null;
+        }
+
         return new GameResultStat(
             gameId: game.GameId,
-            opponentRating: game.PlayersRatings[(int)game.Players.GetOtherStoneFromPlayerId(userId)!],
+            opponentRating: minRating.Rating,
             opponentId: game.Players.GetOtherPlayerIdFromPlayerId(userId)!,
             resultAt: game.EndTime!.DeserializedDate()
         );
@@ -419,7 +434,7 @@ public class GameResultStat // : IComparable<GameResultStat>
 {
     [Id(0)]
     [BsonElement(UserStatFieldNames.OpponentRating)]
-    public double OpponentRating { get; set; }
+    public int OpponentRating { get; set; }
 
     [Id(1)]
     [BsonElement(UserStatFieldNames.OpponentId)]
@@ -433,7 +448,7 @@ public class GameResultStat // : IComparable<GameResultStat>
     [BsonElement(UserStatFieldNames.GameId)]
     public string GameId { get; set; }
 
-    public GameResultStat(double opponentRating, string opponentId, DateTime resultAt, string gameId)
+    public GameResultStat(int opponentRating, string opponentId, DateTime resultAt, string gameId)
     {
         OpponentRating = opponentRating;
         OpponentId = opponentId;

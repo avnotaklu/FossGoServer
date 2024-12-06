@@ -18,9 +18,9 @@ public class UserRatingFieldNames
 
 public static class UserRatingExtensions
 {
-    public static PlayerRatingsData GetRatingData(this PlayerRatings rating, BoardSize boardSize, TimeStandard timeStandard)
+    public static PlayerRatingsData GetRatingData(this PlayerRatings rating, VariantType variant)
     {
-        return rating.Ratings[new VariantType(boardSize, timeStandard).ToKey()];
+        return rating.Ratings[variant.ToKey()];
     }
 }
 

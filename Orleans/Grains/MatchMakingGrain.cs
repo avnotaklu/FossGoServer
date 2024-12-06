@@ -50,7 +50,12 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         if (wantedGameType == GameType.Rated)
         {
             if (playerInfo.Rating == null) throw new InvalidOperationException("Unrated Player can't play a rated game");
-            match = matchingMatches.FirstOrDefault(m => m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard())));
+
+            match = matchingMatches.FirstOrDefault(m =>
+            {
+                var variant = new VariantType(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard());
+                return m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(variant));
+            });
         }
         else
         {
@@ -64,7 +69,7 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         {
             boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][t.SimpleRepr()].Add(new Match(
                 finderId,
-                finderRating?.GetRatingData(b.ToBoardSize(), t.GetStandard()),
+                finderRating?.GetRatingData(new VariantType(b.ToBoardSize(), t.GetStandard())),
                 b,
                 t,
                 playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated)

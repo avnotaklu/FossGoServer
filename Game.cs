@@ -168,7 +168,7 @@ public static class GameExt
 
         return game.Result switch
         {
-            
+
             GameResult.BlackWon => StoneType.Black,
             GameResult.WhiteWon => StoneType.White,
             _ => throw new UnreachableException("Invalid game result")
@@ -233,8 +233,8 @@ public class GameFieldNames
     public const string GameOverMethod = "gom";
     public const string StoneSelectionType = "sst";
     public const string GameCreator = "gc";
-    public const string PlayersRatings = "rts";
-    public const string PlayersRatingsDiff = "prd";
+    public const string PlayersRatingsBefore = "rt1";
+    public const string PlayersRatingsAfter = "rt2";
     public const string GameType = "ty";
 
     public const string MainTimeSeconds = "mts";
@@ -278,7 +278,8 @@ public enum GameType
     Rated = 2
 }
 
-public static class GameResultExt {
+public static class GameResultExt
+{
     public static StoneType? GetWinnerStone(this GameResult result)
     {
         return result switch
@@ -301,6 +302,49 @@ public enum GameResult
     BlackWon,
     WhiteWon,
     Draw
+}
+
+public static class MinimalRatingExt
+{
+    public static string Stringify(this MinimalRating rating)
+    {
+        return rating.Provisional ? $"{rating.Rating}?" : rating.Rating.ToString();
+    }
+
+    public static MinimalRating? FromString(string rating)
+    {
+        if (rating == null)
+        {
+            return null;
+        }
+
+        if (rating.Contains('?'))
+        {
+            return new MinimalRating(int.Parse(rating.Substring(0, rating.Length - 1)), true);
+        }
+
+        return new MinimalRating(int.Parse(rating), false);
+    }
+}
+
+
+/// <summary>
+/// This is the ratings data stored inside the game for both players
+/// </summary>
+[Immutable, GenerateSerializer]
+[Alias("MinimalRating")]
+public class MinimalRating
+{
+    [Id(0)]
+    public int Rating { get; set; }
+    [Id(1)]
+    public bool Provisional { get; set; }
+
+    public MinimalRating(int rating, bool provisional)
+    {
+        Rating = rating;
+        Provisional = provisional;
+    }
 }
 
 [Immutable, GenerateSerializer]
@@ -329,8 +373,8 @@ public class Game
         string? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
-        List<int> playersRatings,
-        List<int> playersRatingsDiff,
+        List<string> playersRatingsBefore,
+        List<string> playersRatingsAfter,
         GameType gameType
     )
     {
@@ -354,8 +398,8 @@ public class Game
         EndTime = endTime;
         StoneSelectionType = stoneSelectionType;
         GameCreator = gameCreator;
-        PlayersRatings = playersRatings;
-        PlayersRatingsDiff = playersRatingsDiff;
+        PlayersRatingsBefore = playersRatingsBefore;
+        PlayersRatingsAfter = playersRatingsAfter;
         GameType = gameType;
     }
 
@@ -423,13 +467,13 @@ public class Game
     [Id(20)]
     public string? GameCreator { get; set; }
 
-    [BsonElement(GameFieldNames.PlayersRatings)]
+    [BsonElement(GameFieldNames.PlayersRatingsBefore)]
     [Id(21)]
-    public List<int> PlayersRatings { get; set; }
+    public List<string> PlayersRatingsBefore { get; set; }
 
-    [BsonElement(GameFieldNames.PlayersRatingsDiff)]
+    [BsonElement(GameFieldNames.PlayersRatingsAfter)]
     [Id(22)]
-    public List<int> PlayersRatingsDiff { get; set; }
+    public List<string> PlayersRatingsAfter { get; set; }
     [Id(23)]
     [BsonElement(GameFieldNames.GameType)]
     public GameType GameType { get; set; }

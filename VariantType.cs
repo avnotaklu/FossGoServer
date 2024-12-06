@@ -142,13 +142,13 @@ public static class VariantTypeExt
         if (parts[0] != "")
         {
             var bs = parts[0].Substring(1);
-            bdS = (BoardSize)int.Parse(key[1].ToString());
+            bdS = (BoardSize)int.Parse(bs);
         }
 
         if (parts[1] != "")
         {
             var ts = parts[1].Substring(1);
-            timeS = (TimeStandard)int.Parse(key[1].ToString());
+            timeS = (TimeStandard)int.Parse(ts);
         }
 
 
