@@ -52,9 +52,11 @@ public class Startup
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<IUsersService, UsersService>();
         services.AddSingleton<IUserRatingService, UserRatingService>();
+        services.AddSingleton<IUserStatService, UserStatService>();
         services.AddSingleton<IGameService, GameService>();
         services.AddSingleton<IPlayerInfoService, PublicUserInfoService>();
         services.AddSingleton<IRatingEngine, RatingEngine>();
+        services.AddSingleton<IStatCalculator, StatCalculator>();
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ITimeCalculator, TimeCalculator>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();

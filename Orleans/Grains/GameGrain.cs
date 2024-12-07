@@ -30,7 +30,7 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<Position, DeadStoneState> _stoneStates = [];
     private GameOverMethod? _gameOverMethod;
 
-    private List<string> _playersRatingsBefore = [];
+    private List<int> _playersRatingsDiff = [];
     private List<string> _playersRatingsAfter = [];
 
     private GameResult? _gameResult;
@@ -50,17 +50,14 @@ public class GameGrain : Grain, IGameGrain
     private readonly IUserRatingService _userRatingService;
     private readonly IUserStatService _userStatService;
     private readonly IGameService _gameService;
-    // private readonly IUsersService _userService;
-    // private readonly IPublicUserInfoService _publicUserInfo;
     private readonly ISignalRHubService _hubService;
     private readonly ITimeCalculator _timeCalculator;
-
-
     private BoardStateUtilities _boardStateUtilities;
     private IRatingEngine _ratingEngine;
+    private IStatCalculator _statCalculator;
 
 
-    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IUserStatService userStatService, IGameService gameService, ISignalRHubService hubService, IRatingEngine ratingEngine, IPlayerInfoService publicUserInfo, ITimeCalculator timeCalculator)
+    public GameGrain(ILogger<GameGrain> logger, IDateTimeService dateTimeService, IUsersService usersService, IUserRatingService userRatingService, IUserStatService userStatService, IGameService gameService, ISignalRHubService hubService, IRatingEngine ratingEngine, IPlayerInfoService publicUserInfo, ITimeCalculator timeCalculator, IStatCalculator statCalculator)
     {
         _logger = logger;
         _dateTimeService = dateTimeService;
@@ -70,9 +67,8 @@ public class GameGrain : Grain, IGameGrain
         _ratingEngine = ratingEngine;
         _hubService = hubService;
         _userStatService = userStatService;
-        // _userService = usersService;
-        // _publicUserInfo = publicUserInfo;
         _timeCalculator = timeCalculator;
+        _statCalculator = statCalculator;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -111,8 +107,8 @@ public class GameGrain : Grain, IGameGrain
         string? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
-        List<string> playersRatings,
-        List<string> playersRatingsDiff
+        List<int> playersRatingsDiff,
+        List<string> playersRatingsAfter
     )
     {
         _rows = rows;
@@ -134,8 +130,8 @@ public class GameGrain : Grain, IGameGrain
         _endTime = endTime?.DeserializedDate();
         _stoneSelectionType = stoneSelectionType;
         _gameCreator = gameCreator;
-        _playersRatingsBefore = playersRatings;
-        _playersRatingsAfter = playersRatingsDiff;
+        _playersRatingsDiff = playersRatingsDiff;
+        _playersRatingsAfter = playersRatingsAfter;
         _initialized = true;
     }
 
@@ -170,8 +166,8 @@ public class GameGrain : Grain, IGameGrain
             endTime: null,
             stoneSelectionType: creationData.FirstPlayerStone,
             gameCreator: gameCreator,
-            playersRatings: [],
-            playersRatingsDiff: []
+            playersRatingsDiff: [],
+            playersRatingsAfter: []
         );
 
         await TrySaveGame();
@@ -464,6 +460,7 @@ public class GameGrain : Grain, IGameGrain
 
         await TrySaveGame();
         await TryUpdateRatings();
+        await TryUpdateStats();
 
         if (!timeStopped)
         {
@@ -506,8 +503,8 @@ public class GameGrain : Grain, IGameGrain
             endTime: game.EndTime,
             stoneSelectionType: game.StoneSelectionType,
             gameCreator: game.GameCreator,
-            playersRatings: game.PlayersRatingsBefore,
-            playersRatingsDiff: game.PlayersRatingsAfter
+            playersRatingsDiff: game.PlayersRatingsDiff,
+            playersRatingsAfter: game.PlayersRatingsAfter
         );
 
         return GetGame();
@@ -601,7 +598,7 @@ public class GameGrain : Grain, IGameGrain
             gameOverMethod: _gameOverMethod,
             endTime: _endTime?.SerializedDate(),
             gameCreator: _gameCreator,
-            playersRatingsBefore: _playersRatingsBefore,
+            playersRatingsDiff: _playersRatingsDiff,
             playersRatingsAfter: _playersRatingsAfter,
             gameType: _gameType
         );
@@ -671,15 +668,6 @@ public class GameGrain : Grain, IGameGrain
 
         _prisoners = [0, 0];
 
-
-        var variant = new VariantType(_GetGame().GetBoardSize(), _timeControl.TimeStandard);
-
-        _playersRatingsBefore = GetPlayerIdSortedByColor().Select(a =>
-        {
-            var ratD = PlayerInfos[a].Rating?.GetRatingData(variant);
-            return MinifiedRating(time.DeserializedDate(), ratD);
-        }).ToList();
-
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
     }
@@ -704,8 +692,10 @@ public class GameGrain : Grain, IGameGrain
 
     private async Task<Game> SaveGame(string gameId)
     {
+        Debug.Assert(_gameType != GameType.Anonymous, "Game must not be anonymous to be updated");
         var curGame = _GetGame();
         var res = await _gameService.SaveGame(curGame);
+
         if (res == null)
         {
             var oldGame = await _gameService.GetGame(gameId);
@@ -734,6 +724,7 @@ public class GameGrain : Grain, IGameGrain
     private async Task<(List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings)> UpdateRatingsOnResult()
     {
         Debug.Assert(_gameState == GameState.Ended, "Game must be ended to update ratings");
+        Debug.Assert(_gameType == GameType.Rated, "Game must be rated to update ratings");
 
         var game = _GetGame();
 
@@ -746,6 +737,7 @@ public class GameGrain : Grain, IGameGrain
         );
 
         _playersRatingsAfter = res.NewPerfs.Select(a => MinifiedRating((DateTime)_endTime!, a)).ToList();
+        _playersRatingsDiff = res.RatingDiffs;
 
         foreach (var rating in res.UserRatings)
         {
@@ -754,6 +746,37 @@ public class GameGrain : Grain, IGameGrain
 
         return res;
     }
+
+
+    private async Task TryUpdateStats()
+    {
+        if (_gameType != GameType.Anonymous)
+        {
+            await UpdateStatsOnResult();
+        }
+    }
+
+    private async Task UpdateStatsOnResult()
+    {
+        Debug.Assert(_gameState == GameState.Ended, "Game must be ended to update stats");
+        Debug.Assert(_gameType != GameType.Anonymous, "Game must not be anonymous to update stats");
+
+        var game = _GetGame();
+
+        var players = GetPlayerIdSortedByColor();
+
+        foreach (var player in players)
+        {
+            var oldStats = (await _userStatService.GetUserStatAsync(player))!;
+
+            var res = _statCalculator.CalculateUserStat(
+                oldStats, game
+            );
+
+            await _userStatService.SaveUserStat(res);
+        }
+    }
+
 
     private void SetScoreCalculationState(GameMove lastMove)
     {

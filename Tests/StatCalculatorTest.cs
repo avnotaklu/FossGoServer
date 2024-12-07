@@ -54,7 +54,7 @@ public class StatCalculatorTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
-        
+
 
         // Counts
         Assert.AreEqual(6, result.stats["B0_S0"].StatCounts.Total);
@@ -182,14 +182,13 @@ public class StatCalculatorTest
 
 
     [TestMethod]
-    private void TestHighestRatingUpdate()
+    public void TestHighestRatingUpdate()
     {
         // Arrange
         var uid = "p1"; // is black
 
-        var oldUserStats = GetProgressedUserStat(null, null);
 
-        var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
+        var (oldUserStats, game) = BlackWonGame9x9BlitzGameAlsoHisGreatestWin();
 
         var statCalculator = new StatCalculator();
 
@@ -203,18 +202,50 @@ public class StatCalculatorTest
         Assert.AreEqual(1600, result.stats["B0_S0"].HighestRating);
     }
 
+    [TestMethod]
+    public void TestLowestRatingUpdate()
+    {
+        // Arrange
+        var uid = "p2"; // is white
 
+        var (oldUserStats, game) = WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss();
+
+        var statCalculator = new StatCalculator();
+
+        // Act
+        var result = statCalculator.CalculateUserStat(oldUserStats, game);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+
+        Assert.AreEqual(1445, result.stats["B0_S0"].LowestRating);
+    }
 
     private static Game BlackWonAgainst1550Player()
     {
         return MasterGame1();
     }
 
-
     private static Game BlackWonGame9x9BlitzGameOnlyCountsShouldChange()
     {
         return MasterGame0();
     }
+
+
+    private static (UserStat, Game) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
+    {
+        var oldUserStats = GetProgressedUserStatForLosingPlayer(null, null);
+        return (oldUserStats, MasterGame0());
+    }
+
+
+    private static (UserStat, Game) BlackWonGame9x9BlitzGameAlsoHisGreatestWin()
+    {
+        var oldUserStats = GetProgressedUserStat(null, null);
+        return (oldUserStats, MasterGame2());
+    }
+
 
     private static Game WinAgainstProvisiona1550Playero()
     {
@@ -270,7 +301,6 @@ public class StatCalculatorTest
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
             startTime: _1980Jan1_1_30PM.SerializedDate(),
-
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
             moves: [], // doesn't matter
@@ -365,14 +395,30 @@ public class StatCalculatorTest
         });
     }
 
+    private static UserStat GetProgressedUserStatForLosingPlayer(ResultStreakData? customStreak, List<GameResultStat>? customGreatestWins)
+    {
+        return new UserStat("p2", new Dictionary<string, UserStatForVariant>
+        {
+            ["B0_S0"] = new UserStatForVariant(
+                highestRating: 1590,
+                lowestRating: 1450,
+                resultStreakData: customStreak,
+                playTime: 0,
+                greatestWins: customGreatestWins,
+                statCounts: new GameStatCounts(5, 5, 5, 5, 5)
+            )
+        });
+    }
+
+
     Streak Get12To10MonthOldStreakLen5()
     {
-        return new Streak(5, _1980Jan1_1_30PM.AddYears(-1), _1980Jan1_1_30PM.AddYears(-1).AddMonths(2));
+        return new Streak(5, _1980Jan1_1_30PM.AddYears(-1), _1980Jan1_1_30PM.AddYears(-1).AddMonths(2), "g1", "g2");
     }
 
     Streak Get2To0MonthOldStreakLen5()
     {
-        return new Streak(5, _1980Jan1_1_30PM.AddMonths(-2), _1980Jan1_1_30PM);
+        return new Streak(5, _1980Jan1_1_30PM.AddMonths(-2), _1980Jan1_1_30PM, "g1", "g2");
     }
 
 

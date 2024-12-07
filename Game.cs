@@ -9,6 +9,52 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BadukServer;
 
+
+public class GameFieldNames
+{
+    public const string Rows = "r";
+    public const string Columns = "c";
+    public const string TimeControl = "tc";
+    public const string PlayerTimeSnapshots = "ts";
+    public const string PlaygroundMap = "map";
+    public const string Moves = "mv";
+    public const string Players = "p";
+    public const string Prisoners = "pr";
+    public const string StartTime = "st";
+    public const string EndTime = "et";
+    public const string KoPositionInLastMove = "ko";
+    public const string GameState = "gs";
+    public const string DeadStones = "ds";
+    public const string Result = "res";
+    public const string FinalTerritoryScores = "fts";
+    public const string Komi = "k";
+    public const string GameOverMethod = "gom";
+    public const string StoneSelectionType = "sst";
+    public const string GameCreator = "gc";
+    public const string PlayersRatingsDiff = "rt1";
+    public const string PlayersRatingsAfter = "rt2";
+    public const string GameType = "ty";
+
+    public const string MainTimeSeconds = "mts";
+    public const string IncrementSeconds = "is";
+    public const string ByoYomiTime = "byt";
+    public const string TimeStandard = "ts";
+    public const string ByoYomiCount = "byc";
+    public const string ByoYomiSeconds = "bys";
+
+    public const string SnapshotTimestamp = "st";
+    public const string MainTimeMilliseconds = "mt";
+    public const string ByoYomisLeft = "byl";
+    public const string ByoYomiActive = "bya";
+    public const string TimeActive = "ta";
+
+    // GameMove
+    public const string Time = "t";
+    public const string X = "x";
+    public const string Y = "y";
+}
+
+
 public static class GameExt
 {
     public static bool DidStart(this Game game)
@@ -212,51 +258,6 @@ public static class GameExt
     }
 }
 
-public class GameFieldNames
-{
-    public const string Rows = "r";
-    public const string Columns = "c";
-    public const string TimeControl = "tc";
-    public const string PlayerTimeSnapshots = "ts";
-    public const string PlaygroundMap = "map";
-    public const string Moves = "mv";
-    public const string Players = "p";
-    public const string Prisoners = "pr";
-    public const string StartTime = "st";
-    public const string EndTime = "et";
-    public const string KoPositionInLastMove = "ko";
-    public const string GameState = "gs";
-    public const string DeadStones = "ds";
-    public const string Result = "res";
-    public const string FinalTerritoryScores = "fts";
-    public const string Komi = "k";
-    public const string GameOverMethod = "gom";
-    public const string StoneSelectionType = "sst";
-    public const string GameCreator = "gc";
-    public const string PlayersRatingsBefore = "rt1";
-    public const string PlayersRatingsAfter = "rt2";
-    public const string GameType = "ty";
-
-    public const string MainTimeSeconds = "mts";
-    public const string IncrementSeconds = "is";
-    public const string ByoYomiTime = "byt";
-    public const string TimeStandard = "ts";
-    public const string ByoYomiCount = "byc";
-    public const string ByoYomiSeconds = "bys";
-
-    public const string SnapshotTimestamp = "st";
-    public const string MainTimeMilliseconds = "mt";
-    public const string ByoYomisLeft = "byl";
-    public const string ByoYomiActive = "bya";
-    public const string TimeActive = "ta";
-
-    // GameMove
-    public const string Time = "t";
-    public const string X = "x";
-    public const string Y = "y";
-}
-
-
 public static class GameTypeExt
 {
     public static bool IsAllowedPlayerType(this GameType type, PlayerType playerType)
@@ -373,8 +374,10 @@ public class Game
         string? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
-        List<string> playersRatingsBefore,
+
         List<string> playersRatingsAfter,
+        List<int> playersRatingsDiff,
+
         GameType gameType
     )
     {
@@ -398,7 +401,7 @@ public class Game
         EndTime = endTime;
         StoneSelectionType = stoneSelectionType;
         GameCreator = gameCreator;
-        PlayersRatingsBefore = playersRatingsBefore;
+        PlayersRatingsDiff = playersRatingsDiff;
         PlayersRatingsAfter = playersRatingsAfter;
         GameType = gameType;
     }
@@ -467,9 +470,9 @@ public class Game
     [Id(20)]
     public string? GameCreator { get; set; }
 
-    [BsonElement(GameFieldNames.PlayersRatingsBefore)]
+    [BsonElement(GameFieldNames.PlayersRatingsDiff)]
     [Id(21)]
-    public List<string> PlayersRatingsBefore { get; set; }
+    public List<int> PlayersRatingsDiff { get; set; }
 
     [BsonElement(GameFieldNames.PlayersRatingsAfter)]
     [Id(22)]

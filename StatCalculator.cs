@@ -6,7 +6,6 @@ using MongoDB.Bson.Serialization.Conventions;
 
 public interface IStatCalculator
 {
-
     public UserStat CalculateUserStat(UserStat oldUserStats, Game game);
 }
 public class StatCalculator : IStatCalculator
@@ -17,32 +16,22 @@ public class StatCalculator : IStatCalculator
         Debug.Assert(game.DidEnd(), "Can't calculate user stat for ongoing game");
         Debug.Assert(game.Players.Keys.Contains(oldUserStats.userId), "User not in game");
 
-        var statKeys = game.GetRelevantVariants().Where(a => a.StatAllowed()).Select(a => a.ToKey()).ToList();
+        var key = game.GetTopLevelVariant().ToKey();
 
-        statKeys.ForEach(key =>
-        {
-            oldUserStats.stats.TryGetValue(key, out UserStatForVariant? userStat);
-            // if (!oldUserStats.stats.ContainsKey(key))
-            // {
-            //     userStat = null;
-            // }
-            // else
-            // {
-            //     userStat = oldUserStats.stats[key];
-            // }
+        oldUserStats.stats.TryGetValue(key, out UserStatForVariant? userStat);
 
-            var uid = oldUserStats.userId;
-            var newUserStat = new UserStatForVariant(
-                highestRating: GetHighestRating(userStat, game, key, uid),
-                lowestRating: GetLowestRating(userStat, game, key, uid),
-                resultStreakData: GetResultStreakData(userStat, game, key, uid),
-                playTime: GetPlayTime(userStat, game),
-                greatestWins: GetGreatestWinningResult(userStat, game, uid),
-                statCounts: GetUpdatedTotalStatCounts(userStat, game, uid)
-            );
+        var uid = oldUserStats.userId;
+        var newUserStat = new UserStatForVariant(
+            highestRating: GetHighestRating(userStat, game, key, uid),
+            lowestRating: GetLowestRating(userStat, game, key, uid),
+            resultStreakData: GetResultStreakData(userStat, game, key, uid),
+            playTime: GetPlayTime(userStat, game),
+            greatestWins: GetGreatestWinningResult(userStat, game, uid),
+            statCounts: GetUpdatedTotalStatCounts(userStat, game, uid)
+        );
 
-            oldUserStats.stats[key] = newUserStat;
-        });
+        oldUserStats.stats[key] = newUserStat;
+        // });
 
         return oldUserStats;
     }
@@ -65,7 +54,7 @@ public class StatCalculator : IStatCalculator
         if (game.DidIWin(userId))
         {
             var newResultStat = GameResultStatExt.New(game, userId)!;
-            if(newResultStat == null) return currentWinningResult;
+            if (newResultStat == null) return currentWinningResult;
 
             return currentWinningResult?.TryAdd(newResultStat) ?? [newResultStat];
         }

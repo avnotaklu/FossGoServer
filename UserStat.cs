@@ -29,6 +29,8 @@ public static class UserStatFieldNames
     public const string CurrentStreak = "cs";
 
     public const string StreakLength = "sl";
+    public const string StreakStartingGameId = "ssgid";
+    public const string StreakEndingGameId = "segid";
     public const string StreakFrom = "sf";
     public const string StreakTo = "st";
 
@@ -93,7 +95,6 @@ public class UserStatForVariant
     [Id(4)]
     [BsonElement(UserStatFieldNames.GreatestWins)]
     public GameResultStatList? GreatestWins { get; set; }
-
 
     [Id(5)]
     [BsonElement(UserStatFieldNames.StatCounts)]
@@ -289,7 +290,7 @@ public static class StreakExt
             return null;
         }
 
-        var streak = new Streak(1, game.EndTime!.DeserializedDate(), game.EndTime!.DeserializedDate());
+        var streak = new Streak(1, game.EndTime!.DeserializedDate(), game.EndTime!.DeserializedDate(), game.GameId, game.GameId);
 
         return streak;
     }
@@ -301,7 +302,7 @@ public static class StreakExt
             return null;
         }
 
-        return new Streak(me.StreakLength + 1, me.StreakFrom, game.EndTime!.DeserializedDate());
+        return new Streak(me.StreakLength + 1, me.StreakFrom, game.EndTime!.DeserializedDate(), me.StartingGameId, game.GameId);
     }
 }
 
@@ -317,19 +318,30 @@ public class Streak
     [BsonElement(UserStatFieldNames.StreakFrom)]
     public DateTime StreakFrom { get; set; }
 
-    [Id(2)]
+    [Id(3)]
+    [BsonElement(UserStatFieldNames.StreakStartingGameId)]
+    public string StartingGameId { get; set; }
+
+    [Id(4)]
+    [BsonElement(UserStatFieldNames.StreakEndingGameId)]
+    public string EndingGameId { get; set; }
+
+
+    [Id(5)]
     [BsonElement(UserStatFieldNames.StreakTo)]
     public DateTime StreakTo { get; set; }
 
 
 
-    public Streak(int streakLength, DateTime streakFrom, DateTime streakTo)
+    public Streak(int streakLength, DateTime streakFrom, DateTime streakTo, string startingGameId, string endingGameId)
     {
         Debug.Assert(streakLength > 0);
 
         StreakLength = streakLength;
         StreakFrom = streakFrom;
         StreakTo = streakTo;
+        StartingGameId = startingGameId;
+        EndingGameId = endingGameId;
     }
 }
 
@@ -406,7 +418,7 @@ public static class GameResultStatExt
             return null;
         }
 
-        var minRating = MinimalRatingExt.FromString(game.PlayersRatingsBefore[(int)game.Players.GetOtherStoneFromPlayerId(userId)!]);
+        var minRating = MinimalRatingExt.FromString(game.PlayersRatingsDiff[(int)game.Players.GetOtherStoneFromPlayerId(userId)!]);
 
         if (minRating == null)
         {
