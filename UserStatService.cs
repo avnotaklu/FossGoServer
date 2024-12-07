@@ -6,6 +6,7 @@ public interface IUserStatService
 {
     Task<UserStat?> GetUserStatAsync(string userId);
     Task<UserStat> SaveUserStat(UserStat userStat);
+    Task<UserStat> CreateUserStat(string uid);
 }
 
 public class UserStatService : IUserStatService
@@ -30,14 +31,23 @@ public class UserStatService : IUserStatService
 
     public async Task<UserStat?> GetUserStatAsync(string userId)
     {
-        var res = await _userStatCollection.Find(a => a.userId == userId).FirstOrDefaultAsync();
+        var res = await _userStatCollection.Find(a => a.UserId == userId).FirstOrDefaultAsync();
 
         return res;
     }
 
     public async Task<UserStat> SaveUserStat(UserStat userStat)
     {
-        var res = await _userStatCollection.ReplaceOneAsync(a => a.userId == userStat.userId, userStat, new ReplaceOptions { IsUpsert = true });
+        var res = await _userStatCollection.ReplaceOneAsync(a => a.UserId == userStat.UserId, userStat, new ReplaceOptions { IsUpsert = true });
         return userStat;
+    }
+
+
+    public async Task<UserStat> CreateUserStat(string uid)
+    {
+        var emptyStat = new UserStat(uid, []);
+        await _userStatCollection.InsertOneAsync(emptyStat);
+
+        return emptyStat;
     }
 }

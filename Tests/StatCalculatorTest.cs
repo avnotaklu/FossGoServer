@@ -23,13 +23,13 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.AreEqual(1, result.stats["B0_S0"].StatCounts.Total);
-        Assert.AreEqual(1, result.stats["B0_S0"].StatCounts.Wins);
-        Assert.AreEqual(0, result.stats["B0_S0"].StatCounts.Losses);
-        Assert.AreEqual(0, result.stats["B0_S0"].StatCounts.Draws);
-        Assert.AreEqual(0, result.stats["B0_S0"].StatCounts.Disconnects);
+        Assert.AreEqual(1, result.Stats["B0_S0"].StatCounts.Total);
+        Assert.AreEqual(1, result.Stats["B0_S0"].StatCounts.Wins);
+        Assert.AreEqual(0, result.Stats["B0_S0"].StatCounts.Losses);
+        Assert.AreEqual(0, result.Stats["B0_S0"].StatCounts.Draws);
+        Assert.AreEqual(0, result.Stats["B0_S0"].StatCounts.Disconnects);
     }
 
 
@@ -41,8 +41,8 @@ public class StatCalculatorTest
 
         var oldUserStats = GetProgressedUserStat(null, null);
 
-        var oldHR = oldUserStats.stats["B0_S0"].HighestRating;
-        var oldLR = oldUserStats.stats["B0_S0"].LowestRating;
+        var oldHR = oldUserStats.Stats["B0_S0"].HighestRating;
+        var oldLR = oldUserStats.Stats["B0_S0"].LowestRating;
 
         var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
 
@@ -53,20 +53,20 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
 
         // Counts
-        Assert.AreEqual(6, result.stats["B0_S0"].StatCounts.Total);
-        Assert.AreEqual(6, result.stats["B0_S0"].StatCounts.Wins);
-        Assert.AreEqual(5, result.stats["B0_S0"].StatCounts.Losses);
-        Assert.AreEqual(5, result.stats["B0_S0"].StatCounts.Draws);
-        Assert.AreEqual(5, result.stats["B0_S0"].StatCounts.Disconnects);
+        Assert.AreEqual(6, result.Stats["B0_S0"].StatCounts.Total);
+        Assert.AreEqual(6, result.Stats["B0_S0"].StatCounts.Wins);
+        Assert.AreEqual(5, result.Stats["B0_S0"].StatCounts.Losses);
+        Assert.AreEqual(5, result.Stats["B0_S0"].StatCounts.Draws);
+        Assert.AreEqual(5, result.Stats["B0_S0"].StatCounts.Disconnects);
 
         // No Ops
 
-        Assert.AreEqual(oldHR, result.stats["B0_S0"].HighestRating);
-        Assert.AreEqual(oldLR, result.stats["B0_S0"].LowestRating);
+        Assert.AreEqual(oldHR, result.Stats["B0_S0"].HighestRating);
+        Assert.AreEqual(oldLR, result.Stats["B0_S0"].LowestRating);
     }
 
     [TestMethod]
@@ -86,10 +86,10 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.IsNotNull(result.stats["B0_S0"].ResultStreakData);
-        Assert.AreEqual(6, result.stats["B0_S0"].ResultStreakData!.WinningStreaks!.CurrentStreak!.StreakLength);
+        Assert.IsNotNull(result.Stats["B0_S0"].ResultStreakData);
+        Assert.AreEqual(6, result.Stats["B0_S0"].ResultStreakData!.WinningStreaks!.CurrentStreak!.StreakLength);
     }
 
 
@@ -112,12 +112,12 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.IsNotNull(result.stats["B0_S0"].ResultStreakData);
-        Assert.AreEqual(6, result.stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
-        Assert.AreEqual(curS.StreakFrom, result.stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
-        Assert.AreEqual(game.EndTime!.DeserializedDate(), result.stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
+        Assert.IsNotNull(result.Stats["B0_S0"].ResultStreakData);
+        Assert.AreEqual(6, result.Stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
+        Assert.AreEqual(curS.StreakFrom, result.Stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
+        Assert.AreEqual(game.EndTime!.DeserializedDate(), result.Stats["B0_S0"].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
     }
 
     [TestMethod]
@@ -137,17 +137,17 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.IsNotNull(result.stats["B0_S0"].GreatestWins);
+        Assert.IsNotNull(result.Stats["B0_S0"].GreatestWins);
 
-        Assert.AreEqual(5, result.stats["B0_S0"].GreatestWins!.Count);
+        Assert.AreEqual(5, result.Stats["B0_S0"].GreatestWins!.Count);
 
-        Assert.AreEqual(1600, result.stats["B0_S0"].GreatestWins![0].OpponentRating);
-        Assert.AreEqual(1580, result.stats["B0_S0"].GreatestWins![1].OpponentRating);
-        Assert.AreEqual(1550, result.stats["B0_S0"].GreatestWins![2].OpponentRating);
-        Assert.AreEqual(1540, result.stats["B0_S0"].GreatestWins![3].OpponentRating);
-        Assert.AreEqual(1530, result.stats["B0_S0"].GreatestWins![4].OpponentRating);
+        Assert.AreEqual(1600, result.Stats["B0_S0"].GreatestWins![0].OpponentRating);
+        Assert.AreEqual(1580, result.Stats["B0_S0"].GreatestWins![1].OpponentRating);
+        Assert.AreEqual(1550, result.Stats["B0_S0"].GreatestWins![2].OpponentRating);
+        Assert.AreEqual(1540, result.Stats["B0_S0"].GreatestWins![3].OpponentRating);
+        Assert.AreEqual(1530, result.Stats["B0_S0"].GreatestWins![4].OpponentRating);
     }
 
     [TestMethod]
@@ -167,17 +167,17 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.IsNotNull(result.stats["B0_S0"].GreatestWins);
+        Assert.IsNotNull(result.Stats["B0_S0"].GreatestWins);
 
-        Assert.AreEqual(5, result.stats["B0_S0"].GreatestWins!.Count);
+        Assert.AreEqual(5, result.Stats["B0_S0"].GreatestWins!.Count);
 
-        Assert.AreEqual(1600, result.stats["B0_S0"].GreatestWins![0].OpponentRating);
-        Assert.AreEqual(1580, result.stats["B0_S0"].GreatestWins![1].OpponentRating);
-        Assert.AreEqual(1540, result.stats["B0_S0"].GreatestWins![2].OpponentRating);
-        Assert.AreEqual(1530, result.stats["B0_S0"].GreatestWins![3].OpponentRating);
-        Assert.AreEqual(1510, result.stats["B0_S0"].GreatestWins![4].OpponentRating);
+        Assert.AreEqual(1600, result.Stats["B0_S0"].GreatestWins![0].OpponentRating);
+        Assert.AreEqual(1580, result.Stats["B0_S0"].GreatestWins![1].OpponentRating);
+        Assert.AreEqual(1540, result.Stats["B0_S0"].GreatestWins![2].OpponentRating);
+        Assert.AreEqual(1530, result.Stats["B0_S0"].GreatestWins![3].OpponentRating);
+        Assert.AreEqual(1510, result.Stats["B0_S0"].GreatestWins![4].OpponentRating);
     }
 
 
@@ -197,9 +197,9 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.AreEqual(1600, result.stats["B0_S0"].HighestRating);
+        Assert.AreEqual(1600, result.Stats["B0_S0"].HighestRating);
     }
 
     [TestMethod]
@@ -217,9 +217,9 @@ public class StatCalculatorTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.stats.ContainsKey("B0_S0"));
+        Assert.IsTrue(result.Stats.ContainsKey("B0_S0"));
 
-        Assert.AreEqual(1445, result.stats["B0_S0"].LowestRating);
+        Assert.AreEqual(1445, result.Stats["B0_S0"].LowestRating);
     }
 
     private static Game BlackWonAgainst1550Player()
@@ -283,8 +283,8 @@ public class StatCalculatorTest
             rows: 9,
             columns: 9,
             playerTimeSnapshots: [],
-            playersRatingsAfter: ["1600", "1545?"],
-            playersRatingsBefore: ["1590", "1550?"]
+            playersRatingsAfter: ["1600", "1565?"],
+            playersRatingsDiff: [-10, 15]
         );
     }
 
@@ -321,7 +321,7 @@ public class StatCalculatorTest
             columns: 9,
             playerTimeSnapshots: [],
             playersRatingsAfter: ["1500", "1445"],
-            playersRatingsBefore: ["1490", "1450"]
+            playersRatingsDiff: [10, -5]
         );
     }
 
@@ -359,7 +359,7 @@ public class StatCalculatorTest
             columns: 9,
             playerTimeSnapshots: [],
             playersRatingsAfter: ["1500", "1545"],
-            playersRatingsBefore: ["1490", "1550"]
+            playersRatingsDiff: [10, -5]
         );
     }
 

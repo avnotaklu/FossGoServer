@@ -6,6 +6,9 @@ using BadukServer.Services;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.ConstrainedExecution;
 using MongoDB.Bson;
+using System.Diagnostics;
+using BadukServer;
+using Microsoft.AspNetCore.Identity.Data;
 
 [ApiController]
 [Authorize]
@@ -15,6 +18,7 @@ public class AuthenticationController : ControllerBase
     private readonly ILogger<AuthenticationController> _logger;
     private readonly IUsersService _usersService;
     private readonly IUserRatingService _userRatingService;
+    private readonly IUserStatService _userStatService;
     private readonly AuthenticationService _authenticationService;
 
     [ActivatorUtilitiesConstructorAttribute]
@@ -28,24 +32,43 @@ public class AuthenticationController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("GoogleSignIn")]
-    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn([FromBody] GoogleSignInTokenBody tokenBody)
+    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn([FromBody] GoogleSignInTokenBody body)
     {
-        string token = tokenBody.Token; //remove Bearer 
+        var token = body.Token;
+        if (token == null)
+        {
+            return BadRequest("No Google token provided");
+        }
+
         try
         {
             var payload = await _authenticationService.VerifyGoogleTokenId(token);
 
-
             var email = payload.Email;
+
             var user = await _usersService.GetByEmail(email);
 
             if (user == null)
             {
-                return await SignUp(new UserDetailsDto(email, true));
+                return await SignUp(new UserDetailsDto(
+                    email: email,
+                    username: email,
+                    googleSignIn: true,
+                    fullName: null,
+                    bio: null,
+                    avatar: null,
+                    nationalilty: null,
+                    password: null
+                ));
             }
             else
             {
-                return await Login(new UserDetailsDto(email, true));
+                return await Login(new SignInDto(
+                    email: email,
+                    password: null,
+                    googleToken: body.Token,
+                    username: email
+                ));
             }
         }
         catch (System.Exception e)
@@ -56,7 +79,7 @@ public class AuthenticationController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("PasswordLogIn")]
-    public async Task<ActionResult<UserAuthenticationModel>> PasswordLogIn([FromBody] UserDetailsDto userDetails)
+    public async Task<ActionResult<UserAuthenticationModel>> PasswordLogIn([FromBody] SignInDto userDetails)
     {
         try
         {
@@ -100,16 +123,28 @@ public class AuthenticationController : ControllerBase
     }
 
 
-    private async Task<ActionResult<UserAuthenticationModel>> Login(UserDetailsDto request)
+    private async Task<ActionResult<UserAuthenticationModel>> Login(SignInDto request)
     {
-        var user = await _usersService.GetByEmail(request.Email);
+        Debug.Assert(request.Username != null || request.Email != null);
+        Debug.Assert(request.GoogleToken != null || request.Password != null);
+
+        User? user = null;
+        if (request.Username != null)
+        {
+            user = await _usersService.GetByUserName(request.Username);
+        }
+        else
+        {
+            user = await _usersService.GetByEmail(request.Email!);
+        }
+
         if (user == null)
         {
-            _logger.LogInformation("Incorrect email provided {email}", request.Email);
+            _logger.LogInformation("Incorrect username/email provided {email}/{username}", request.Email, request.Username);
             return Unauthorized("User credentials don't match");
         }
 
-        if (!request.GoogleSignIn)
+        if (request.GoogleToken == null)
         {
             bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
@@ -126,11 +161,11 @@ public class AuthenticationController : ControllerBase
 
     private async Task<ActionResult<UserAuthenticationModel>> SignUp(UserDetailsDto request)
     {
-        var user = await _usersService.GetByEmail(request.Email);
+        var user = await _usersService.GetByUserName(request.Username);
+
         if (user != null)
         {
-
-            _logger.LogInformation("User already exists {email}", request.Email);
+            _logger.LogInformation("Incorrect username/email provided {email}/{username}", request.Email, request.Username);
             return BadRequest("User already exists");
         }
 
@@ -146,8 +181,10 @@ public class AuthenticationController : ControllerBase
             string salt = BCrypt.Net.BCrypt.GenerateSalt();
             password = BCrypt.Net.BCrypt.HashPassword(request.Password, salt);
         }
-        var newUser = await _usersService.CreateUser(request.Email, request.GoogleSignIn, password);
+
+        var newUser = await _usersService.CreateUser(request, password);
         var newRatings = await _userRatingService.CreateUserRatings(newUser!.Id!);
+        var newStats = await _userStatService.CreateUserStat(newUser!.Id!);
 
         if (newUser == null)
         {

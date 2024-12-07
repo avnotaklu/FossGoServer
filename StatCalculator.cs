@@ -14,13 +14,13 @@ public class StatCalculator : IStatCalculator
     public UserStat CalculateUserStat(UserStat oldUserStats, Game game)
     {
         Debug.Assert(game.DidEnd(), "Can't calculate user stat for ongoing game");
-        Debug.Assert(game.Players.Keys.Contains(oldUserStats.userId), "User not in game");
+        Debug.Assert(game.Players.Keys.Contains(oldUserStats.UserId), "User not in game");
 
         var key = game.GetTopLevelVariant().ToKey();
 
-        oldUserStats.stats.TryGetValue(key, out UserStatForVariant? userStat);
+        oldUserStats.Stats.TryGetValue(key, out UserStatForVariant? userStat);
 
-        var uid = oldUserStats.userId;
+        var uid = oldUserStats.UserId;
         var newUserStat = new UserStatForVariant(
             highestRating: GetHighestRating(userStat, game, key, uid),
             lowestRating: GetLowestRating(userStat, game, key, uid),
@@ -30,7 +30,7 @@ public class StatCalculator : IStatCalculator
             statCounts: GetUpdatedTotalStatCounts(userStat, game, uid)
         );
 
-        oldUserStats.stats[key] = newUserStat;
+        oldUserStats.Stats[key] = newUserStat;
         // });
 
         return oldUserStats;

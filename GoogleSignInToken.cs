@@ -1,3 +1,5 @@
+using BadukServer.Dto;
+
 public class GoogleSignInTokenBody
 {
     public string Token { get; set; }
@@ -6,4 +8,5 @@ public class GoogleSignInTokenBody
     {
         Token = token;
     }
+    
 }

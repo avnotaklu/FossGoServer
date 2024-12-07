@@ -33,22 +33,50 @@ public class User
     public string? Id { get; set; }
 
     [BsonElement(UserFieldNames.Email)]
-    public string Email { get; set; }
+    public string? Email { get; set; }
+
+    [BsonElement(UserFieldNames.GoogleSignIn)]
+    public bool GoogleSignIn { get; set; }
+
+    [BsonElement(UserFieldNames.UserName)]
+    public string UserName { get; set; }
+
+    [BsonElement(UserFieldNames.FullName)]
+    public string? FullName { get; set; }
+
+    [BsonElement(UserFieldNames.Bio)]
+    public string? Bio { get; set; }
+
+    [BsonElement(UserFieldNames.Avatar)]
+    public string? Avatar { get; set; }
+
+    [BsonElement(UserFieldNames.Nationality)]
+    public string? Nationalilty { get; set; }
+
+    [BsonElement(UserFieldNames.CreationDate)]
+    public DateTime CreationDate { get; set; }
+
+    [BsonElement(UserFieldNames.LastSeen)]
+    public DateTime LastSeen { get; set; }
 
     [BsonElement(UserFieldNames.PasswordHash)]
     [BsonIgnoreIfNull]
     public string? PasswordHash { get; set; }
 
-    [BsonElement(UserFieldNames.GoogleSignIn)]
-    public bool GoogleSignIn { get; set; }
 
-    
-
-
-    public User(string email, bool googleSignIn, string? passwordHash = null)
+    public User(string? email, bool googleSignIn, string userName, string? fullName, string? bio, string? avatar, string? nationality, DateTime creation, DateTime lastSeen, string? passwordHash = null)
     {
         Email = email;
         PasswordHash = passwordHash;
         GoogleSignIn = googleSignIn;
+
+        UserName = userName;
+        FullName = fullName;
+        Bio = bio;
+        Avatar = avatar;
+        Nationalilty = nationality;
+
+
+
     }
 }

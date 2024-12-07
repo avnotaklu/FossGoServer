@@ -5,6 +5,7 @@ using BadukServer;
 using System.Diagnostics;
 using System.CodeDom;
 using MongoDB.Driver;
+using MongoDB.Bson;
 
 public static class UserStatFieldNames
 {
@@ -51,18 +52,19 @@ public static class UserStatFieldNames
 public class UserStat
 {
     [Id(0)]
-    [BsonElement(UserStatFieldNames.userId)]
-    public string userId { get; set; }
+    [BsonRepresentation(BsonType.ObjectId)]
+    [BsonId]
+    public string UserId { get; set; }
 
     [Id(1)]
     [BsonElement(UserStatFieldNames.stats)]
-    public Dictionary<string, UserStatForVariant> stats { get; set; }
+    public Dictionary<string, UserStatForVariant> Stats { get; set; }
 
 
     public UserStat(string userId, Dictionary<string, UserStatForVariant> stats)
     {
-        this.userId = userId;
-        this.stats = stats;
+        UserId = userId;
+        Stats = stats;
     }
 }
 
@@ -418,21 +420,25 @@ public static class GameResultStatExt
             return null;
         }
 
-        var minRating = MinimalRatingExt.FromString(game.PlayersRatingsDiff[(int)game.Players.GetOtherStoneFromPlayerId(userId)!]);
+        var otherP = (int)game.Players.GetOtherStoneFromPlayerId(userId)!;
+        var otherPAfterRat = MinimalRatingExt.FromString(game.PlayersRatingsAfter[otherP])!;
+        var otherPRatDiff = game.PlayersRatingsDiff[otherP];
 
-        if (minRating == null)
+        var otherPBeforeRat = new MinimalRating(otherPAfterRat.Rating - otherPRatDiff, otherPAfterRat.Provisional);
+
+        if (otherPBeforeRat == null)
         {
             return null;
         }
 
-        if (minRating!.Provisional)
+        if (otherPBeforeRat!.Provisional)
         {
             return null;
         }
 
         return new GameResultStat(
             gameId: game.GameId,
-            opponentRating: minRating.Rating,
+            opponentRating: otherPBeforeRat.Rating,
             opponentId: game.Players.GetOtherPlayerIdFromPlayerId(userId)!,
             resultAt: game.EndTime!.DeserializedDate()
         );

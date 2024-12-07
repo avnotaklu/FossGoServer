@@ -23,11 +23,11 @@ public class GameGrainTests
     static public Mock<ISignalRHubService> hubContextMock = new();
     static public Mock<IRatingEngine> ratingEngineMock = new();
 
-    static List<User> users = new List<User>
-    {
-        new User("p1@p1.com", false, "ph") {Id = "p1" },
-        new User("p2@p2.com", false, "ph") {Id = "p2" },
-    };
+    // static List<User> users = new List<User>
+    // {
+    //     new User("p1@p1.com", false, "ph") {Id = "p1" },
+    //     new User("p2@p2.com", false, "ph") {Id = "p2" },
+    // };
 
     static List<PlayerRatings> userRatings = [
         new PlayerRatings("p1", UserRatingService.GetInitialRatings()),
