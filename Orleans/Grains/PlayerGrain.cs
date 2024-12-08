@@ -104,7 +104,7 @@ public class PlayerGrain : Grain, IPlayerGrain
             var otherConId = await otherPlayerGrain.GetConnectionId();
 
             var pushG = GrainFactory.GetGrain<IPushNotifierGrain>(otherConId);
-            pushG.SendMessageToMe(
+            await pushG.SendMessageToMe(
                 new SignalRMessage(
                     SignalRMessageType.gameJoin,
                     new GameJoinResult(

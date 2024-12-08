@@ -30,9 +30,25 @@ public class GameGrainTests
     // };
 
     static List<PlayerRatings> userRatings = [
-        new PlayerRatings("p1", UserRatingService.GetInitialRatings()),
-        new PlayerRatings("p2", UserRatingService.GetInitialRatings())
+        new PlayerRatings("p1", GetInitialRatings()),
+        new PlayerRatings("p2", GetInitialRatings())
     ];
+
+    private static Dictionary<string, PlayerRatingsData> GetInitialRatings()
+    {
+        return new Dictionary<string, PlayerRatingsData>(
+            RatingEngine.RateableVariants().Select(
+                t => new KeyValuePair<string, PlayerRatingsData>(t.ToKey(), GetInitialRatingData())
+            )
+        );
+    }
+
+    private static PlayerRatingsData GetInitialRatingData()
+    {
+        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
+    }
+
+
 
 
 

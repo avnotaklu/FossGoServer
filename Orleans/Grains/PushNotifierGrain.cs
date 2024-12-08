@@ -54,43 +54,46 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return Task.FromResult(ConnectionId);
     }
 
-    public async void SendMessageToMe(SignalRMessage message)
+    public ValueTask SendMessageToMe(SignalRMessage message)
     {
         try
         {
             _logger.LogInformation("Notification sent to <user>{user}<user>, <message>{message}<message>", ConnectionId, message);
-            await _hubService.SendToClient(ConnectionId, "userUpdate", message, CancellationToken.None);
+            return _hubService.SendToClient(ConnectionId, "userUpdate", message, CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error broadcasting to host");
+            return new();
         }
     }
 
-    public async void SendMessageToAllUsers(SignalRMessage message)
+    public ValueTask SendMessageToAllUsers(SignalRMessage message)
     {
         try
         {
             _logger.LogInformation("Notification sent to allusers, <message>{message}<message>", message);
-            await _hubService.SendToGroup("userUpdate", "Users", message, CancellationToken.None);
+            return _hubService.SendToGroup("userUpdate", "Users", message, CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error broadcasting to host");
+            return new();
         }
     }
 
-    public async void SendMessageToSameType(SignalRMessage message)
+    public ValueTask SendMessageToSameType(SignalRMessage message)
     {
         try
         {
             var group = _playerType?.ToTypeString()!;
             _logger.LogInformation("Notification sent to <group>{group}<group>, <message>{message}<message>", group, message);
-            await _hubService.SendToGroup("userUpdate", group, message, CancellationToken.None);
+            return _hubService.SendToGroup("userUpdate", group, message, CancellationToken.None);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error broadcasting to host");
+            return new();
         }
     }
 }

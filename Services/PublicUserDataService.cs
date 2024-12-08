@@ -25,12 +25,12 @@ public class PublicUserInfoService : IPlayerInfoService
         var rating = await _userRatingService.GetUserRatings(userId);
         if (rating == null) throw new UserNotFoundException(userId);
 
-        return new PlayerInfo(id: user[0].Id!, email: user[0].Email, rating: rating, PlayerType.Normal);
+        return new PlayerInfo(id: user[0].Id!, username: user[0].UserName, rating: rating, PlayerType.Normal);
     }
 
     public Task<PlayerInfo> GetPublicUserInfoForGuest(string userId)
     {
-        return Task.FromResult(new PlayerInfo(id: userId, email: null, rating: null, PlayerType.Guest));
+        return Task.FromResult(new PlayerInfo(id: userId, username: null, rating: null, PlayerType.Guest));
     }
 
 

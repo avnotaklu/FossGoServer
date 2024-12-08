@@ -17,7 +17,11 @@ public class UserRatingService : IUserRatingService
     private readonly IMongoCollection<PlayerRatings> _ratingsCollection;
     private readonly IRatingEngine _ratingEngine;
     private readonly IDateTimeService _dateTimeService;
-    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<PlayerRatings>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService)
+    private readonly IMongoOperationLogger _mongoOperation;
+
+
+    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<PlayerRatings>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService, IMongoOperationLogger mongoOperation)
+
     {
         var mongoClient = new MongoClient(
             userDatabaseSettings.Value.ConnectionString);
@@ -30,29 +34,15 @@ public class UserRatingService : IUserRatingService
 
         _ratingEngine = ratingEngine;
         _dateTimeService = dateTimeService;
+        _mongoOperation = mongoOperation;
     }
-
-
-    public PlayerRatings UpdateUserRatingToCurrentRead(PlayerRatings oldRating)
-    {
-        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
-        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
-            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), false), a.Value.Glicko.Volatility
-        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
-        )));
-    }
-
-    public PlayerRatings UpdateUserRatingToCurrentWrite(PlayerRatings oldRating)
-    {
-        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
-        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
-            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), true), a.Value.Glicko.Volatility
-        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
-        )));
-    }
-
 
     public async Task<PlayerRatings> GetUserRatings(string userId)
+    {
+        return await _mongoOperation.Operation(() => GetUserRatingsInternal(userId));
+    }
+
+    private async Task<PlayerRatings> GetUserRatingsInternal(string userId)
     {
         var oldRating = await _ratingsCollection.Find(a => a.PlayerId == userId).FirstOrDefaultAsync();
 
@@ -66,34 +56,35 @@ public class UserRatingService : IUserRatingService
 
     public async Task<PlayerRatings?> CreateUserRatings(string userId)
     {
-        try
-        {
-            var rating = new PlayerRatings(userId, GetInitialRatings());
-            await _ratingsCollection.InsertOneAsync(rating);
-            return rating;
-        }
-        catch
-        {
-            return null;
-        }
+        return await _mongoOperation.Operation(() => CreateUserRatingsInternal(userId));
+    }
+
+    private async Task<PlayerRatings?> CreateUserRatingsInternal(string userId)
+    {
+        var rating = new PlayerRatings(userId, GetInitialRatings());
+        await _ratingsCollection.InsertOneAsync(rating);
+        return rating;
     }
 
     public async Task<PlayerRatings?> SaveUserRatings(PlayerRatings userRating)
     {
-        try
-        {
-            var newRat = UpdateUserRatingToCurrentWrite(userRating);
-            var res = await _ratingsCollection.UpdateOneAsync(Builders<PlayerRatings>.Filter.Eq(a => a.PlayerId, userRating.PlayerId), Builders<PlayerRatings>.Update.Set(a => a.Ratings, newRat.Ratings));
-
-            return userRating;
-        }
-        catch
-        {
-            return null;
-        }
+        return await _mongoOperation.Operation(() => SaveUserRatingsInternal(userRating));
     }
 
-    public static Dictionary<string, PlayerRatingsData> GetInitialRatings()
+    private async Task<PlayerRatings?> SaveUserRatingsInternal(PlayerRatings userRating)
+    {
+        var newRat = UpdateUserRatingToCurrentWrite(userRating);
+        var res = await _ratingsCollection.UpdateOneAsync(Builders<PlayerRatings>.Filter.Eq(a => a.PlayerId, userRating.PlayerId), Builders<PlayerRatings>.Update.Set(a => a.Ratings, newRat.Ratings));
+
+        return userRating;
+    }
+
+    private static PlayerRatingsData GetInitialRatingData()
+    {
+        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
+    }
+
+    private static Dictionary<string, PlayerRatingsData> GetInitialRatings()
     {
         return new Dictionary<string, PlayerRatingsData>(
             RatingEngine.RateableVariants().Select(
@@ -102,9 +93,23 @@ public class UserRatingService : IUserRatingService
         );
     }
 
-    private static PlayerRatingsData GetInitialRatingData()
+    private PlayerRatings UpdateUserRatingToCurrentRead(PlayerRatings oldRating)
     {
-        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
+        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
+        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
+            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), false), a.Value.Glicko.Volatility
+        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
+        )));
     }
+
+    private PlayerRatings UpdateUserRatingToCurrentWrite(PlayerRatings oldRating)
+    {
+        return new PlayerRatings(oldRating.PlayerId, new Dictionary<string, PlayerRatingsData>(oldRating.Ratings.Select(a =>
+        new KeyValuePair<string, PlayerRatingsData>(a.Key, new PlayerRatingsData(new GlickoRating(
+            a.Value.Glicko.Rating, _ratingEngine.PreviewDeviation(a.Value, _dateTimeService.Now(), true), a.Value.Glicko.Volatility
+        ), a.Value.NB, a.Value.Recent, a.Value.Latest))
+        )));
+    }
+
 }
 

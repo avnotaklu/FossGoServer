@@ -49,13 +49,13 @@ public enum PlayerType
 public class PlayerInfo
 {
     public string Id { get; set; }
-    public string? Email { get; set; }
+    public string? Username { get; set; }
     public PlayerRatings? Rating { get; set; }
     public PlayerType PlayerType { get; set; }
 
-    public PlayerInfo(string id, string? email, PlayerRatings? rating, PlayerType playerType)
+    public PlayerInfo(string id, string? username, PlayerRatings? rating, PlayerType playerType)
     {
-        Email = email;
+        Username = username;
         Id = id;
         Rating = rating;
         PlayerType =playerType;

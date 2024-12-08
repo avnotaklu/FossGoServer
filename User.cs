@@ -75,8 +75,5 @@ public class User
         Bio = bio;
         Avatar = avatar;
         Nationalilty = nationality;
-
-
-
     }
 }

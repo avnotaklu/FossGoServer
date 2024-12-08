@@ -368,7 +368,7 @@ public class GameStatCounts
     [BsonElement(UserStatFieldNames.Disconnects)]
     public int Disconnects { get; set; }
     [Id(4)]
-    [BsonElement(UserStatFieldNames.Wins)]
+    [BsonElement(UserStatFieldNames.Draws)]
     public int Draws { get; set; }
 
     public GameStatCounts(int total, int wins, int losses, int disconnects, int draws)

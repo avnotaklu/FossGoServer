@@ -60,6 +60,7 @@ public class Startup
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ITimeCalculator, TimeCalculator>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();
+        services.AddSingleton<IMongoOperationLogger, MongoOperationLogger>();
 
         services.AddEndpointsApiExplorer();
 
@@ -71,6 +72,9 @@ public class Startup
 
         services.Configure<MongodbCollectionParams<PlayerRatings>>(
             Configuration.GetSection("UserRatingsCollection"));
+
+        services.Configure<MongodbCollectionParams<UserStat>>(
+            Configuration.GetSection("UserStatsCollection"));
 
         services.Configure<MongodbCollectionParams<Game>>(
             Configuration.GetSection("GameCollection"));

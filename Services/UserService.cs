@@ -21,11 +21,15 @@ public class UsersService : IUsersService
 {
     private readonly IMongoCollection<User> _usersCollection;
     private readonly IDateTimeService _dateTimeService;
+    private readonly ILogger<UsersService> _logger;
+    private readonly IMongoOperationLogger _mongoOperation;
 
     public UsersService(
         IOptions<DatabaseSettings> userDatabaseSettings,
         IOptions<MongodbCollectionParams<User>> userCollection,
-        IDateTimeService dateTimeService
+        IDateTimeService dateTimeService,
+        ILogger<UsersService> logger,
+        IMongoOperationLogger mongoOperation
         )
     {
         var mongoClient = new MongoClient(
@@ -37,6 +41,8 @@ public class UsersService : IUsersService
         _usersCollection = mongoDatabase.GetCollection<User>(
             userCollection.Value.Name);
         _dateTimeService = dateTimeService;
+        _logger = logger;
+        _mongoOperation = mongoOperation;
     }
 
     public async Task<List<User>> Get() =>
@@ -48,13 +54,14 @@ public class UsersService : IUsersService
                select user).ToListAsync();
 
     public async Task<User?> GetByEmail(string email) =>
-        await _usersCollection.Find(user => user.Email == email).FirstOrDefaultAsync();
+        await _mongoOperation.Operation(async () => await _usersCollection.Find(user => user.Email == email).FirstOrDefaultAsync());
+
     public async Task<User?> GetByUserName(string uname) =>
-        await _usersCollection.Find(user => user.UserName == uname).FirstOrDefaultAsync();
+         await _mongoOperation.Operation(async () => await _usersCollection.Find(user => user.UserName == uname).FirstOrDefaultAsync());
 
     public async Task<User?> CreateUser(UserDetailsDto userDetails, string? passwordHash)
     {
-        try
+        return await _mongoOperation.Operation(async () =>
         {
             var user = new User(
                 email: userDetails.Email,
@@ -71,10 +78,6 @@ public class UsersService : IUsersService
 
             await _usersCollection.InsertOneAsync(user);
             return user;
-        }
-        catch
-        {
-            return null;
-        }
+        });
     }
 }

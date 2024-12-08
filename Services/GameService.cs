@@ -11,7 +11,9 @@ public interface IGameService
 public class GameService : IGameService
 {
     private readonly IMongoCollection<Game> _gameCollection;
-    public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection)
+    private readonly IMongoOperationLogger _mongoOperation;
+
+    public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation)
     {
         var mongoClient = new MongoClient(
             gameDatabaseSettings.Value.ConnectionString);
@@ -21,6 +23,7 @@ public class GameService : IGameService
 
         _gameCollection = mongoDatabase.GetCollection<Game>(
             gameCollection.Value.Name);
+        _mongoOperation = mongoOperation;
     }
 
     public async Task<Game?> GetGame(string gameId)
@@ -33,15 +36,19 @@ public class GameService : IGameService
     {
         try
         {
-            var updateOptions = new ReplaceOptions { IsUpsert = true };
-
-            var res = await _gameCollection.ReplaceOneAsync(Builders<Game>.Filter.Eq(a => a.GameId, game.GameId), game, updateOptions);
-
-            return game;
+            return await _mongoOperation.Operation(() => SaveGameInternal(game));
         }
-        catch
+        // Here we catch the DatabaseException and return null
+        // This is because the SaveGame function isn't called by any api
+        catch (DatabaseOperationException)
         {
             return null;
         }
+    }
+
+    private async Task<Game> SaveGameInternal(Game game)
+    {
+        var res = await _gameCollection.ReplaceOneAsync(a => a.GameId == game.GameId, game, new ReplaceOptions { IsUpsert = true });
+        return game;
     }
 }

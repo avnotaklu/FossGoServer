@@ -36,7 +36,7 @@ public sealed class MainHub : Hub
     }
 
     // [Authorize(Policy = "PlayerOnly")]
-    public async Task FindMatch(FindMatchDto findMatchDto)
+    public ValueTask FindMatch(FindMatchDto findMatchDto)
     {
         try
         {
@@ -53,17 +53,23 @@ public sealed class MainHub : Hub
 
             var playerType = PlayerTypeExt.FromString(userType);
 
-            var playerData = await _userInfoService.GetPublicUserInfoForPlayer(playerId, playerType);
+            return new(Task.Run(
+            async () =>
+            {
+                var playerData = await _userInfoService.GetPublicUserInfoForPlayer(playerId, playerType);
 
-            await matchGrain.FindMatch(
-                playerData,
-                findMatchDto.BoardSizes,
-                findMatchDto.TimeStandards
-            );
+                await matchGrain.FindMatch(
+                    playerData,
+                    findMatchDto.BoardSizes,
+                    findMatchDto.TimeStandards
+                );
+            }
+            ));
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Error finding match");
+            return new();
         }
     }
 

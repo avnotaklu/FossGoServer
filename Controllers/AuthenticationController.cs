@@ -22,12 +22,13 @@ public class AuthenticationController : ControllerBase
     private readonly AuthenticationService _authenticationService;
 
     [ActivatorUtilitiesConstructorAttribute]
-    public AuthenticationController(ILogger<AuthenticationController> logger, IUsersService usersService, IUserRatingService userRatingService, AuthenticationService authenticationService)
+    public AuthenticationController(ILogger<AuthenticationController> logger, IUsersService usersService, IUserRatingService userRatingService, IUserStatService userStatService, AuthenticationService authenticationService)
     {
         _logger = logger;
         _authenticationService = authenticationService;
         _usersService = usersService;
         _userRatingService = userRatingService;
+        _userStatService = userStatService;
     }
 
     [AllowAnonymous]
@@ -63,7 +64,7 @@ public class AuthenticationController : ControllerBase
             }
             else
             {
-                return await Login(new SignInDto(
+                return await Login(new LoginDto(
                     email: email,
                     password: null,
                     googleToken: body.Token,
@@ -79,7 +80,7 @@ public class AuthenticationController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("PasswordLogIn")]
-    public async Task<ActionResult<UserAuthenticationModel>> PasswordLogIn([FromBody] SignInDto userDetails)
+    public async Task<ActionResult<UserAuthenticationModel>> PasswordLogIn([FromBody] LoginDto userDetails)
     {
         try
         {
@@ -113,7 +114,7 @@ public class AuthenticationController : ControllerBase
         try
         {
             var newGuest = new GuestUser(ObjectId.GenerateNewId().ToString());
-            var token = _authenticationService.GenerateJSONWebTokenGuestUser(newGuest);
+            var token = await _authenticationService.GenerateJSONWebTokenGuestUser(newGuest);
             return Ok(new GuestAuthenticationModel(newGuest, token));
         }
         catch (Exception e)
@@ -123,7 +124,7 @@ public class AuthenticationController : ControllerBase
     }
 
 
-    private async Task<ActionResult<UserAuthenticationModel>> Login(SignInDto request)
+    private async Task<ActionResult<UserAuthenticationModel>> Login(LoginDto request)
     {
         Debug.Assert(request.Username != null || request.Email != null);
         Debug.Assert(request.GoogleToken != null || request.Password != null);
@@ -156,7 +157,7 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", request.Email);
-        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
+        return Ok(new UserAuthenticationModel(user, await _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
     }
 
     private async Task<ActionResult<UserAuthenticationModel>> SignUp(UserDetailsDto request)
@@ -194,7 +195,7 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", newUser.Email);
-        return Ok(new UserAuthenticationModel(newUser, _authenticationService.GenerateJSONWebTokenForNormalUser(newUser)));
+        return Ok(new UserAuthenticationModel(newUser, await _authenticationService.GenerateJSONWebTokenForNormalUser(newUser)));
     }
 
 
@@ -217,6 +218,6 @@ public class AuthenticationController : ControllerBase
 
         var user = users.First();
 
-        return Ok(new UserAuthenticationModel(user, _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
+        return Ok(new UserAuthenticationModel(user, await _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
     }
 }

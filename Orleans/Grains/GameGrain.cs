@@ -19,7 +19,6 @@ public class GameGrain : Grain, IGameGrain
     private Dictionary<Position, StoneType> _board = [];
     private List<int> _prisoners = [];
     private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
-    private bool _initialized = false;
     private DateTime? _startTime;
     private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
@@ -132,7 +131,6 @@ public class GameGrain : Grain, IGameGrain
         _gameCreator = gameCreator;
         _playersRatingsDiff = playersRatingsDiff;
         _playersRatingsAfter = playersRatingsAfter;
-        _initialized = true;
     }
 
     // Grain overrides
@@ -294,7 +292,7 @@ public class GameGrain : Grain, IGameGrain
         {
             // Send message to player with current turn
             var currentTurnPlayer = GetPlayerIdWithTurn();
-            SendNewMoveMessage(currentTurnPlayer);
+            await SendNewMoveMessage(currentTurnPlayer);
         }
 
 
@@ -317,7 +315,7 @@ public class GameGrain : Grain, IGameGrain
         var game = await GetGame();
         var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
 
-        SendContinueGameMessage(otherPlayer);
+        await SendContinueGameMessage(otherPlayer);
 
         await TrySaveGame();
         return game;
@@ -338,11 +336,11 @@ public class GameGrain : Grain, IGameGrain
         {
             // Game is over
             await EndGame(GameOverMethod.Score);
-            SendGameOverMessage(GameOverMethod.Score);
+            await SendGameOverMessage(GameOverMethod.Score);
         }
         else
         {
-            SendAcceptedScoresMessage(otherPlayer);
+            await SendAcceptedScoresMessage(otherPlayer);
         }
 
         var game = await GetGame();
@@ -373,7 +371,7 @@ public class GameGrain : Grain, IGameGrain
 
         }
 
-        SendEditDeadStoneMessage(GetOtherPlayerIdFromPlayerId(editorPlayer), rawPosition, state);
+        await SendEditDeadStoneMessage(GetOtherPlayerIdFromPlayerId(editorPlayer), rawPosition, state);
 
         await TrySaveGame();
         return _GetGame();
@@ -389,7 +387,7 @@ public class GameGrain : Grain, IGameGrain
 
         var game = await GetGame();
 
-        SendGameOverMessage(GameOverMethod.Resign);
+        await SendGameOverMessage(GameOverMethod.Resign);
 
 
         await TrySaveGame();
@@ -408,14 +406,14 @@ public class GameGrain : Grain, IGameGrain
         if (curPlayerTime.MainTimeMilliseconds <= 0)
         {
             await EndGame(GameOverMethod.Timeout, myStone.ResultForOtherWon(), true);
-            SendGameOverMessage(GameOverMethod.Timeout);
+            await SendGameOverMessage(GameOverMethod.Timeout);
             Console.WriteLine("Game timeout");
         }
         else
         {
             foreach (var playerId in _players.Keys)
             {
-                SendGameTimerUpdateMessage(playerId, curPlayerTime);
+                await SendGameTimerUpdateMessage(playerId, curPlayerTime);
             }
         }
         return curPlayerTime;
@@ -767,7 +765,7 @@ public class GameGrain : Grain, IGameGrain
 
         foreach (var player in players)
         {
-            var oldStats = (await _userStatService.GetUserStatAsync(player))!;
+            var oldStats = (await _userStatService.GetUserStat(player))!;
 
             var res = _statCalculator.CalculateUserStat(
                 oldStats, game
@@ -778,7 +776,7 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    private void SetScoreCalculationState(GameMove lastMove)
+    private async void SetScoreCalculationState(GameMove lastMove)
     {
         Debug.Assert(HasPassedTwice());
         Debug.Assert(lastMove.IsPass());
@@ -787,7 +785,7 @@ public class GameGrain : Grain, IGameGrain
 
         _gameState = GameState.ScoreCalculation;
 
-        SendScoreCalculationStartedMessage(playerWithTurn);
+        await SendScoreCalculationStartedMessage(playerWithTurn);
     }
 
     private bool HasPassedTwice()
@@ -854,7 +852,7 @@ public class GameGrain : Grain, IGameGrain
     //     ), toPlayer);
     // }
 
-    private async void SendNewMoveMessage(string toPlayer)
+    private async Task SendNewMoveMessage(string toPlayer)
     {
         var game = _GetGame();
         await SendMessageToClient(new SignalRMessage(
@@ -863,7 +861,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendScoreCalculationStartedMessage(string toPlayer)
+    private async Task SendScoreCalculationStartedMessage(string toPlayer)
     {
         await SendMessageToClient(new SignalRMessage(
             SignalRMessageType.scoreCaculationStarted,
@@ -871,7 +869,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendEditDeadStoneMessage(string toPlayer, RawPosition position, DeadStoneState state)
+    private async Task SendEditDeadStoneMessage(string toPlayer, RawPosition position, DeadStoneState state)
     {
         await SendMessageToClient(new SignalRMessage(
             SignalRMessageType.editDeadStone,
@@ -879,7 +877,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendContinueGameMessage(string toPlayer)
+    private async Task SendContinueGameMessage(string toPlayer)
     {
         var game = _GetGame();
         await SendMessageToClient(new SignalRMessage(
@@ -888,7 +886,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendAcceptedScoresMessage(string toPlayer)
+    private async Task SendAcceptedScoresMessage(string toPlayer)
     {
         await SendMessageToClient(new SignalRMessage(
             SignalRMessageType.acceptedScores,
@@ -896,7 +894,7 @@ public class GameGrain : Grain, IGameGrain
         ), toPlayer);
     }
 
-    private async void SendGameOverMessage(GameOverMethod method)
+    private async Task SendGameOverMessage(GameOverMethod method)
     {
         var game = _GetGame();
         await SendMessageToAll(new SignalRMessage(
@@ -905,7 +903,7 @@ public class GameGrain : Grain, IGameGrain
         ));
     }
 
-    private async void SendGameTimerUpdateMessage(string toPlayer, PlayerTimeSnapshot playerTime)
+    private async Task SendGameTimerUpdateMessage(string toPlayer, PlayerTimeSnapshot playerTime)
     {
         var playerWithTurn = GetPlayerIdWithTurn();
         await SendMessageToClient(new SignalRMessage(

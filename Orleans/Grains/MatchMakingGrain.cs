@@ -51,11 +51,12 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         {
             if (playerInfo.Rating == null) throw new InvalidOperationException("Unrated Player can't play a rated game");
 
-            match = matchingMatches.FirstOrDefault(m =>
-            {
-                var variant = new VariantType(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard());
-                return m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(variant));
-            });
+            match = matchingMatches.FirstOrDefault();
+            // match = matchingMatches.FirstOrDefault(m =>
+            // {
+            //     var variant = new VariantType(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard());
+            //     return m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(variant));
+            // });
         }
         else
         {

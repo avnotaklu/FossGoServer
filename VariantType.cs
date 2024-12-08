@@ -105,8 +105,8 @@ public static class VariantTypeExt
 
     public static bool StatAllowed(this VariantType me)
     {
-        if (me.TimeStandard == null) return true;
-        if (me.BoardSize == null) return true;
+        if (me.TimeStandard == null) return false;
+        if (me.BoardSize == null) return false;
 
         return (bool)me.BoardSize?.RatingAllowed()! && (bool)me.TimeStandard?.RatingAllowed()!;
     }

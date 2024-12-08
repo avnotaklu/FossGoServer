@@ -19,44 +19,44 @@ public class AuthenticationService
     }
 
 
-    public string GenerateJSONWebTokenForNormalUser(User user)
+    public Task<string> GenerateJSONWebTokenForNormalUser(User user)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
         var claims = new ClaimsIdentity(new[] {
             new Claim("user_id", user.GetUserId()),
             new Claim("user_type", "normal_user"),
             new Claim("role", "player")
         });
 
-        var token = new JwtSecurityToken(JwtSettings.Issuer,
-          JwtSettings.Issuer,
-          claims.Claims,
-          expires: DateTime.Now.AddMinutes(120),
-          signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return _GenerateJSONWeb(claims);
     }
 
-
-    public string GenerateJSONWebTokenGuestUser(GuestUser user)
+    public Task<string> GenerateJSONWebTokenGuestUser(GuestUser user)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-        var claims = new ClaimsIdentity(new[] {
+
+        var claims = new ClaimsIdentity([
             new Claim("user_id", user.Id),
             new Claim("user_type", "guest_user"),
             new Claim("role", "player")
+        ]);
+
+        return _GenerateJSONWeb(claims);
+    }
+
+    public Task<string> _GenerateJSONWeb(ClaimsIdentity claims)
+    {
+        return Task.Run(() =>
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(JwtSettings.Issuer,
+              JwtSettings.Issuer,
+              claims.Claims,
+              expires: DateTime.Now.AddMinutes(120),
+              signingCredentials: credentials);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         });
-
-        var token = new JwtSecurityToken(JwtSettings.Issuer,
-          JwtSettings.Issuer,
-          claims.Claims,
-          expires: DateTime.Now.AddMinutes(120),
-          signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public async Task<GoogleJsonWebSignature.Payload> VerifyGoogleTokenId(string token)
