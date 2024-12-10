@@ -46,7 +46,12 @@ public class UserStatService : IUserStatService
     private async Task<UserStat> SaveUserStatInternal(UserStat userStat)
     {
         var res = await _userStatCollection.ReplaceOneAsync(a => a.UserId == userStat.UserId, userStat, new ReplaceOptions { IsUpsert = true });
-        return userStat;
+
+        if (res.IsAcknowledged)
+        {
+            return userStat;
+        }
+        throw new Exception("Failed to update user profile");
     }
 
     public async Task<UserStat> CreateUserStat(string uid)

@@ -9,10 +9,10 @@ if [[ $1 == "all" ]] then
 		echo -e "\e[31m$coll\e[0m"
 		comm=$(printf "%s%s" "db." "$coll" ".find({})")
 		res=$(mongosh --eval $comm $db)
-		echo $comm $res
+		echo $res
 	done
 else
 	comm=$(printf "%s%s" "db." "$1" ".find({})")
 	res=$(mongosh --eval $comm $db)
-	echo $comm $res
+	echo $res
 fi

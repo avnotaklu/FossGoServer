@@ -51,7 +51,7 @@ public class User
     public string? Avatar { get; set; }
 
     [BsonElement(UserFieldNames.Nationality)]
-    public string? Nationalilty { get; set; }
+    public string? Nationality { get; set; }
 
     [BsonElement(UserFieldNames.CreationDate)]
     public DateTime CreationDate { get; set; }
@@ -74,6 +74,6 @@ public class User
         FullName = fullName;
         Bio = bio;
         Avatar = avatar;
-        Nationalilty = nationality;
+        Nationality = nationality;
     }
 }
