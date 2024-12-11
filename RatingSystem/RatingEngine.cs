@@ -31,7 +31,7 @@ using Moq;
 
 public interface IRatingEngine
 {
-    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, VariantType gameVariant, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime);
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant gameVariant, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime);
 
     public double PreviewDeviation(PlayerRatingsData data, DateTime ratingPeriodEndDate, bool reverse);
 
@@ -83,11 +83,19 @@ public class RatingEngine : IRatingEngine
     }
 
     // 
-    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, VariantType variantType, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime)
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant variantType, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime)
     {
         if (!variantType.RatingAllowed())
         {
             throw new InvalidOperationException($"Can't calculate rating for variants other than {RateableVariants().Aggregate("", (p, n) => p + ", " + n.ToString())}");
+        }
+
+        foreach (var userR in usersRatings)
+        {
+            if (userR.GetRatingData(variantType) == null)
+            {
+                userR.Ratings[variantType.ToKey()] = GetInitialRatingData();
+            }
         }
 
         // var usersRatings = await Task.WhenAll(players.Keys.Select(id => _userRepo.GetUserRatings(id)!).ToList());
@@ -193,7 +201,7 @@ public class RatingEngine : IRatingEngine
     }
 
 
-    private UncalculatedRatingGame GetPlayerRatingsForGame(VariantType variantType, List<PlayerRatings> userRating, GameResult res, DateTime endTime)
+    private UncalculatedRatingGame GetPlayerRatingsForGame(ConcreteGameVariant variantType, List<PlayerRatings> userRating, GameResult res, DateTime endTime)
     {
         var key = variantType.ToKey();
         var userRatings = userRating.Select(u => u.Ratings[key]).ToList();
@@ -209,9 +217,9 @@ public class RatingEngine : IRatingEngine
         {
             oldUser.Ratings[style] = rating;
 
-            var (key, data) = RatingForTimeStandard(new VariantType(null, ratingGame.Variant.TimeStandard), oldUser);
+            // var (key, data) = RatingForTimeStandard(new VariantType(null, ratingGame.Variant.TimeStandard), oldUser);
 
-            oldUser.Ratings[key] = data;
+            // oldUser.Ratings[key] = data;
 
             return new PlayerRatings(
                 oldUser.PlayerId,
@@ -222,45 +230,45 @@ public class RatingEngine : IRatingEngine
         return result;
     }
 
-    private (string standardKey, PlayerRatingsData data) RatingForTimeStandard(VariantType variant, PlayerRatings p)
-    {
-        var timeStandardStyle = variant.ToKey();
+    // private (string standardKey, PlayerRatingsData data) RatingForTimeStandard(ConcreteGameVariant variant, PlayerRatings p)
+    // {
+    //     var timeStandardStyle = variant.ToKey();
 
-        // Collecting the sub-performances
-        var subs = RateableBoards().Select(boardSize => p.Ratings[new VariantType(boardSize, variant.TimeStandard).ToKey()])
-            .Where(perf => perf.Latest == null ? false : !IsRatingProvisional(perf, (DateTime)perf.Latest))
-            .ToList();
+    //     // Collecting the sub-performances
+    //     var subs = RateableBoards().Select(boardSize => p.Ratings[new ConcreteGameVariant(boardSize, variant.TimeStandard).ToKey()])
+    //         .Where(perf => perf.Latest == null ? false : !IsRatingProvisional(perf, (DateTime)perf.Latest))
+    //         .ToList();
 
-        // Determining the latest date
-        var latestStyle = subs.Where(a => a.Latest != null).MaxBy((a) => a.Latest);
-        // .MaxByOption(perf => perf.Latest.HasValue ? perf.Latest.Value.Ticks : 0)
-        // ?.Latest;
+    //     // Determining the latest date
+    //     var latestStyle = subs.Where(a => a.Latest != null).MaxBy((a) => a.Latest);
+    //     // .MaxByOption(perf => perf.Latest.HasValue ? perf.Latest.Value.Ticks : 0)
+    //     // ?.Latest;
 
-        static int nbSelector(PlayerRatingsData p) => p.NB;
+    //     static int nbSelector(PlayerRatingsData p) => p.NB;
 
-        // Updating the standard performance
-        var newStandard = (latestStyle?.Latest.HasValue ?? false)
-            ? new PlayerRatingsData
-            (
-                glicko: new GlickoRating(
-                    rating: subs.Sum(s => s.Glicko.Rating * (s.NB / subs.Sum(nbSelector))),
-                    deviation: subs.Sum(s => s.Glicko.Deviation * (s.NB / subs.Sum(nbSelector))),
-                    volatility: subs.Sum(s => s.Glicko.Volatility * (s.NB / subs.Sum(nbSelector)))
-            ),
-                nb: subs.Sum(nbSelector),
-                recent: new(),
-                latest: latestStyle.Latest
-            )
-            : p.Ratings[timeStandardStyle];
+    //     // Updating the standard performance
+    //     var newStandard = (latestStyle?.Latest.HasValue ?? false)
+    //         ? new PlayerRatingsData
+    //         (
+    //             glicko: new GlickoRating(
+    //                 rating: subs.Sum(s => s.Glicko.Rating * (s.NB / subs.Sum(nbSelector))),
+    //                 deviation: subs.Sum(s => s.Glicko.Deviation * (s.NB / subs.Sum(nbSelector))),
+    //                 volatility: subs.Sum(s => s.Glicko.Volatility * (s.NB / subs.Sum(nbSelector)))
+    //         ),
+    //             nb: subs.Sum(nbSelector),
+    //             recent: new(),
+    //             latest: latestStyle.Latest
+    //         )
+    //         : p.Ratings[timeStandardStyle];
 
-        // Returning a new UserPerfs instance with the updated Standard
-        return (timeStandardStyle, new PlayerRatingsData(
-            glicko: newStandard.Glicko,
-            nb: newStandard.NB,
-            recent: newStandard.Recent,
-            latest: newStandard.Latest
-        ));
-    }
+    //     // Returning a new UserPerfs instance with the updated Standard
+    //     return (timeStandardStyle, new PlayerRatingsData(
+    //         glicko: newStandard.Glicko,
+    //         nb: newStandard.NB,
+    //         recent: newStandard.Recent,
+    //         latest: newStandard.Latest
+    //     ));
+    // }
 
     public static IEnumerable<BoardSize> RateableBoards()
     {
@@ -273,9 +281,9 @@ public class RatingEngine : IRatingEngine
     }
 
 
-    public static IEnumerable<VariantType> RateableVariants()
+    public static IEnumerable<ConcreteGameVariant> RateableVariants()
     {
-        return RateableBoards().Select(a => (BoardSize?)a).Append(null).SelectMany(a => RateableTimeStandards().Select(t => new VariantType(a, t)));
+        return RateableBoards().SelectMany(a => RateableTimeStandards().Select(t => new ConcreteGameVariant(a, t)));
     }
 
 
@@ -283,16 +291,23 @@ public class RatingEngine : IRatingEngine
     {
         return PreviewDeviation(rating, periodEnd, false) > ProvisionalDeviation;
     }
+
+
+    private static PlayerRatingsData GetInitialRatingData()
+    {
+        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
+    }
+
 }
 
 public class UncalculatedRatingGame
 {
     public List<PlayerRatingsData> PlayersRatingData;
-    public VariantType Variant;
+    public ConcreteGameVariant Variant;
     public GameResult Result;
     public DateTime EndTime;
 
-    public UncalculatedRatingGame(List<PlayerRatingsData> players, GameResult res, DateTime endTime, VariantType variant)
+    public UncalculatedRatingGame(List<PlayerRatingsData> players, GameResult res, DateTime endTime, ConcreteGameVariant variant)
     {
         PlayersRatingData = players;
         Result = res;

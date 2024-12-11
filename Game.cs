@@ -83,29 +83,30 @@ public static class GameExt
         throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn once game has started");
     }
 
-    public static VariantType GetTopLevelVariant(this Game game)
+    public static ConcreteGameVariant GetTopLevelVariant(this Game game)
     {
-        return new VariantType(game.GetBoardSize(), game.TimeControl.TimeStandard);
+        return new ConcreteGameVariant(game.GetBoardSize(), game.TimeControl.TimeStandard);
     }
 
-    public static VariantType GetBoardVariant(this Game game)
-    {
-        return new VariantType(game.GetBoardSize(), null);
-    }
+    // NOTE: Concrete game type cannot have null to abstract away the actual type
+    // public static ConcreteGameVariant GetBoardVariant(this Game game)
+    // {
+    //     return new ConcreteVariantType(game.GetBoardSize(), null);
+    // }
 
-    public static VariantType GetTimeStandardVariant(this Game game)
-    {
-        return new VariantType(null, game.TimeControl.TimeStandard);
-    }
+    // public static ConcreteGameVariant GetTimeStandardVariant(this Game game)
+    // {
+    //     return new ConcreteVariantType(null, game.TimeControl.TimeStandard);
+    // }
 
-    public static List<VariantType> GetRelevantVariants(this Game game)
-    {
-        return [
-            game.GetTopLevelVariant(),
-            game.GetBoardVariant(),
-            game.GetTimeStandardVariant()
-        ];
-    }
+    // public static List<ConcreteGameVariant> GetRelevantVariants(this Game game)
+    // {
+    //     return [
+    //         game.GetTopLevelVariant(),
+    //         game.GetBoardVariant(),
+    //         game.GetTimeStandardVariant()
+    //     ];
+    // }
 
 
 

@@ -79,18 +79,13 @@ public class UserRatingService : IUserRatingService
         return userRating;
     }
 
-    private static PlayerRatingsData GetInitialRatingData()
-    {
-        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
-    }
-
     private static Dictionary<string, PlayerRatingsData> GetInitialRatings()
     {
-        return new Dictionary<string, PlayerRatingsData>(
-            RatingEngine.RateableVariants().Select(
-                t => new KeyValuePair<string, PlayerRatingsData>(t.ToKey(), GetInitialRatingData())
-            )
-        );
+        return new Dictionary<string, PlayerRatingsData>();
+        //     RatingEngine.RateableVariants().Select(
+        //         t => new KeyValuePair<string, PlayerRatingsData>(t.ToKey(), GetInitialRatingData())
+        //     )
+        // );
     }
 
     private PlayerRatings UpdateUserRatingToCurrentRead(PlayerRatings oldRating)

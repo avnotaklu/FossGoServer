@@ -22,13 +22,13 @@ public static class BoardSizeExtensions
             BoardSize.Nine => true,
             BoardSize.Thirteen => true,
             BoardSize.Nineteen => true,
-            _ => true,
+            _ => false,
         };
     }
 
     public static string ToKey(this BoardSize me)
     {
-        return $"B{(int)me}";
+        return $"{(int)me}";
     }
 
 
@@ -81,7 +81,7 @@ public static class TimeStandardExt
 
     public static string ToKey(this TimeStandard me)
     {
-        return $"S{(int)me}";
+        return $"{(int)me}";
     }
 }
 
@@ -96,75 +96,47 @@ public enum TimeStandard
 
 public static class VariantTypeExt
 {
-    public static bool RatingAllowed(this VariantType me)
+    public static bool RatingAllowed(this ConcreteGameVariant me)
     {
-        if (me.TimeStandard == null) return false;
-        if (me.BoardSize == null) return (bool)me.TimeStandard?.RatingAllowed()!;
-        return (bool)me.BoardSize?.RatingAllowed()! && (bool)me.TimeStandard?.RatingAllowed()!;
+        return me.BoardSize.RatingAllowed()! && me.TimeStandard.RatingAllowed()!;
     }
 
-    public static bool StatAllowed(this VariantType me)
+    public static bool StatAllowed(this ConcreteGameVariant me)
     {
-        if (me.TimeStandard == null) return false;
-        if (me.BoardSize == null) return false;
-
-        return (bool)me.BoardSize?.RatingAllowed()! && (bool)me.TimeStandard?.RatingAllowed()!;
+        return me.BoardSize.RatingAllowed()! && me.TimeStandard.RatingAllowed()!;
     }
 
-    public static string ToKey(this VariantType me)
+    public static string ToKey(this ConcreteGameVariant me)
     {
-        var bs = me.BoardSize?.ToKey();
-        var ts = me.TimeStandard?.ToKey();
+        var bs = me.BoardSize.ToKey();
+        var ts = me.TimeStandard.ToKey();
 
-        switch (bs, ts)
-        {
-            case (null, null):
-                return "o";
-            case (null, string t):
-                return $"_{t}";
-            case (string b, null):
-                return $"{b}_";
-            case (string b, string t):
-                return $"{b}_{t}";
-            default:
-                throw new UnreachableException("Invalid variant type");
-        }
+        return $"{bs}_{ts}";
     }
 
-    public static VariantType FromKey(string key)
+    public static ConcreteGameVariant FromKey(string key)
     {
-        if (key == "o") return new VariantType(null, null);
         var parts = key.Split('_');
 
-        BoardSize? bdS = null;
-        TimeStandard? timeS = null;
+        var bs = parts[0];
+        var bdS = (BoardSize)int.Parse(bs);
 
-        if (parts[0] != "")
-        {
-            var bs = parts[0].Substring(1);
-            bdS = (BoardSize)int.Parse(bs);
-        }
+        var ts = parts[1];
+        var timeS = (TimeStandard)int.Parse(ts);
 
-        if (parts[1] != "")
-        {
-            var ts = parts[1].Substring(1);
-            timeS = (TimeStandard)int.Parse(ts);
-        }
-
-
-        return new VariantType(bdS, timeS);
+        return new ConcreteGameVariant(bdS, timeS);
     }
 }
 
 
 [Immutable, GenerateSerializer]
-[Alias("VariantType")]
-public class VariantType
+[Alias("ConcreteVariantType")]
+public class ConcreteGameVariant
 {
-    public BoardSize? BoardSize { get; set; }
-    public TimeStandard? TimeStandard { get; set; }
+    public BoardSize BoardSize { get; set; }
+    public TimeStandard TimeStandard { get; set; }
 
-    public VariantType(BoardSize? boardSize, TimeStandard? timeStandard)
+    public ConcreteGameVariant(BoardSize boardSize, TimeStandard timeStandard)
     {
         BoardSize = boardSize;
         TimeStandard = timeStandard;
@@ -173,5 +145,22 @@ public class VariantType
     public override string ToString()
     {
         return $"BoardSize: {BoardSize}, TimeStandard: {TimeStandard}";
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+
+        var other = (ConcreteGameVariant)obj;
+
+        return BoardSize == other.BoardSize && TimeStandard == other.TimeStandard;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(BoardSize, TimeStandard);
     }
 }

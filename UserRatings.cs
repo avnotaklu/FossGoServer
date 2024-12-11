@@ -18,9 +18,9 @@ public class UserRatingFieldNames
 
 public static class UserRatingExtensions
 {
-    public static PlayerRatingsData GetRatingData(this PlayerRatings rating, VariantType variant)
+    public static PlayerRatingsData? GetRatingData(this PlayerRatings rating, ConcreteGameVariant variant)
     {
-        return rating.Ratings[variant.ToKey()];
+        return rating.Ratings.ContainsKey(variant.ToKey()) ? rating.Ratings[variant.ToKey()] : null;
     }
 }
 

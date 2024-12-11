@@ -70,7 +70,7 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         {
             boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][t.SimpleRepr()].Add(new Match(
                 finderId,
-                finderRating?.GetRatingData(new VariantType(b.ToBoardSize(), t.GetStandard())),
+                finderRating?.GetRatingData(new ConcreteGameVariant(b.ToBoardSize(), t.GetStandard())),
                 b,
                 t,
                 playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated)
