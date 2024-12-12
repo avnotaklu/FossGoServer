@@ -24,7 +24,8 @@ static class SignalRMessageType
     public const string gameJoin = "GameJoin";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";
     public const string timeout = "Timeout";
-    public const string matchFound = "MatchFound";
+    // public const string matchFound = "MatchFound";
+    public const string statUpdate = "StatUpdate";
 }
 
 [Immutable, GenerateSerializer]

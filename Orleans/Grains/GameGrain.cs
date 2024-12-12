@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection.Metadata;
 using BadukServer.Services;
 using Microsoft.CodeAnalysis;
 
@@ -456,9 +457,7 @@ public class GameGrain : Grain, IGameGrain
         _endTime = now.DeserializedDate();
         _gameOverMethod = method;
 
-        await TrySaveGame();
-        await TryUpdateRatings();
-        await TryUpdateStats();
+        await TryUpdatePlayerData();
 
         if (!timeStopped)
         {
@@ -680,6 +679,29 @@ public class GameGrain : Grain, IGameGrain
         return new MinimalRating((int)ratD.Glicko.Rating, _ratingEngine.IsRatingProvisional(ratD, time)).Stringify();
     }
 
+
+    private async Task TryUpdatePlayerData()
+    {
+        await TrySaveGame();
+        if (_gameType == GameType.Rated)
+        {
+            var (_, _, newPerfs, _) = await UpdateRatingsOnResult();
+            var stat = await UpdateStatsOnResult();
+
+            StoneTypeExt.GetValuesSafe().Zip(newPerfs.Zip(stat)).ToList().ForEach(async (a) =>
+            {
+                var (stone, (perf, stat)) = a;
+                var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(_players.GetPlayerIdFromStoneType(stone));
+                var pushGrain = GrainFactory.GetGrain<IPushNotifierGrain>(await playerGrain.GetConnectionId());
+                await pushGrain.SendMessageToMe(new SignalRMessage(
+                    type: SignalRMessageType.statUpdate,
+                    data: new StatUpdateMessage(stat, perf, _GetGame().GetTopLevelVariant().ToKey())
+                ));
+            });
+        }
+    }
+
+
     private async Task TrySaveGame()
     {
         if (_gameType != GameType.Anonymous)
@@ -711,13 +733,14 @@ public class GameGrain : Grain, IGameGrain
         }
     }
 
-    private async Task TryUpdateRatings()
-    {
-        if (_gameType == GameType.Rated)
-        {
-            await UpdateRatingsOnResult();
-        }
-    }
+    // private async Task TryUpdateRatings()
+    // {
+    //     if (_gameType == GameType.Rated)
+    //     {
+    //         var res = await UpdateRatingsOnResult();
+    //         return player
+    //     }
+    // }
 
     private async Task<(List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings)> UpdateRatingsOnResult()
     {
@@ -746,15 +769,15 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    private async Task TryUpdateStats()
-    {
-        if (_gameType != GameType.Anonymous)
-        {
-            await UpdateStatsOnResult();
-        }
-    }
+    // private async Task TryUpdateStats()
+    // {
+    //     if (_gameType == GameType.Rated)
+    //     {
+    //         await UpdateStatsOnResult();
+    //     }
+    // }
 
-    private async Task UpdateStatsOnResult()
+    private async Task<List<UserStatForVariant>> UpdateStatsOnResult()
     {
         Debug.Assert(_gameState == GameState.Ended, "Game must be ended to update stats");
         Debug.Assert(_gameType != GameType.Anonymous, "Game must not be anonymous to update stats");
@@ -763,6 +786,7 @@ public class GameGrain : Grain, IGameGrain
 
         var players = GetPlayerIdSortedByColor();
 
+        var userStat = new List<UserStatForVariant>();
         foreach (var player in players)
         {
             var oldStats = (await _userStatService.GetUserStat(player))!;
@@ -771,8 +795,10 @@ public class GameGrain : Grain, IGameGrain
                 oldStats, game
             );
 
-            await _userStatService.SaveUserStat(res);
+            var stat = await _userStatService.SaveUserStat(res);
+            userStat.Add(stat.Stats[game.GetTopLevelVariant().ToKey()]);
         }
+        return userStat;
     }
 
 

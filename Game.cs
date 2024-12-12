@@ -509,6 +509,11 @@ public static class StoneTypeExt
     {
         return stone.GetOpposite().ResultForIWon();
     }
+
+    public static List<StoneType> GetValuesSafe()
+    {
+        return new List<StoneType> { StoneType.Black, StoneType.White };
+    }
 }
 
 [GenerateSerializer]

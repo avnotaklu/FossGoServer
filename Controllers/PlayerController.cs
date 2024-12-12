@@ -45,14 +45,15 @@ public class PlayerController : ControllerBase
 
         var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        var publicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType);
+        // var publicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType);
 
         await playerGrain.InitializePlayer(data.ConnectionId, playerType);
 
         var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         await playerPoolGrain.AddActivePlayer(userId);
 
-        return Ok(new RegisterPlayerResult(publicData));
+        // return Ok(new RegisterPlayerResult(publicData));
+        return Ok(new RegisterPlayerResult());
     }
 
     [HttpPost("CreateGame")]
@@ -85,7 +86,7 @@ public class PlayerController : ControllerBase
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
         var notifierGrain = _grainFactory.GetGrain<IPushNotifierGrain>(await player.GetConnectionId());
-        notifierGrain.SendMessageToSameType(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
+        await notifierGrain.SendMessageToSameType(new SignalRMessage(type: SignalRMessageType.newGame, data: newGameMessage));
 
         return Ok(game);
     }
