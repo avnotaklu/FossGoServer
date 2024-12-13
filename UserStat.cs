@@ -42,7 +42,7 @@ public static class UserStatFieldNames
     public const string Draws = "dw";
 
     public const string OpponentRating = "opR";
-    public const string OpponentId = "opId";
+    public const string OpponentName = "opN";
     public const string ResultAt = "at";
     public const string GameId = "gid";
 }
@@ -386,7 +386,6 @@ public static class GameResultStatListExt
 {
     private static readonly int MaxGameResultStats = 5;
 
-
     public static GameResultStatList TryAdd(this GameResultStatList list, GameResultStat item)
     {
         list.Add(item);
@@ -439,7 +438,7 @@ public static class GameResultStatExt
         return new GameResultStat(
             gameId: game.GameId,
             opponentRating: otherPBeforeRat.Rating,
-            opponentId: game.Players.GetOtherPlayerIdFromPlayerId(userId)!,
+            opponentName: game.Players.GetOtherPlayerIdFromPlayerId(userId)!,
             resultAt: game.EndTime!.DeserializedDate()
         );
     }
@@ -455,8 +454,8 @@ public class GameResultStat // : IComparable<GameResultStat>
     public int OpponentRating { get; set; }
 
     [Id(1)]
-    [BsonElement(UserStatFieldNames.OpponentId)]
-    public string OpponentId { get; set; }
+    [BsonElement(UserStatFieldNames.OpponentName)]
+    public string OpponentName { get; set; }
 
     [Id(2)]
     [BsonElement(UserStatFieldNames.ResultAt)]
@@ -466,10 +465,10 @@ public class GameResultStat // : IComparable<GameResultStat>
     [BsonElement(UserStatFieldNames.GameId)]
     public string GameId { get; set; }
 
-    public GameResultStat(int opponentRating, string opponentId, DateTime resultAt, string gameId)
+    public GameResultStat(int opponentRating, string opponentName, DateTime resultAt, string gameId)
     {
         OpponentRating = opponentRating;
-        OpponentId = opponentId;
+        OpponentName = opponentName;
         ResultAt = resultAt;
         GameId = gameId;
     }
