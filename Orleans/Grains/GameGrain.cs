@@ -316,6 +316,8 @@ public class GameGrain : Grain, IGameGrain
         var game = await GetGame();
         var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
 
+        ResumeActivePlayerTimer();
+
         await SendContinueGameMessage(otherPlayer);
 
         await TrySaveGame();
@@ -380,6 +382,12 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ResignGame(string playerId)
     {
+
+        if (!DidStart())
+        {
+            throw new InvalidOperationException("Game hasn't started yet");
+        }
+
         Debug.Assert(_players.ContainsKey(playerId));
 
         var myStone = GetStoneFromPlayerId(playerId);
@@ -809,10 +817,52 @@ public class GameGrain : Grain, IGameGrain
 
         var playerWithTurn = GetPlayerIdWithTurn();
 
+        SetRecalculatedTurnPlayerTimeSnapshots(
+            _moves, _playerTimeSnapshots, _timeControl
+        );
+
+        PauseActivePlayerTimer();
+
         _gameState = GameState.ScoreCalculation;
 
         await SendScoreCalculationStartedMessage(playerWithTurn);
     }
+
+    private async void PauseActivePlayerTimer()
+    {
+        var timerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+        await timerGrain.StopTurnTimer();
+
+        var oldData = _playerTimeSnapshots[(int)playerTurn];
+
+        _playerTimeSnapshots[(int)playerTurn] = new PlayerTimeSnapshot(
+            snapshotTimestamp: oldData.SnapshotTimestamp,
+            mainTimeMilliseconds: oldData.MainTimeMilliseconds,
+            byoYomisLeft: oldData.ByoYomisLeft,
+            byoYomiActive: oldData.ByoYomiActive,
+            timeActive: false
+        );
+    }
+
+    private async void ResumeActivePlayerTimer()
+    {
+        var timerGrain = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
+
+        var oldData = _playerTimeSnapshots[(int)playerTurn];
+
+        _playerTimeSnapshots[(int)playerTurn] = new PlayerTimeSnapshot(
+            snapshotTimestamp: _dateTimeService.Now().SerializedDate(),
+            mainTimeMilliseconds: oldData.MainTimeMilliseconds,
+            byoYomisLeft: oldData.ByoYomisLeft,
+            byoYomiActive: oldData.ByoYomiActive,
+            timeActive: true
+        );
+
+        var newData = _playerTimeSnapshots[(int)playerTurn];
+
+        await timerGrain.StartTurnTimer(newData.MainTimeMilliseconds);
+    }
+
 
     private bool HasPassedTwice()
     {
