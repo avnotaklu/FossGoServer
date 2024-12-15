@@ -313,12 +313,12 @@ public static class MinimalRatingExt
         return rating.Provisional ? $"{rating.Rating}?" : rating.Rating.ToString();
     }
 
-    public static MinimalRating? FromString(string rating)
+    public static MinimalRating FromString(string rating)
     {
-        if (rating == null)
-        {
-            return null;
-        }
+        // if (rating == null)
+        // {
+        //     return null;
+        // }
 
         if (rating.Contains('?'))
         {

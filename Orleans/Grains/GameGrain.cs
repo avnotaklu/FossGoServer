@@ -42,7 +42,7 @@ public class GameGrain : Grain, IGameGrain
     private string now => _dateTimeService.NowFormatted();
 
     // External stuff
-    public Dictionary<string, PlayerInfo> PlayerInfos = [];
+    public Dictionary<string, PlayerInfo> _playerInfos = [];
 
     // Injected
     private readonly ILogger<GameGrain> _logger;
@@ -143,7 +143,7 @@ public class GameGrain : Grain, IGameGrain
 
         if (gameCreator != null)
         {
-            PlayerInfos[gameCreator] = gameCreatorData!;
+            _playerInfos[gameCreator] = gameCreatorData!;
         }
         SetState(
             rows: creationData.Rows,
@@ -179,22 +179,22 @@ public class GameGrain : Grain, IGameGrain
         if (_gameCreator == player)
         {
             return (
-                _GetGame(), DidStart() ? PlayerInfos[GetOtherPlayerIdFromPlayerId(player)] : null, false
+                _GetGame(), DidStart() ? _playerInfos[GetOtherPlayerIdFromPlayerId(player)] : null, false
             );
         }
 
         if (_players.Keys.Contains(player))
         {
             return (
-                _GetGame(), PlayerInfos[GetOtherPlayerIdFromPlayerId(player)], false
+                _GetGame(), _playerInfos[GetOtherPlayerIdFromPlayerId(player)], false
             );
         }
 
-        PlayerInfos[player] = playerData;
+        _playerInfos[player] = playerData;
 
         await StartGame(time, [_gameCreator, player]);
 
-        var otherPlayerInfo = PlayerInfos[GetOtherPlayerIdFromPlayerId(player)]; ;
+        var otherPlayerInfo = _playerInfos[GetOtherPlayerIdFromPlayerId(player)]; ;
 
         var game = _GetGame();
 
@@ -529,7 +529,7 @@ public class GameGrain : Grain, IGameGrain
         );
 
         List<string> players = playerInfos.Select(a => a.Id).ToList();
-        PlayerInfos = players.Zip(playerInfos).ToDictionary(a => a.First, a => a.Second);
+        _playerInfos = players.Zip(playerInfos).ToDictionary(a => a.First, a => a.Second);
 
         await StartGame(now, players);
 
@@ -574,11 +574,13 @@ public class GameGrain : Grain, IGameGrain
 
     private string gameId => this.GetPrimaryKeyString();
 
-    // private async Task<Game?> SaveGame()
-    // {
-    //     var game = _GetGame();
-    //     return await _gameService.SaveGame(game);
-    // }
+    private GamePlayersAggregate _GetGameAggr()
+    {
+        return new GamePlayersAggregate(
+            game: _GetGame(),
+            players: GetPlayerIdSortedByColor().Select(a => _playerInfos[a]).ToList()
+        );
+    }
 
     private Game _GetGame()
     {
@@ -770,8 +772,15 @@ public class GameGrain : Grain, IGameGrain
 
         foreach (var rating in res.UserRatings)
         {
-            await _userRatingService.SaveUserRatings(rating);
+            var newRating = await _userRatingService.SaveUserRatings(rating);
         }
+
+        _playerInfos = _playerInfos.ToDictionary(a => a.Key, a => new PlayerInfo(
+            a.Value.Id,
+            a.Value.Username,
+            res.UserRatings[(int)GetStoneFromPlayerId(a.Key)],
+            a.Value.PlayerType
+        ));
 
         return res;
     }
@@ -800,7 +809,7 @@ public class GameGrain : Grain, IGameGrain
             var oldStats = (await _userStatService.GetUserStat(player))!;
 
             var res = _statCalculator.CalculateUserStat(
-                oldStats, game
+                oldStats, _GetGameAggr()
             );
 
             var stat = await _userStatService.SaveUserStat(res);

@@ -119,7 +119,7 @@ public class StatCalculatorTest
         Assert.IsNotNull(result.Stats[gameKey].ResultStreakData);
         Assert.AreEqual(6, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
         Assert.AreEqual(curS.StreakFrom, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
-        Assert.AreEqual(game.EndTime!.DeserializedDate(), result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
+        Assert.AreEqual(game.Game.EndTime!.DeserializedDate(), result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
     }
 
     [TestMethod]
@@ -224,39 +224,39 @@ public class StatCalculatorTest
         Assert.AreEqual(1445, result.Stats[gameKey].LowestRating);
     }
 
-    private static Game BlackWonAgainst1550Player()
+    private static GamePlayersAggregate BlackWonAgainst1550Player()
     {
         return MasterGame1();
     }
 
-    private static Game BlackWonGame9x9BlitzGameOnlyCountsShouldChange()
+    private static GamePlayersAggregate BlackWonGame9x9BlitzGameOnlyCountsShouldChange()
     {
         return MasterGame0();
     }
 
 
-    private static (UserStat, Game) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
+    private static (UserStat, GamePlayersAggregate) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
     {
         var oldUserStats = GetProgressedUserStatForLosingPlayer(null, null);
         return (oldUserStats, MasterGame0());
     }
 
 
-    private static (UserStat, Game) BlackWonGame9x9BlitzGameAlsoHisGreatestWin()
+    private static (UserStat, GamePlayersAggregate) BlackWonGame9x9BlitzGameAlsoHisGreatestWin()
     {
         var oldUserStats = GetProgressedUserStat(null, null);
         return (oldUserStats, MasterGame2());
     }
 
 
-    private static Game WinAgainstProvisiona1550Playero()
+    private static GamePlayersAggregate WinAgainstProvisiona1550Playero()
     {
         return MasterGame2();
     }
 
-    private static Game MasterGame2()
+    private static GamePlayersAggregate MasterGame2()
     {
-        return new Game(
+        var game = new Game(
             players: new Dictionary<string, StoneType>
             {
                 ["p1"] = StoneType.Black,
@@ -288,13 +288,23 @@ public class StatCalculatorTest
             playersRatingsAfter: ["1600", "1565?"],
             playersRatingsDiff: [-10, 15]
         );
+
+        List<PlayerInfo> players = [
+            GetSamplePlayerInfo(1, game.GetTopLevelVariant(), game.PlayersRatingsAfter[0]),
+            GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
+        ];
+
+        return new GamePlayersAggregate(
+            game: game,
+            players: players
+        );
     }
 
 
 
-    private static Game MasterGame0()
+    private static GamePlayersAggregate MasterGame0()
     {
-        return new Game(
+        var game = new Game(
             players: new Dictionary<string, StoneType>
             {
                 ["p1"] = StoneType.Black,
@@ -325,13 +335,24 @@ public class StatCalculatorTest
             playersRatingsAfter: ["1500", "1445"],
             playersRatingsDiff: [10, -5]
         );
+
+
+        List<PlayerInfo> players = [
+            GetSamplePlayerInfo(1, game.GetTopLevelVariant(), game.PlayersRatingsAfter[0]),
+            GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
+        ];
+
+        return new GamePlayersAggregate(
+            game: game,
+            players: players
+        );
     }
 
 
 
-    private static Game MasterGame1()
+    private static GamePlayersAggregate MasterGame1()
     {
-        return new Game(
+        var game = new Game(
             players: new Dictionary<string, StoneType>
             {
                 ["p1"] = StoneType.Black,
@@ -363,17 +384,28 @@ public class StatCalculatorTest
             playersRatingsAfter: ["1500", "1545"],
             playersRatingsDiff: [10, -5]
         );
+
+
+        List<PlayerInfo> players = [
+            GetSamplePlayerInfo(1, game.GetTopLevelVariant(), game.PlayersRatingsAfter[0]),
+            GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
+        ];
+
+        return new GamePlayersAggregate(
+            game: game,
+            players: players
+        );
     }
 
     List<GameResultStat> GetBasicGreatestWins()
     {
         return new List<GameResultStat>
         {
-            new GameResultStat(1600,"op1" , _1980Jan1_1_30PM.AddYears(-1), "g1"),
-            new GameResultStat(1580,"op2" , _1980Jan1_1_30PM.AddYears(-1), "g1"),
-            new GameResultStat(1540,"op3" , _1980Jan1_1_30PM.AddYears(-1), "g1"),
-            new GameResultStat(1530,"op4" , _1980Jan1_1_30PM.AddYears(-1), "g1"),
-            new GameResultStat(1510,"op5" , _1980Jan1_1_30PM.AddYears(-1), "g1")
+            new GameResultStat(1600, _1980Jan1_1_30PM.AddYears(-1), "g1","op1" , "op1Name1"),
+            new GameResultStat(1580, _1980Jan1_1_30PM.AddYears(-1), "g1","op2" , "op1Name2"),
+            new GameResultStat(1540, _1980Jan1_1_30PM.AddYears(-1), "g1","op3" , "op1Name3"),
+            new GameResultStat(1530, _1980Jan1_1_30PM.AddYears(-1), "g1","op4" , "op1Name4"),
+            new GameResultStat(1510, _1980Jan1_1_30PM.AddYears(-1), "g1","op5" , "op1Name5")
         };
     }
 
@@ -432,4 +464,28 @@ public class StatCalculatorTest
         minute: 30,
         second: 0
     );
+
+    static public PlayerInfo GetSamplePlayerInfo(int id, ConcreteGameVariant variant, String ratingString)
+    {
+        var rating = MinimalRatingExt.FromString(ratingString);
+
+        return new PlayerInfo(
+            id: id.ToString(),
+            username: $"username{id}",
+            rating: new PlayerRatings(
+                userId: id.ToString(),
+                ratings: new Dictionary<string, PlayerRatingsData>
+                {
+                    [variant.ToKey()] = new PlayerRatingsData
+                    (
+                        glicko: new GlickoRating(rating.Rating, rating.Provisional ? 200 : 80, 0.06),
+                        nb: 2,
+                        recent: [],
+                        latest: null
+                    )
+                }
+            ),
+            playerType: PlayerType.Normal
+        );
+    }
 }

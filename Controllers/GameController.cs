@@ -28,6 +28,11 @@ public class GameController : ControllerBase
         _gameService = gameService;
     }
 
+    [HttpPost("{gameId}")]
+    public async Task<ActionResult<Game>> GetGame(string GameId)
+    {
+        return Ok(await _gameService.GetGame(GameId));
+    }
 
     [HttpPost("{gameId}/MakeMove")]
     public async Task<ActionResult<NewMoveResult>> MakeMove([FromBody] MovePosition move, string GameId)
