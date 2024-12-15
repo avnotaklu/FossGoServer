@@ -3,8 +3,8 @@ using BadukServer.Services;
 
 public interface IPlayerInfoService
 {
-    public Task<PlayerInfo> GetPublicUserInfoForPlayer(string userId, PlayerType playerType);
-    public Task<PlayerInfo> GetPublicUserInfoForNormalUser(string userId);
+    public Task<PlayerInfo?> GetPublicUserInfoForPlayer(string userId, PlayerType playerType);
+    public Task<PlayerInfo?> GetPublicUserInfoForNormalUser(string userId);
     public Task<PlayerInfo> GetPublicUserInfoForGuest(string userId);
 }
 public class PublicUserInfoService : IPlayerInfoService
@@ -18,12 +18,12 @@ public class PublicUserInfoService : IPlayerInfoService
         _userRatingService = userRatingService;
     }
 
-    public async Task<PlayerInfo> GetPublicUserInfoForNormalUser(string userId)
+    public async Task<PlayerInfo?> GetPublicUserInfoForNormalUser(string userId)
     {
         var user = await _usersService.GetByIds(new List<string> { userId });
-        if (user.Count == 0) throw new UserNotFoundException(userId);
+        if (user.Count == 0) return null;
         var rating = await _userRatingService.GetUserRatings(userId);
-        if (rating == null) throw new UserNotFoundException(userId);
+        if (rating == null) return null;
 
         return new PlayerInfo(id: user[0].Id!, username: user[0].UserName, rating: rating, PlayerType.Normal);
     }
@@ -34,7 +34,7 @@ public class PublicUserInfoService : IPlayerInfoService
     }
 
 
-    public async Task<PlayerInfo> GetPublicUserInfoForPlayer(string userId, PlayerType playerType)
+    public async Task<PlayerInfo?> GetPublicUserInfoForPlayer(string userId, PlayerType playerType)
     {
         return playerType switch
         {

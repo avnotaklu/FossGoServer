@@ -81,7 +81,7 @@ public class PlayerController : ControllerBase
 
         var game = await gameGrain.GetGame();
 
-        var creatorPublicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType);
+        var creatorPublicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType) ?? throw new UserNotFoundException(userId);
 
         var newGameMessage = new NewGameCreatedMessage(new AvailableGameData(game: game, creatorInfo: creatorPublicData));
 
@@ -155,9 +155,10 @@ allowedGames.Select(async g =>
         {
             // REVIEW: Getting game creator info using myType, i'm assuming that the creator is the same type as me
             var creatorData = await _playerInfoService.GetPublicUserInfoForPlayer(g.GameCreator!, myType);
+            if (creatorData == null) return null;
             return new AvailableGameData(game: g, creatorInfo: creatorData);
         })
-        )).ToList();
+        )).Where(a => a != null).Select(a => a!).ToList();
 
         return Ok(new AvailableGamesResult(games: [.. (result ?? [])]));
     }

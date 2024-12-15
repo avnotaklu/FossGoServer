@@ -61,7 +61,12 @@ public class PlayerGrain : Grain, IPlayerGrain
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId); // create new game
 
 
-        var publicUserInfo = PlayerType == PlayerType.Guest ? await _publicUserInfoService.GetPublicUserInfoForGuest(userId) : await _publicUserInfoService.GetPublicUserInfoForNormalUser(userId);
+        var publicUserInfo = await _publicUserInfoService.GetPublicUserInfoForPlayer(userId, PlayerType);
+
+        if(publicUserInfo == null)
+        {
+            throw new Exception("Player not found");
+        }
 
         var gameType = PlayerType.GetGameType(creationData.RankedOrCasual);
 
@@ -92,7 +97,12 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
 
-        var publicUserInfo = PlayerType == PlayerType.Guest ? await _publicUserInfoService.GetPublicUserInfoForGuest(userId) : await _publicUserInfoService.GetPublicUserInfoForNormalUser(userId);
+        var publicUserInfo = await _publicUserInfoService.GetPublicUserInfoForPlayer(userId, PlayerType);
+
+        if(publicUserInfo == null)
+        {
+            throw new Exception("Player not found");
+        }
 
         var (game, otherPlayerData, justJoined) = await gameGrain.JoinGame(publicUserInfo, time);
 

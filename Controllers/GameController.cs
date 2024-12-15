@@ -8,6 +8,7 @@ using System.ComponentModel.DataAnnotations;
 using BadukServer;
 using BadukServer.Orleans.Grains;
 using Microsoft.CodeAnalysis.Differencing;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 [ApiController]
 [Authorize]
@@ -17,21 +18,47 @@ public class GameController : ControllerBase
     private readonly ILogger<AuthenticationController> _logger;
     private readonly IUsersService _usersService;
     private readonly IGameService _gameService;
+    private readonly IPlayerInfoService _playerInfoService;
     private readonly IGrainFactory _grainFactory;
 
+
     [ActivatorUtilitiesConstructorAttribute]
-    public GameController(ILogger<AuthenticationController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService)
+    public GameController(ILogger<AuthenticationController> logger, IUsersService usersService, IGrainFactory grainFactory, IGameService gameService, IPlayerInfoService playerInfoService)
     {
         _logger = logger;
         _usersService = usersService;
         _grainFactory = grainFactory;
         _gameService = gameService;
+        _playerInfoService = playerInfoService;
     }
 
-    [HttpPost("{gameId}")]
-    public async Task<ActionResult<Game>> GetGame(string GameId)
+    [HttpGet("{gameId}/GameAndOpponent")]
+    public async Task<ActionResult<GameAndOpponent>> GetGameAndOpponent(string GameId)
     {
-        return Ok(await _gameService.GetGame(GameId));
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized("Session invalid");
+
+        var userType = User.FindFirst("user_type")?.Value;
+        if (userType == null) return Unauthorized("Session invalid");
+
+        var playerType = PlayerTypeExt.FromString(userType);
+        if (playerType != PlayerType.Normal) return Unauthorized("User Account is not valid");
+
+        var game = await _gameService.GetGame(GameId);
+
+        if (game == null)
+        {
+            return BadRequest("Game not found");
+        }
+
+        var playerInfo = await _playerInfoService.GetPublicUserInfoForNormalUser(game.Players.GetOtherPlayerIdFromPlayerId(userId)!);
+
+        if (playerInfo == null)
+        {
+            return BadRequest("Opponent not found");
+        }
+
+        return Ok(new GameAndOpponent(playerInfo, game));
     }
 
     [HttpPost("{gameId}/MakeMove")]
