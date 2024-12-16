@@ -93,7 +93,7 @@ public class PlayerController : ControllerBase
 
     private async Task<PlayerInfo?> GetOtherPlayerData(Game game, string myId, PlayerType myType)
     {
-        var otherPlayer = game.Players.Keys.FirstOrDefault(p => p != myId);
+        var otherPlayer = game.Players.FirstOrDefault(p => p != myId);
         if (otherPlayer != null)
         {
             return await _playerInfoService.GetPublicUserInfoForPlayer(otherPlayer, myType);
@@ -186,7 +186,7 @@ allowedGames.Select(async g =>
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        var myGames = games.Where(a => a.Players.ContainsKey(userId) || a.GameCreator == userId);
+        var myGames = games.Where(a => a.Players.Contains(userId) || a.GameCreator == userId);
 
         var result = (await Task.WhenAll(
         myGames.Select(async g =>

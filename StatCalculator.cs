@@ -15,7 +15,7 @@ public class StatCalculator : IStatCalculator
     {
         var game = data.Game;
         Debug.Assert(game.DidEnd(), "Can't calculate user stat for ongoing game");
-        Debug.Assert(game.Players.Keys.Contains(oldUserStats.UserId), "User not in game");
+        Debug.Assert(game.Players.Contains(oldUserStats.UserId), "User not in game");
 
         var key = game.GetTopLevelVariant().ToKey();
 

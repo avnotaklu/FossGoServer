@@ -72,15 +72,8 @@ public static class GameExt
         if (!game.DidStart()) return null;
 
         var turn = game.Moves.Count;
-        foreach (var item in game.Players)
-        {
-            if ((int)item.Value == (turn % 2))
-            {
-                return item.Key;
-            }
-        }
-
-        throw new UnreachableException("This path shouldn't be reachable, as there always exists one user with supposed next turn once game has started");
+        var player = game.Players.GetPlayerIdFromStoneType((StoneType)(turn % 2)) ?? throw new UnreachableException("Should always have a player as game has started");
+        return null;
     }
 
     public static ConcreteGameVariant GetTopLevelVariant(this Game game)
@@ -110,17 +103,19 @@ public static class GameExt
 
 
 
-    public static StoneType? GetStoneFromPlayerId(this Dictionary<string, StoneType> players, string id)
+    public static StoneType? GetStoneFromPlayerId(this List<string> players, string id)
     {
-        return players[id];
+        return (StoneType)players.IndexOf(id);
     }
 
-    public static StoneType? GetOtherStoneFromPlayerId(this Dictionary<string, StoneType> players, string id)
+    public static StoneType? GetOtherStoneFromPlayerId(this List<string> players, string id)
     {
-        return 1 - players[id];
+        var me = players.GetStoneFromPlayerId(id);
+        if (me == null) return null;
+        return 1 - me;
     }
 
-    public static string? GetOtherPlayerIdFromPlayerId(this Dictionary<string, StoneType> players, string id)
+    public static string? GetOtherPlayerIdFromPlayerId(this List<string> players, string id)
     {
         var otherStone = players.GetOtherStoneFromPlayerId(id);
         if (otherStone == null) return null;
@@ -129,30 +124,9 @@ public static class GameExt
     }
 
 
-    public static string? GetPlayerIdFromStoneType(this Dictionary<string, StoneType> players, StoneType stone)
+    public static string? GetPlayerIdFromStoneType(this List<string> players, StoneType stone)
     {
-        foreach (var item in players)
-        {
-            if (item.Value == stone)
-            {
-                return item.Key;
-            }
-        }
-
-        // Player: {stone} has not yet joined the game
-        return null;
-    }
-
-    public static List<string> GetPlayerIdSortedByColor(this Dictionary<string, StoneType> players)
-    {
-        var black = players.GetPlayerIdFromStoneType(StoneType.Black);
-        var white = players.GetPlayerIdFromStoneType(StoneType.White);
-        if (black == null || white == null)
-        {
-            throw new UnreachableException("Both players should be present in the game");
-        }
-
-        return new List<string> { black, white };
+        return players.Count <= (int)stone ? null : players[(int)stone];
     }
 
     public static BoardSize GetBoardSize(this Game game)
@@ -187,8 +161,8 @@ public static class GameExt
 
         return game.Result switch
         {
-            GameResult.BlackWon => game.Players[myId] == StoneType.Black ? 1 : -1,
-            GameResult.WhiteWon => game.Players[myId] == StoneType.White ? 1 : -1,
+            GameResult.BlackWon => game.Players.GetStoneFromPlayerId(myId) == StoneType.Black ? 1 : -1,
+            GameResult.WhiteWon => game.Players.GetStoneFromPlayerId(myId) == StoneType.White ? 1 : -1,
             GameResult.Draw => 0,
             _ => throw new UnreachableException("Invalid game result")
         };
@@ -362,7 +336,9 @@ public class Game
         List<PlayerTimeSnapshot> playerTimeSnapshots,
         List<GameMove> moves,
         Dictionary<string, StoneType> playgroundMap,
-        Dictionary<string, StoneType> players,
+        // Dictionary<string, StoneType> players,
+        List<string> players,
+
         List<int> prisoners,
         string? startTime,
         GameState gameState,
@@ -431,7 +407,7 @@ public class Game
     public List<GameMove> Moves { get; set; }
     [BsonElement(GameFieldNames.Players)]
     [Id(8)]
-    public Dictionary<string, StoneType> Players { get; set; }
+    public List<string> Players { get; set; }
     [BsonElement(GameFieldNames.Prisoners)]
     [Id(9)]
     public List<int> Prisoners { get; set; }
@@ -513,6 +489,16 @@ public static class StoneTypeExt
     public static List<StoneType> GetValuesSafe()
     {
         return new List<StoneType> { StoneType.Black, StoneType.White };
+    }
+
+    public static StoneType? ToStoneType(this int stone)
+    {
+        return stone switch
+        {
+            0 => StoneType.Black,
+            1 => StoneType.White,
+            _ => null
+        };
     }
 }
 

@@ -44,24 +44,27 @@ public class RatingEngineTest
 
         var variant = new ConcreteGameVariant(boardSize, timeStandard);
 
-        var players = new Dictionary<string, StoneType>
-        {
-            ["a"] = StoneType.Black,
-            ["b"] = StoneType.White
-        };
+        List<string> players = [
+            "a", "b"
+        ];
+
+        // new Dictionary<string, StoneType>
+        // {
+        //     ["a"] = StoneType.Black,
+        //     ["b"] = StoneType.White
+        // };
 
         var res = engine.CalculateRatingAndPerfsAsync(
                 gameResult: GameResult.BlackWon,
                 variantType: variant,
-                players: players,
-                usersRatings: [.. (await Task.WhenAll(players.GetPlayerIdSortedByColor().Select(a => userRepoMock.Object.GetUserRatings(a))))],
+                usersRatings: [.. (await Task.WhenAll(players.Select(a => userRepoMock.Object.GetUserRatings(a))))],
                 endTime: DateTime.Now
             );
 
-        Assert.IsTrue(res.RatingDiffs[(int)players[winnerId]] > 0);
+        Assert.IsTrue(res.RatingDiffs[(int)players.GetStoneFromPlayerId(winnerId)!] > 0);
         Assert.IsTrue(res.RatingDiffs[(int)players.GetOtherStoneFromPlayerId(winnerId)!] < 0);
 
-        Assert.IsTrue(res.UserRatings[(int)players[winnerId]].Ratings[blitz_nine_by_nine_style].Glicko.Rating > 1500);
+        Assert.IsTrue(res.UserRatings[(int)players.GetStoneFromPlayerId(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating > 1500);
         Assert.IsTrue(res.UserRatings[(int)players.GetOtherStoneFromPlayerId(winnerId)!].Ratings[blitz_nine_by_nine_style].Glicko.Rating < 1500);
 
         // Assert.IsTrue(res.UserRatings[(int)players[winnerId]].Ratings[blitz_style].Glicko.Rating > 1500);

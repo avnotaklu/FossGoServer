@@ -9,7 +9,7 @@ namespace BadukServer.Orleans.Grains;
 public class GameGrain : Grain, IGameGrain
 {
     // Player id with player's stone; 0 for black, 1 for white
-    private Dictionary<string, StoneType> _players = [];
+    private List<string> _players = [];
     private GameState _gameState;
     private List<GameMove> _moves = [];
     private int _rows;
@@ -94,7 +94,7 @@ public class GameGrain : Grain, IGameGrain
         List<PlayerTimeSnapshot> playerTimeSnapshots,
         List<GameMove> moves,
         Dictionary<string, StoneType> playgroundMap,
-        Dictionary<string, StoneType> players,
+        List<string> players,
         List<int> prisoners,
         string? startTime,
         GameState gameState,
@@ -117,6 +117,7 @@ public class GameGrain : Grain, IGameGrain
         _playerTimeSnapshots = playerTimeSnapshots;
         _moves = moves;
         _board = playgroundMap.ToDictionary(a => new Position(a.Key), a => a.Value);
+        Debug.Assert(players.Count == 0 || players.Count == 2, "Players must be 0 or 2");
         _players = players;
         _prisoners = prisoners;
         _startTime = startTime?.DeserializedDate();
@@ -183,7 +184,7 @@ public class GameGrain : Grain, IGameGrain
             );
         }
 
-        if (_players.Keys.Contains(player))
+        if (_players.Contains(player))
         {
             return (
                 _GetGame(), _playerInfos[GetOtherPlayerIdFromPlayerId(player)], false
@@ -222,13 +223,13 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<(bool moveSuccess, Game game)> MakeMove(MovePosition move, string playerId)
     {
-        Debug.Assert(_players.ContainsKey(playerId));
+        Debug.Assert(_players.Contains(playerId));
 
         if (_gameState != GameState.Playing)
         {
             throw new InvalidOperationException("Game is not in playing state");
         }
-        var player = _players[playerId];
+        var player = _players.GetStoneFromPlayerId(playerId)!;
 
         if ((turn % 2) != (int)player)
         {
@@ -303,7 +304,7 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ContinueGame(string playerId)
     {
-        Debug.Assert(_players.ContainsKey(playerId));
+        Debug.Assert(_players.Contains(playerId));
         if (_gameState != GameState.ScoreCalculation)
         {
             throw new InvalidOperationException("Game is not in score calculation state");
@@ -326,7 +327,7 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> AcceptScores(string playerId)
     {
-        Debug.Assert(_players.ContainsKey(playerId));
+        Debug.Assert(_players.Contains(playerId));
         if (_gameState != GameState.ScoreCalculation)
         {
             throw new InvalidOperationException("Game is not in score calculation state");
@@ -354,7 +355,7 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> EditDeadStone(RawPosition rawPosition, DeadStoneState state, string editorPlayer)
     {
-        Debug.Assert(_players.ContainsKey(editorPlayer));
+        Debug.Assert(_players.Contains(editorPlayer));
 
         if (_gameState != GameState.ScoreCalculation)
         {
@@ -388,7 +389,7 @@ public class GameGrain : Grain, IGameGrain
             throw new InvalidOperationException("Game hasn't started yet");
         }
 
-        Debug.Assert(_players.ContainsKey(playerId));
+        Debug.Assert(_players.Contains(playerId));
 
         var myStone = GetStoneFromPlayerId(playerId);
 
@@ -420,7 +421,7 @@ public class GameGrain : Grain, IGameGrain
         }
         else
         {
-            foreach (var playerId in _players.Keys)
+            foreach (var playerId in _players)
             {
                 await SendGameTimerUpdateMessage(playerId, curPlayerTime);
             }
@@ -578,7 +579,7 @@ public class GameGrain : Grain, IGameGrain
     {
         return new GamePlayersAggregate(
             game: _GetGame(),
-            players: GetPlayerIdSortedByColor().Select(a => _playerInfos[a]).ToList()
+            players: _players.Select(a => _playerInfos[a]).ToList()
         );
     }
 
@@ -665,11 +666,11 @@ public class GameGrain : Grain, IGameGrain
         {
             if (player == firstPlayerToAssignStone)
             {
-                _players[player] = firstPlayerStone;
+                _players[0] = player;
             }
             else
             {
-                _players[player] = secondPlayerStone;
+                _players[1] = player;
             }
         }
 
@@ -762,8 +763,7 @@ public class GameGrain : Grain, IGameGrain
         var res = _ratingEngine.CalculateRatingAndPerfsAsync(
             gameResult: (GameResult)_gameResult!,
             gameVariant: game.GetTopLevelVariant(),
-            players: game.Players,
-            usersRatings: [.. (await Task.WhenAll(GetPlayerIdSortedByColor().Select(a => _userRatingService.GetUserRatings(a))))],
+            usersRatings: [.. (await Task.WhenAll(_players.Select(a => _userRatingService.GetUserRatings(a))))],
             endTime: (DateTime)_endTime!
         );
 
@@ -801,10 +801,10 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
 
-        var players = GetPlayerIdSortedByColor();
+        // var players = GetPlayerIdSortedByColor();
 
         var userStat = new List<UserStatForVariant>();
-        foreach (var player in players)
+        foreach (var player in _players)
         {
             var oldStats = (await _userStatService.GetUserStat(player))!;
 
@@ -1041,10 +1041,4 @@ public class GameGrain : Grain, IGameGrain
         return _GetGame().Players.GetOtherPlayerIdFromPlayerId(id)!;
     }
 
-
-    public List<string> GetPlayerIdSortedByColor()
-    {
-        Debug.Assert(DidStart());
-        return _GetGame().Players.GetPlayerIdSortedByColor();
-    }
 }

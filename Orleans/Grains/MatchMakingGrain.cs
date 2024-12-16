@@ -93,7 +93,7 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
 
         var game = await gameGrain.StartMatch(match, publicInfos);
 
-        foreach (var player in game.Players.Keys)
+        foreach (var player in game.Players)
         {
             var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
             await playerGrain.JoinGame(game.GameId, _dateTimeService.Now().SerializedDate());

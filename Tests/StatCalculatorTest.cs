@@ -257,11 +257,7 @@ public class StatCalculatorTest
     private static GamePlayersAggregate MasterGame2()
     {
         var game = new Game(
-            players: new Dictionary<string, StoneType>
-            {
-                ["p1"] = StoneType.Black,
-                ["p2"] = StoneType.White
-            },
+            players: ["p1", "p2"],
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
             startTime: _1980Jan1_1_30PM.SerializedDate(),
@@ -305,11 +301,7 @@ public class StatCalculatorTest
     private static GamePlayersAggregate MasterGame0()
     {
         var game = new Game(
-            players: new Dictionary<string, StoneType>
-            {
-                ["p1"] = StoneType.Black,
-                ["p2"] = StoneType.White
-            },
+            players: ["p1", "p2"],
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
             startTime: _1980Jan1_1_30PM.SerializedDate(),
@@ -353,11 +345,7 @@ public class StatCalculatorTest
     private static GamePlayersAggregate MasterGame1()
     {
         var game = new Game(
-            players: new Dictionary<string, StoneType>
-            {
-                ["p1"] = StoneType.Black,
-                ["p2"] = StoneType.White
-            },
+            players: ["p1", "p2"],
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
             startTime: _1980Jan1_1_30PM.SerializedDate(),

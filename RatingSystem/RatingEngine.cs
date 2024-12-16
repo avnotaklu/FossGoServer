@@ -31,7 +31,7 @@ using Moq;
 
 public interface IRatingEngine
 {
-    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant gameVariant, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime);
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant gameVariant, List<PlayerRatings> usersRatings, DateTime endTime);
 
     public double PreviewDeviation(PlayerRatingsData data, DateTime ratingPeriodEndDate, bool reverse);
 
@@ -83,7 +83,7 @@ public class RatingEngine : IRatingEngine
     }
 
     // 
-    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant variantType, Dictionary<string, StoneType> players, List<PlayerRatings> usersRatings, DateTime endTime)
+    public (List<int> RatingDiffs, List<PlayerRatingsData> PrevPerfs, List<PlayerRatingsData> NewPerfs, List<PlayerRatings> UserRatings) CalculateRatingAndPerfsAsync(GameResult gameResult, ConcreteGameVariant variantType, List<PlayerRatings> usersRatings, DateTime endTime)
     {
         if (!variantType.RatingAllowed())
         {
