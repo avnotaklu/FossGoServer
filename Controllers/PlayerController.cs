@@ -127,6 +127,11 @@ public class PlayerController : ControllerBase
         return Ok(joinRes);
     }
 
+
+    // [HttpGet("AvailableGames")]
+    // public async Task<ActionResult<AvailableGamesResult>> AvailableGames()
+
+
     [HttpGet("AvailableGames")]
     public async Task<ActionResult<AvailableGamesResult>> AvailableGames()
     {

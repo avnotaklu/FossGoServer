@@ -26,6 +26,14 @@ public class GameService : IGameService
         _mongoOperation = mongoOperation;
     }
 
+
+    // public async Task<Game?> GetGames()
+    // {
+    //     var game = await _gameCollection.Find(Builders<Game>.Filter.Eq(a => a.GameId, gameId)).FirstOrDefaultAsync();
+    //     return game;
+    // }
+
+
     public async Task<Game?> GetGame(string gameId)
     {
         var game = await _gameCollection.Find(Builders<Game>.Filter.Eq(a => a.GameId, gameId)).FirstOrDefaultAsync();
