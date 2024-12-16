@@ -73,7 +73,7 @@ public static class GameExt
 
         var turn = game.Moves.Count;
         var player = game.Players.GetPlayerIdFromStoneType((StoneType)(turn % 2)) ?? throw new UnreachableException("Should always have a player as game has started");
-        return null;
+        return player;
     }
 
     public static ConcreteGameVariant GetTopLevelVariant(this Game game)
@@ -336,9 +336,7 @@ public class Game
         List<PlayerTimeSnapshot> playerTimeSnapshots,
         List<GameMove> moves,
         Dictionary<string, StoneType> playgroundMap,
-        // Dictionary<string, StoneType> players,
         List<string> players,
-
         List<int> prisoners,
         string? startTime,
         GameState gameState,
@@ -406,6 +404,7 @@ public class Game
     [Id(7)]
     public List<GameMove> Moves { get; set; }
     [BsonElement(GameFieldNames.Players)]
+    [BsonRepresentation(BsonType.ObjectId)]
     [Id(8)]
     public List<string> Players { get; set; }
     [BsonElement(GameFieldNames.Prisoners)]

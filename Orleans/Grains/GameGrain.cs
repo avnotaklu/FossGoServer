@@ -659,21 +659,22 @@ public class GameGrain : Grain, IGameGrain
         var stoneSelectionType = _stoneSelectionType;
         var firstPlayerToAssignStone = _gameCreator ?? players.First();
 
+
         var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)(int)stoneSelectionType;
         var secondPlayerStone = 1 - firstPlayerStone;
 
-        foreach (var player in players)
-        {
-            if (player == firstPlayerToAssignStone)
-            {
-                _players[0] = player;
-            }
-            else
-            {
-                _players[1] = player;
-            }
-        }
 
+        Dictionary<StoneType, string> firstAndSecondPlayer = new Dictionary<StoneType, string>
+        {
+            [firstPlayerStone] = firstPlayerToAssignStone,
+            [secondPlayerStone] = players.GetOtherPlayerIdFromPlayerId(firstPlayerToAssignStone)!
+        };
+
+        List<StoneType> firstAndSecondPlayerStones = [firstPlayerStone, secondPlayerStone];
+
+        firstAndSecondPlayerStones.Sort((a, b) => a.CompareTo(b));
+
+        _players = firstAndSecondPlayerStones.Select(a => firstAndSecondPlayer[a]).ToList();
         _prisoners = [0, 0];
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
