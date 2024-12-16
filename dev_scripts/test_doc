@@ -85,7 +85,7 @@
 
 
 
-db.tempGames.aggregate([
+db.games.aggregate([
   {
     $lookup: {
       from: "users",
@@ -96,13 +96,27 @@ db.tempGames.aggregate([
           { $ne: ["$un", "taklu"] }
         ] }}}
       ],
-      as: "filteredProducts"
+      as: "o"
+    }
+  },
+  {
+    $lookup: {
+      from: "users_ratings",
+      let: { uids: "$p" },
+      pipeline: [
+        { $match: { $expr: { $and: [
+          { $in: ["$_id", "$$uids"] },
+          { $ne: ["$un", "taklu"] }
+        ] }}}
+      ],
+      as: "r"
     }
   },
   {
     $project: {
-      game: "$$ROOT",
-	  filteredProducts: 1,
+      g: "$$ROOT",
+	  o: {"$arrayElemAt" : ["$o" , 0]},
+	  r: {"$arrayElemAt" : ["$r" , 0]}
     }
   }
 ]);

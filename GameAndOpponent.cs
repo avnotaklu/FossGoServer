@@ -1,4 +1,5 @@
 using BadukServer;
+using MongoDB.Bson.Serialization.Attributes;
 
 [Immutable, GenerateSerializer]
 [Alias("GameAndOpponent")]

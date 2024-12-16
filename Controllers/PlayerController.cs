@@ -31,6 +31,22 @@ public class PlayerController : ControllerBase
     }
 
 
+    [HttpGet("MyGameHistory")]
+    public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory()
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var userType = User.FindFirst("user_type")?.Value;
+        if (userType == null) return Unauthorized();
+
+        var playerType = PlayerTypeExt.FromString(userType);
+        if (playerType != PlayerType.Normal) return Unauthorized("The account is invalid");
+
+        var games = await _gameService.GetGamesForPlayer(userId);
+
+        return Ok(new GameHistoryBatch(games));
+    }
 
     [HttpPost("RegisterPlayer")]
     public async Task<ActionResult<RegisterPlayerResult>> RegisterPlayer([FromBody] RegisterPlayerDto data)
