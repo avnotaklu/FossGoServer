@@ -616,7 +616,7 @@ public class GameGrain : Grain, IGameGrain
             playersRatingsAfter: _playersRatingsAfter,
             gameType: _gameType,
             usernames: _usernames,
-            creationDate: _creationTime
+            creationTime: _creationTime
         );
     }
 

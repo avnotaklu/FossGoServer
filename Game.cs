@@ -349,7 +349,7 @@ public class Game
         GameOverMethod? gameOverMethod,
         DateTime? startTime,
         DateTime? endTime,
-        DateTime creationDate,
+        DateTime creationTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
 
@@ -385,6 +385,7 @@ public class Game
         PlayersRatingsAfter = playersRatingsAfter;
         GameType = gameType;
         Usernames = usernames;
+        CreationTime = creationTime;
     }
 
     [BsonId]

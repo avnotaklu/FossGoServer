@@ -262,7 +262,7 @@ public class StatCalculatorTest
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30),
             startTime: _1980Jan1_1_30PM,
-            creationDate: _1980Jan1_1_30PM,
+            creationTime: _1980Jan1_1_30PM,
 
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
@@ -308,7 +308,7 @@ public class StatCalculatorTest
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30),
             startTime: _1980Jan1_1_30PM,
-            creationDate: _1980Jan1_1_30PM,
+            creationTime: _1980Jan1_1_30PM,
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
             moves: [], // doesn't matter
@@ -354,7 +354,7 @@ public class StatCalculatorTest
             result: GameResult.BlackWon,
             endTime: _1980Jan1_1_30PM.AddMinutes(30),
             startTime: _1980Jan1_1_30PM,
-            creationDate: _1980Jan1_1_30PM,
+            creationTime: _1980Jan1_1_30PM,
 
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
