@@ -7,7 +7,8 @@ using MongoDB.Driver;
 
 public interface IGameService
 {
-    public Task<List<GameAndOpponent>> GetGamesForPlayer(string player);
+    public Task<List<GameAndOpponent>> GetGamesWithOpponent(string player);
+    public Task<List<Game>> GetGamesForPlayers(string player, int page);
     public Task<Game?> GetGame(string gameId);
     public Task<Game?> SaveGame(Game game);
 }
@@ -30,9 +31,18 @@ public class GameService : IGameService
     }
 
 
-    public async Task<List<GameAndOpponent>> GetGamesForPlayer(string player)
+    public async Task<List<Game>> GetGamesForPlayers(string player, int page)
     {
+        var pageSize = 12;
+        var filter = Builders<Game>.Filter.Where(a => a.Players.Contains(player));
+        var sort = Builders<Game>.Sort.Descending(a => a.CreationTime);
+        var games = await _gameCollection.Find(filter).Sort(sort).Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
+        return games;
+    }
 
+    public async Task<List<GameAndOpponent>> GetGamesWithOpponent(string player)
+    {
+        // TODO: pagination
         /*
             [
             {

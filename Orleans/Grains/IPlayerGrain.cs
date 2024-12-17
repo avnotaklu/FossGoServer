@@ -9,9 +9,9 @@ public interface IPlayerGrain : IGrainWithStringKey
 
     Task InitializePlayer(string connectionId, PlayerType playerType);
     // Task<bool> IsInitializedByOtherDevice(string connectionId);
-    Task<string> CreateGame(GameCreationDto creationData, string time);
+    Task<string> CreateGame(GameCreationDto creationData, DateTime time);
     // join an existing game
-    Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, string time);
+    Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, DateTime time);
     Task LeaveGame(string gameId);
 
     public Task<string?> GetConnectionId();

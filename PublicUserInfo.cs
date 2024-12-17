@@ -44,6 +44,16 @@ public enum PlayerType
     Guest = 1
 }
 
+
+public static class PlayerInfoExt
+{
+    public static string GetUsername(this PlayerInfo playerInfo)
+    {
+        return playerInfo.Username ?? "Guest";
+    }
+}
+
+
 [Immutable]
 [GenerateSerializer]
 public class PlayerInfo
@@ -58,6 +68,6 @@ public class PlayerInfo
         Username = username;
         Id = id;
         Rating = rating;
-        PlayerType =playerType;
+        PlayerType = playerType;
     }
 }

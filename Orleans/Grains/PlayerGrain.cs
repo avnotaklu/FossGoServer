@@ -51,7 +51,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    public async Task<string> CreateGame(GameCreationDto creationData, string time)
+    public async Task<string> CreateGame(GameCreationDto creationData, DateTime time)
     {
         Debug.Assert(_isInitialized, "Can't create game if not initialized");
         var gameId = ObjectId.GenerateNewId().ToString();
@@ -87,7 +87,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return (await grain.GetGames()).Where(x => _activeGameId != x.GameId).ToArray();
     // }
 
-    public async Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, string time)
+    public async Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, DateTime time)
     {
         Debug.Assert(_isInitialized, "Can't create game if not initialized");
         _logger.LogInformation("Trying to join game");

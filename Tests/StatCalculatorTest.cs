@@ -119,7 +119,7 @@ public class StatCalculatorTest
         Assert.IsNotNull(result.Stats[gameKey].ResultStreakData);
         Assert.AreEqual(6, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
         Assert.AreEqual(curS.StreakFrom, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
-        Assert.AreEqual(game.Game.EndTime!.DeserializedDate(), result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
+        Assert.AreEqual(game.Game.EndTime!, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
     }
 
     [TestMethod]
@@ -258,9 +258,11 @@ public class StatCalculatorTest
     {
         var game = new Game(
             players: ["p1", "p2"],
+            usernames: ["u1", "u2"],
             result: GameResult.BlackWon,
-            endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
-            startTime: _1980Jan1_1_30PM.SerializedDate(),
+            endTime: _1980Jan1_1_30PM.AddMinutes(30),
+            startTime: _1980Jan1_1_30PM,
+            creationDate: _1980Jan1_1_30PM,
 
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
@@ -302,9 +304,11 @@ public class StatCalculatorTest
     {
         var game = new Game(
             players: ["p1", "p2"],
+            usernames: ["u1", "u2"],
             result: GameResult.BlackWon,
-            endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
-            startTime: _1980Jan1_1_30PM.SerializedDate(),
+            endTime: _1980Jan1_1_30PM.AddMinutes(30),
+            startTime: _1980Jan1_1_30PM,
+            creationDate: _1980Jan1_1_30PM,
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
             moves: [], // doesn't matter
@@ -346,9 +350,11 @@ public class StatCalculatorTest
     {
         var game = new Game(
             players: ["p1", "p2"],
+            usernames: ["u1", "u2"],
             result: GameResult.BlackWon,
-            endTime: _1980Jan1_1_30PM.AddMinutes(30).SerializedDate(),
-            startTime: _1980Jan1_1_30PM.SerializedDate(),
+            endTime: _1980Jan1_1_30PM.AddMinutes(30),
+            startTime: _1980Jan1_1_30PM,
+            creationDate: _1980Jan1_1_30PM,
 
 
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter

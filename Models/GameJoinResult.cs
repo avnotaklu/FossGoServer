@@ -6,9 +6,9 @@ public class GameJoinResult
 {
     public PlayerInfo? OtherPlayerData { get; set; }
     public Game Game { get; set; }
-    public string JoinTime { get; set; }
+    public DateTime JoinTime { get; set; }
 
-    public GameJoinResult(Game game, PlayerInfo? otherPlayerData,  string time)
+    public GameJoinResult(Game game, PlayerInfo? otherPlayerData,  DateTime time)
     {
         Game = game;
         OtherPlayerData = otherPlayerData;

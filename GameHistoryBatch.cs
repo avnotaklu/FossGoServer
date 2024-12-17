@@ -5,8 +5,8 @@ using MongoDB.Bson.Serialization.Attributes;
 [Alias("GameHistoryBatch")]
 public class GameHistoryBatch
 {
-    public List<GameAndOpponent> Games { get; set; }
-    public GameHistoryBatch(List<GameAndOpponent> games)
+    public List<Game> Games { get; set; }
+    public GameHistoryBatch(List<Game> games)
     {
         Games = games;
     }

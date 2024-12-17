@@ -10,6 +10,7 @@ public class GameGrain : Grain, IGameGrain
 {
     // Player id with player's stone; 0 for black, 1 for white
     private List<string> _players = [];
+    private List<string> _usernames { get => _players.Select(a => _playerInfos[a].GetUsername()).ToList(); }
     private GameState _gameState;
     private List<GameMove> _moves = [];
     private int _rows;
@@ -21,6 +22,7 @@ public class GameGrain : Grain, IGameGrain
     private List<int> _prisoners = [];
     private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
     private DateTime? _startTime;
+    private DateTime _creationTime;
     private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
     private StoneType playerTurn => (StoneType)(turn % 2);
@@ -39,7 +41,7 @@ public class GameGrain : Grain, IGameGrain
     public GameType _gameType;
     private float _komi = 6.5f;
 
-    private string now => _dateTimeService.NowFormatted();
+    private DateTime now => _dateTimeService.Now();
 
     // External stuff
     public Dictionary<string, PlayerInfo> _playerInfos = [];
@@ -96,7 +98,7 @@ public class GameGrain : Grain, IGameGrain
         Dictionary<string, StoneType> playgroundMap,
         List<string> players,
         List<int> prisoners,
-        string? startTime,
+        DateTime? startTime,
         GameState gameState,
         string? koPositionInLastMove,
         List<string> deadStones,
@@ -104,11 +106,12 @@ public class GameGrain : Grain, IGameGrain
         List<int> finalTerritoryScores,
         float komi,
         GameOverMethod? gameOverMethod,
-        string? endTime,
+        DateTime? endTime,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
         List<int> playersRatingsDiff,
-        List<string> playersRatingsAfter
+        List<string> playersRatingsAfter,
+        DateTime creationTime
     )
     {
         _rows = rows;
@@ -120,7 +123,7 @@ public class GameGrain : Grain, IGameGrain
         Debug.Assert(players.Count == 0 || players.Count == 2, "Players must be 0 or 2");
         _players = players;
         _prisoners = prisoners;
-        _startTime = startTime?.DeserializedDate();
+        _startTime = startTime;
         _gameState = gameState;
         _koPositionInLastMove = koPositionInLastMove == null ? null : new Position(koPositionInLastMove);
         _stoneStates = deadStones.Select(a => new Position(a)).ToDictionary(a => a, a => DeadStoneState.Dead);
@@ -128,11 +131,12 @@ public class GameGrain : Grain, IGameGrain
         _finalTerritoryScores = new ReadOnlyCollection<int>(finalTerritoryScores);
         _komi = komi;
         _gameOverMethod = gameOverMethod;
-        _endTime = endTime?.DeserializedDate();
+        _endTime = endTime;
         _stoneSelectionType = stoneSelectionType;
         _gameCreator = gameCreator;
         _playersRatingsDiff = playersRatingsDiff;
         _playersRatingsAfter = playersRatingsAfter;
+        _creationTime = creationTime;
     }
 
     // Grain overrides
@@ -167,13 +171,14 @@ public class GameGrain : Grain, IGameGrain
             stoneSelectionType: creationData.FirstPlayerStone,
             gameCreator: gameCreator,
             playersRatingsDiff: [],
-            playersRatingsAfter: []
+            playersRatingsAfter: [],
+            creationTime: now
         );
 
         await TrySaveGame();
     }
 
-    public async Task<(Game game, PlayerInfo? otherPlayerInfo, bool justJoined)> JoinGame(PlayerInfo playerData, string time)
+    public async Task<(Game game, PlayerInfo? otherPlayerInfo, bool justJoined)> JoinGame(PlayerInfo playerData, DateTime time)
     {
         var player = playerData.Id;
 
@@ -264,7 +269,7 @@ public class GameGrain : Grain, IGameGrain
         var lastMove = new GameMove(
             move.X,
             move.Y,
-            now
+            (int)now.Subtract(_startTime!.Value).TotalSeconds
         );
 
         _logger.LogInformation("Move played <id>{gameId}<id>, <move>{move}<move>", gameId, lastMove);
@@ -463,7 +468,7 @@ public class GameGrain : Grain, IGameGrain
             _finalTerritoryScores = scoreCalculator.TerritoryScores;
         }
 
-        _endTime = now.DeserializedDate();
+        _endTime = now;
         _gameOverMethod = method;
 
         await TryUpdatePlayerData();
@@ -510,7 +515,8 @@ public class GameGrain : Grain, IGameGrain
             stoneSelectionType: game.StoneSelectionType,
             gameCreator: game.GameCreator,
             playersRatingsDiff: game.PlayersRatingsDiff,
-            playersRatingsAfter: game.PlayersRatingsAfter
+            playersRatingsAfter: game.PlayersRatingsAfter,
+            creationTime: game.CreationTime
         );
 
         return GetGame();
@@ -596,7 +602,7 @@ public class GameGrain : Grain, IGameGrain
             playgroundMap: _board.ToDictionary(e => e.Key.ToHighLevelRepr(), e => e.Value),
             players: _players,
             prisoners: _prisoners,
-            startTime: _startTime?.SerializedDate(),
+            startTime: _startTime,
             gameState: _gameState,
             koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
@@ -604,11 +610,13 @@ public class GameGrain : Grain, IGameGrain
             finalTerritoryScores: _finalTerritoryScores.ToList(),
             komi: _komi,
             gameOverMethod: _gameOverMethod,
-            endTime: _endTime?.SerializedDate(),
+            endTime: _endTime,
             gameCreator: _gameCreator,
             playersRatingsDiff: _playersRatingsDiff,
             playersRatingsAfter: _playersRatingsAfter,
-            gameType: _gameType
+            gameType: _gameType,
+            usernames: _usernames,
+            creationDate: _creationTime
         );
     }
 
@@ -620,7 +628,7 @@ public class GameGrain : Grain, IGameGrain
 
         // var lastPlayerPreInc = _playerTimeSnapshots[1 - (int)playerTurn].MainTimeMilliseconds - (int)(DateTime.Parse(_now) - DateTime.Parse(_playerTimeSnapshots[1 - (int)playerTurn].SnapshotTimestamp)).TotalMilliseconds;
 
-        var times = _timeCalculator.RecalculateTurnPlayerTimeSnapshots(playerTurn, playerTimes, timeControl, _now);
+        var times = _timeCalculator.RecalculateTurnPlayerTimeSnapshots(playerTurn, playerTimes, timeControl, _now.SerializedDate());
 
         _logger.LogInformation("Recalculated Player Times");
         _playerTimeSnapshots = times;
@@ -634,21 +642,21 @@ public class GameGrain : Grain, IGameGrain
 
     }
 
-    private async Task StartGame(string time, List<string> players)
+    private async Task StartGame(DateTime time, List<string> players)
     {
         _logger.LogInformation("Game started <gameId>{gameId}<gameId>", gameId);
         _gameState = GameState.Playing;
-        _startTime = time.DeserializedDate();
+        _startTime = time;
         _playerTimeSnapshots = [
                     new PlayerTimeSnapshot(
-                snapshotTimestamp: time,
+                snapshotTimestamp: time.SerializedDate(),
                 mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
                 byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
                 byoYomiActive: false,
                 timeActive: true
             ),
             new PlayerTimeSnapshot(
-                snapshotTimestamp: time,
+                snapshotTimestamp: time.SerializedDate(),
                 mainTimeMilliseconds: _timeControl.MainTimeSeconds * 1000,
                 byoYomisLeft: _timeControl.ByoYomiTime?.ByoYomis,
                 byoYomiActive: false,

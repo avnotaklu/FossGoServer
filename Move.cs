@@ -48,14 +48,14 @@ public class GameMove
 
     [BsonElement("t")]
     [Id(2)]
-    public string Time { get; set; }
+    public int SecondsAfterStart { get; set; }
 
-    public GameMove(int? x, int? y, string time)
+    public GameMove(int? x, int? y, int secondsAfterStart)
     {
         Debug.Assert((x == null && y == null) || (x != null && y != null));
-        Time = time;
         X = x;
         Y = y;
+        SecondsAfterStart = secondsAfterStart;
     }
 
     public bool IsPass()

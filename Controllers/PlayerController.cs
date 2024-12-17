@@ -31,8 +31,8 @@ public class PlayerController : ControllerBase
     }
 
 
-    [HttpGet("MyGameHistory")]
-    public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory()
+    [HttpGet("MyGameHistory/{page}")]
+    public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory(int page)
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
@@ -43,7 +43,7 @@ public class PlayerController : ControllerBase
         var playerType = PlayerTypeExt.FromString(userType);
         if (playerType != PlayerType.Normal) return Unauthorized("The account is invalid");
 
-        var games = await _gameService.GetGamesForPlayer(userId);
+        var games = await _gameService.GetGamesForPlayers(userId, page);
 
         return Ok(new GameHistoryBatch(games));
     }
@@ -86,7 +86,7 @@ public class PlayerController : ControllerBase
         if (gameParams.Rows == 0) return BadRequest("Rows can't be 0");
         if (gameParams.Columns == 0) return BadRequest("Columns can't be 0");
         if (gameParams.TimeControl.MainTimeSeconds == 0) return BadRequest("main time can't be 0");
-        var time = DateTime.Now.ToString("o");
+        var time = DateTime.Now;
 
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
@@ -130,7 +130,7 @@ public class PlayerController : ControllerBase
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        var time = DateTime.Now.ToString("o");
+        var time = DateTime.Now;
 
         var res = await player.JoinGame(gameId, time);
 

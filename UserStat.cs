@@ -293,7 +293,8 @@ public static class StreakExt
             return null;
         }
 
-        var streak = new Streak(1, game.EndTime!.DeserializedDate(), game.EndTime!.DeserializedDate(), game.GameId, game.GameId);
+        var endTime = (DateTime)game.EndTime!;
+        var streak = new Streak(1, endTime, endTime, game.GameId, game.GameId);
 
         return streak;
     }
@@ -305,7 +306,8 @@ public static class StreakExt
             return null;
         }
 
-        return new Streak(me.StreakLength + 1, me.StreakFrom, game.EndTime!.DeserializedDate(), me.StartingGameId, game.GameId);
+        var endTime = (DateTime)game.EndTime!;
+        return new Streak(me.StreakLength + 1, me.StreakFrom, endTime, me.StartingGameId, game.GameId);
     }
 }
 
@@ -443,7 +445,7 @@ public static class GameResultStatExt
             opponentId: otherPData.Id,
             opponentRating: otherPBeforeRat.Rating,
             opponentName: otherPData.Username!,
-            resultAt: data.Game.EndTime!.DeserializedDate()
+            resultAt: (DateTime)data.Game.EndTime!
         );
     }
 }

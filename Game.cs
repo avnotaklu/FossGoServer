@@ -19,6 +19,8 @@ public class GameFieldNames
     public const string PlaygroundMap = "map";
     public const string Moves = "mv";
     public const string Players = "p";
+    public const string PlayerUsernames = "un";
+    public const string CreationTime = "ct";
     public const string Prisoners = "pr";
     public const string StartTime = "st";
     public const string EndTime = "et";
@@ -228,8 +230,8 @@ public static class GameExt
             // Game didn't end and current time hasn't been given
             return null;
         }
-        var latestDate = game.EndTime?.DeserializedDate() ?? forRunningGame;
-        return latestDate - DateTime.Parse(game.StartTime!);
+        var latestDate = game.EndTime ?? forRunningGame;
+        return latestDate - game.StartTime!;
     }
 }
 
@@ -338,7 +340,6 @@ public class Game
         Dictionary<string, StoneType> playgroundMap,
         List<string> players,
         List<int> prisoners,
-        string? startTime,
         GameState gameState,
         string? koPositionInLastMove,
         List<string> deadStones,
@@ -346,14 +347,18 @@ public class Game
         List<int> finalTerritoryScores,
         float komi,
         GameOverMethod? gameOverMethod,
-        string? endTime,
+        DateTime? startTime,
+        DateTime? endTime,
+        DateTime creationDate,
         StoneSelectionType stoneSelectionType,
         string? gameCreator,
 
         List<string> playersRatingsAfter,
         List<int> playersRatingsDiff,
 
-        GameType gameType
+        GameType gameType,
+        List<string> usernames
+
     )
     {
         GameId = gameId;
@@ -379,6 +384,7 @@ public class Game
         PlayersRatingsDiff = playersRatingsDiff;
         PlayersRatingsAfter = playersRatingsAfter;
         GameType = gameType;
+        Usernames = usernames;
     }
 
     [BsonId]
@@ -412,7 +418,7 @@ public class Game
     public List<int> Prisoners { get; set; }
     [BsonElement(GameFieldNames.StartTime)]
     [Id(10)]
-    public string? StartTime { get; set; }
+    public DateTime? StartTime { get; set; }
     [BsonElement(GameFieldNames.KoPositionInLastMove)]
     [Id(11)]
     public string? KoPositionInLastMove { get; set; }
@@ -436,7 +442,7 @@ public class Game
     public GameOverMethod? GameOverMethod { get; set; }
     [BsonElement(GameFieldNames.EndTime)]
     [Id(18)]
-    public string? EndTime { get; set; }
+    public DateTime? EndTime { get; set; }
 
     [BsonElement(GameFieldNames.StoneSelectionType)]
     [Id(19)]
@@ -456,6 +462,14 @@ public class Game
     [Id(23)]
     [BsonElement(GameFieldNames.GameType)]
     public GameType GameType { get; set; }
+
+    [BsonElement(GameFieldNames.PlayerUsernames)]
+    [Id(24)]
+    public List<string> Usernames { get; set; }
+
+    [BsonElement(GameFieldNames.CreationTime)]
+    [Id(25)]
+    public DateTime CreationTime { get; set; }
 }
 
 public static class StoneTypeExt
@@ -603,6 +617,7 @@ public class PlayerTimeSnapshot
         TimeActive = timeActive;
     }
 
+    // TODO: maybe this can just be seconds since start of game
     [BsonElement(GameFieldNames.SnapshotTimestamp)]
     [Id(0)]
     public string SnapshotTimestamp { get; set; }
