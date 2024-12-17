@@ -36,7 +36,7 @@ public class GameService : IGameService
         var pageSize = 12;
         var filter = Builders<Game>.Filter.Where(a => a.Players.Contains(player));
         var sort = Builders<Game>.Sort.Descending(a => a.CreationTime);
-        var games = await _gameCollection.Find(filter).Sort(sort).Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
+        var games = await _gameCollection.Find(filter).Sort(sort).Skip(page * pageSize).Limit(pageSize).ToListAsync();
         return games;
     }
 

@@ -31,6 +31,23 @@ public class PlayerController : ControllerBase
     }
 
 
+
+    [HttpGet("Opponent/{opponent}")]
+    public async Task<ActionResult<PlayerInfo>> GetOpponent(string opponent)
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var userType = User.FindFirst("user_type")?.Value;
+        if (userType == null) return Unauthorized();
+
+        var playerType = PlayerTypeExt.FromString(userType);
+
+        // REVIEW: Getting game creator info using myType, i'm assuming that the creator is the same type as me
+        return Ok(await _playerInfoService.GetPublicUserInfoForPlayer(opponent, playerType)) ?? throw new UserNotFoundException(opponent);
+    }
+
+
     [HttpGet("MyGameHistory/{page}")]
     public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory(int page)
     {

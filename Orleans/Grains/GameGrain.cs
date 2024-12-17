@@ -702,7 +702,6 @@ public class GameGrain : Grain, IGameGrain
 
     private async Task TryUpdatePlayerData()
     {
-        await TrySaveGame();
         if (_gameType == GameType.Rated)
         {
             var (_, _, newPerfs, _) = await UpdateRatingsOnResult();
@@ -719,6 +718,8 @@ public class GameGrain : Grain, IGameGrain
                 ));
             });
         }
+
+        await TrySaveGame();
     }
 
 
