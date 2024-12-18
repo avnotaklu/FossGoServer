@@ -398,6 +398,8 @@ public class GameGrain : Grain, IGameGrain
 
         var myStone = GetStoneFromPlayerId(playerId);
 
+        SetRecalculatedTurnPlayerTimeSnapshots(_moves, _playerTimeSnapshots, _timeControl);
+
         await EndGame(GameOverMethod.Resign, myStone.ResultForOtherWon());
 
         var game = await GetGame();
