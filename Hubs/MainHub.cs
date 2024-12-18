@@ -56,7 +56,7 @@ public sealed class MainHub : Hub
             return new(Task.Run(
             async () =>
             {
-                var playerData = await _userInfoService.GetPublicUserInfoForPlayer(playerId, playerType);
+                var playerData = await _userInfoService.GetPublicUserInfoForPlayer(playerId, playerType) ?? throw new UserNotFoundException(playerId);
 
                 await matchGrain.FindMatch(
                     playerData,
@@ -72,5 +72,4 @@ public sealed class MainHub : Hub
             return new();
         }
     }
-
 }
