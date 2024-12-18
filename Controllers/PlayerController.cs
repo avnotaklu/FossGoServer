@@ -185,7 +185,7 @@ public class PlayerController : ControllerBase
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        var availableGames = games.Where(a => a.DidStart() && !a.DidEnd());
+        var availableGames = games.Where(a => !a.DidStart() && !a.DidEnd());
         var allowedGames = availableGames.Where(a => a.GameType.IsAllowedPlayerType(myType));
 
         var result = (await Task.WhenAll(

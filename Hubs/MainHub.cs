@@ -35,12 +35,11 @@ public sealed class MainHub : Hub
         return base.OnConnectedAsync();
     }
 
-    // [Authorize(Policy = "PlayerOnly")]
     public ValueTask FindMatch(FindMatchDto findMatchDto)
     {
         try
         {
-            _logger.LogInformation("Player {user} is looking for a match", Context.ConnectionId);
+            _logger.LogInformation("User {user} is looking for a match", Context.ConnectionId);
 
             Debug.Assert(findMatchDto.BoardSizes.Count > 0);
             Debug.Assert(findMatchDto.TimeStandards.Count > 0);
@@ -69,6 +68,26 @@ public sealed class MainHub : Hub
         catch (Exception e)
         {
             _logger.LogError(e, "Error finding match");
+            return new();
+        }
+    }
+
+    public ValueTask AcknowledgeGameEntry(String gameId)
+    {
+        try
+        {
+            _logger.LogInformation("User {user} acknowledged game {gameId}", Context.ConnectionId, gameId);
+
+            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+
+            var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
+            return new();
+
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error entring game");
             return new();
         }
     }
