@@ -63,7 +63,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var publicUserInfo = await _publicUserInfoService.GetPublicUserInfoForPlayer(userId, PlayerType);
 
-        if(publicUserInfo == null)
+        if (publicUserInfo == null)
         {
             throw new Exception("Player not found");
         }
@@ -99,14 +99,34 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var publicUserInfo = await _publicUserInfoService.GetPublicUserInfoForPlayer(userId, PlayerType);
 
-        if(publicUserInfo == null)
+        if (publicUserInfo == null)
         {
             throw new Exception("Player not found");
         }
 
         var (game, otherPlayerData, justJoined) = await gameGrain.JoinGame(publicUserInfo, time);
 
-        await _hubService.AddToGroup(_connectionId!, gameId, CancellationToken.None);
+        if (justJoined && otherPlayerData != null)
+        {
+            await InformMyJoin(game, new List<PlayerInfo> { publicUserInfo, otherPlayerData }, time);
+        }
+
+        _activeGameId = gameId;
+
+        return (game, otherPlayerData);
+    }
+
+    public async Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time)
+    {
+        var userId = this.GetPrimaryKeyString(); // our player id
+
+        Debug.Assert(players.Count == 2);
+        Debug.Assert(players.Any(a => a.Id == userId));
+
+        var otherPlayerData = players.FirstOrDefault(p => p.Id != userId);
+        var publicUserInfo = players.FirstOrDefault(p => p.Id == userId);
+
+        await _hubService.AddToGroup(_connectionId!, game.GameId, CancellationToken.None);
 
         if (otherPlayerData != null)
         {
@@ -125,11 +145,6 @@ public class PlayerGrain : Grain, IPlayerGrain
                 )
             );
         }
-        // }
-
-        _activeGameId = gameId;
-
-        return (game, otherPlayerData);
     }
 
     public Task<string?> GetConnectionId()

@@ -325,6 +325,15 @@ public class MinimalRating
     }
 }
 
+public static class PlayerListExt
+{
+    public static T? getValueByStone<T>(this List<T> list, StoneType stone)
+    {
+        return (int)stone < list.Count ? list[(int)stone] : default;
+    }
+}
+
+
 [Immutable, GenerateSerializer]
 [Alias("Game")]
 [BsonIgnoreExtraElements]
@@ -513,6 +522,11 @@ public static class StoneTypeExt
             1 => StoneType.White,
             _ => null
         };
+    }
+
+    public static T? GetValueFromPlayerList<T>(this StoneType stone, List<T> list)
+    {
+        return list.getValueByStone(stone);
     }
 }
 

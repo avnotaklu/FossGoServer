@@ -12,6 +12,8 @@ public interface IPlayerGrain : IGrainWithStringKey
     Task<string> CreateGame(GameCreationDto creationData, DateTime time);
     // join an existing game
     Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, DateTime time);
+
+    Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time);
     Task LeaveGame(string gameId);
 
     public Task<string?> GetConnectionId();

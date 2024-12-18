@@ -22,6 +22,7 @@ static class SignalRMessageType
     public const string gameTimerUpdate = "GameTimerUpdate";
     public const string editDeadStone = "EditDeadStone";
     public const string gameJoin = "GameJoin";
+    public const string gameStart = "GameStart";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";
     public const string timeout = "Timeout";
     // public const string matchFound = "MatchFound";

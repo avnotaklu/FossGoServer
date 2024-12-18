@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Reflection.Metadata;
 using BadukServer.Services;
 using Microsoft.CodeAnalysis;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client.Payloads;
 
 namespace BadukServer.Orleans.Grains;
 
@@ -45,6 +46,10 @@ public class GameGrain : Grain, IGameGrain
 
     // External stuff
     public Dictionary<string, PlayerInfo> _playerInfos = [];
+
+    // Own Timer stuff (Used for acknowledging game starts)
+    private IDisposable _timerHandle = null!;
+    private bool _isTimerActive;
 
     // Injected
     private readonly ILogger<GameGrain> _logger;
@@ -180,6 +185,7 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<(Game game, PlayerInfo? otherPlayerInfo, bool justJoined)> JoinGame(PlayerInfo playerData, DateTime time)
     {
+        Debug.Assert(_gameCreator != null);
         var player = playerData.Id;
 
         if (_gameCreator == player)
@@ -198,9 +204,9 @@ public class GameGrain : Grain, IGameGrain
 
         _playerInfos[player] = playerData;
 
-        await StartGame(time, [_gameCreator, player]);
+        await StartGameStartTimer();
 
-        var otherPlayerInfo = _playerInfos[GetOtherPlayerIdFromPlayerId(player)]; ;
+        var otherPlayerInfo = _playerInfos[_gameCreator];
 
         var game = _GetGame();
 
@@ -436,6 +442,44 @@ public class GameGrain : Grain, IGameGrain
         return curPlayerTime;
     }
 
+    // Grain methods ---/
+
+    private Task StartGameStartTimer()
+    {
+        if (_isTimerActive)
+        {
+            return Task.CompletedTask; // Timer already active
+        }
+
+        _isTimerActive = true;
+        _timerHandle = this.RegisterGrainTimer(
+            Timeout,
+            this,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromMilliseconds(-1));
+
+        return Task.CompletedTask;
+    }
+
+    private async Task Timeout(object state)
+    {
+        _isTimerActive = false;
+
+        await StopTurnTimer();
+        await StartGame(now);
+    }
+
+    public ValueTask StopTurnTimer()
+    {
+        if (_isTimerActive)
+        {
+            _timerHandle?.Dispose();
+            _isTimerActive = false;
+        }
+        return new();
+    }
+
+
     private async Task EndGame(GameOverMethod method, GameResult? _result = null, bool timeStopped = false)
     {
         _gameState = GameState.Ended;
@@ -540,7 +584,7 @@ public class GameGrain : Grain, IGameGrain
         List<string> players = playerInfos.Select(a => a.Id).ToList();
         _playerInfos = players.Zip(playerInfos).ToDictionary(a => a.First, a => a.Second);
 
-        await StartGame(now, players);
+        await StartGameStartTimer();
 
         // await JoinPlayersToPushGroup();
 
@@ -644,8 +688,10 @@ public class GameGrain : Grain, IGameGrain
 
     }
 
-    private async Task StartGame(DateTime time, List<string> players)
+    private async Task StartGame(DateTime time)
     {
+        Debug.Assert(_playerInfos.Count == 2);
+
         _logger.LogInformation("Game started <gameId>{gameId}<gameId>", gameId);
         _gameState = GameState.Playing;
         _startTime = time;
@@ -667,7 +713,7 @@ public class GameGrain : Grain, IGameGrain
                 ];
 
         var stoneSelectionType = _stoneSelectionType;
-        var firstPlayerToAssignStone = _gameCreator ?? players.First();
+        var firstPlayerToAssignStone = _gameCreator != null ? _playerInfos[_gameCreator].Id : _playerInfos.Values.First().Id;
 
 
         var firstPlayerStone = stoneSelectionType == StoneSelectionType.Auto ? (StoneType)new Random().Next(2) : (StoneType)(int)stoneSelectionType;
@@ -677,7 +723,7 @@ public class GameGrain : Grain, IGameGrain
         Dictionary<StoneType, string> firstAndSecondPlayer = new Dictionary<StoneType, string>
         {
             [firstPlayerStone] = firstPlayerToAssignStone,
-            [secondPlayerStone] = players.GetOtherPlayerIdFromPlayerId(firstPlayerToAssignStone)!
+            [secondPlayerStone] = _playerInfos.Values.Select(a => a.Id).ToList().GetOtherPlayerIdFromPlayerId(firstPlayerToAssignStone)!
         };
 
         List<StoneType> firstAndSecondPlayerStones = [firstPlayerStone, secondPlayerStone];
@@ -689,6 +735,8 @@ public class GameGrain : Grain, IGameGrain
 
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
+
+        await SendGameStartMessageToPlayers();
     }
 
     private string MinifiedRating(DateTime time, PlayerRatingsData? ratD)
@@ -948,6 +996,15 @@ public class GameGrain : Grain, IGameGrain
     //         )
     //     ), toPlayer);
     // }
+
+    private async Task SendGameStartMessageToPlayers()
+    {
+        var game = _GetGame();
+        await SendMessageToAll(new SignalRMessage(
+            SignalRMessageType.gameStart,
+            new GameStartMessage(game)
+        ));
+    }
 
     private async Task SendNewMoveMessage(string toPlayer)
     {
