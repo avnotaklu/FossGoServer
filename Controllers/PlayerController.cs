@@ -189,7 +189,7 @@ public class PlayerController : ControllerBase
         var allowedGames = availableGames.Where(a => a.GameType.IsAllowedPlayerType(myType));
 
         var result = (await Task.WhenAll(
-allowedGames.Select(async g =>
+        allowedGames.Select(async g =>
         {
             // REVIEW: Getting game creator info using myType, i'm assuming that the creator is the same type as me
             var creatorData = await _playerInfoService.GetPublicUserInfoForPlayer(g.GameCreator!, myType);

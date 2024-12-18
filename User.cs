@@ -75,5 +75,7 @@ public class User
         Bio = bio;
         Avatar = avatar;
         Nationality = nationality;
+        CreationDate = creation;
+        LastSeen = lastSeen;
     }
 }

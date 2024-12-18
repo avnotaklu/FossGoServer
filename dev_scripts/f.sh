@@ -1,3 +1,5 @@
+#!/usr/bin/bash
+
 db=baduk_server
 
 if [[ $1 == "all" ]] then
