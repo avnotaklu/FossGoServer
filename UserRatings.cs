@@ -22,6 +22,11 @@ public static class UserRatingExtensions
     {
         return rating.Ratings.ContainsKey(variant.ToKey()) ? rating.Ratings[variant.ToKey()] : null;
     }
+    
+    public static PlayerRatingsData GetRatingDataOrInitial(this PlayerRatings rating, ConcreteGameVariant variant)
+    {
+        return rating.Ratings.ContainsKey(variant.ToKey()) ? rating.Ratings[variant.ToKey()] : RatingEngine.GetInitialRatingData();
+    }
 }
 
 [Immutable, GenerateSerializer]

@@ -51,7 +51,7 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         var lookedMatches = boardSizes.SelectMany(b => timeStandards.Select(t =>
         {
             var variant = new ConcreteGameVariant(b.ToBoardSize(), t.GetStandard());
-            var wantedGameTypeRating = playerInfo.Rating?.GetRatingData(variant);
+            var wantedGameTypeRating = playerInfo.Rating?.GetRatingDataOrInitial(variant);
             var wantedRatingRange = wantedGameTypeRating?.GetRatingRange();
             return new Match(b, t, wantedGameType, wantedRatingRange);
         }));

@@ -293,7 +293,7 @@ public class RatingEngine : IRatingEngine
     }
 
 
-    private static PlayerRatingsData GetInitialRatingData()
+    public static PlayerRatingsData GetInitialRatingData()
     {
         return new PlayerRatingsData(new GlickoRating(1500, 110, 0.06), nb: 0, recent: [], latest: null);
     }
