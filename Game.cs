@@ -237,6 +237,16 @@ public static class GameExt
 
 public static class GameTypeExt
 {
+    public static PlayerType AllowedPlayerType(this GameType type)
+    {
+        return type switch
+        {
+            GameType.Anonymous => PlayerType.Guest,
+            GameType.Casual => PlayerType.Normal,
+            GameType.Rated => PlayerType.Normal,
+            _ => throw new Exception("Invalid game type")
+        };
+    }
     public static bool IsAllowedPlayerType(this GameType type, PlayerType playerType)
     {
         return type switch
@@ -615,6 +625,22 @@ public class ByoYomiTime
     {
         ByoYomis = byoYomis;
         ByoYomiSeconds = byoYomiSeconds;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+
+        var other = (ByoYomiTime)obj;
+        return ByoYomis == other.ByoYomis && ByoYomiSeconds == other.ByoYomiSeconds;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(ByoYomis, ByoYomiSeconds);
     }
 }
 

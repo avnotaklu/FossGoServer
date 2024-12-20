@@ -166,6 +166,22 @@ public class TimeControlDto
         IncrementSeconds = incrementSeconds;
         ByoYomiTime = byoYomiTime;
     }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+
+        var other = (TimeControlDto)obj;
+        return MainTimeSeconds == other.MainTimeSeconds && IncrementSeconds == other.IncrementSeconds && ByoYomiTime == other.ByoYomiTime;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(MainTimeSeconds, IncrementSeconds, ByoYomiTime);
+    }
 }
 
 [GenerateSerializer]

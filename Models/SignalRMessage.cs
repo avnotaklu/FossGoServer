@@ -6,7 +6,7 @@ public record class SignalRMessage
     public string Type { get; set; }
     public object? Data { get; set; }
 
-    public SignalRMessage(string type, object? data )
+    public SignalRMessage(string type, object? data)
     {
         Data = data;
         Type = type;
@@ -25,7 +25,7 @@ static class SignalRMessageType
     public const string gameStart = "GameStart";
     public const string scoreCaculationStarted = "ScoreCaculationStarted";
     public const string timeout = "Timeout";
-    // public const string matchFound = "MatchFound";
+    public const string matchFound = "MatchFound";
     public const string statUpdate = "StatUpdate";
 }
 

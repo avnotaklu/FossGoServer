@@ -20,111 +20,148 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         _dateTimeService = dateTimeService;
     }
 
-    Dictionary<int, Dictionary<string, List<Match>>> _matchesByBoardAndTime = [];
-
-    private void InitializeMatches()
-    {
-        foreach (var boardSize in Enum.GetValues(typeof(MatchableBoardSize)).Cast<BoardSize>())
-        {
-            _matchesByBoardAndTime[(int)boardSize] = new Dictionary<string, List<Match>>();
-            foreach (var timeStandard in Constants.timeControlsForMatch)
-            {
-                _matchesByBoardAndTime[(int)boardSize][timeStandard.SimpleRepr()] = new List<Match>();
-            }
-        }
-    }
+    Dictionary<Match, LinkedList<string>> _matches = [];
+    Dictionary<string, List<(Match, LinkedListNode<string>)>> _players = [];
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        InitializeMatches();
         await base.OnActivateAsync(cancellationToken);
     }
 
+    private string? lookupMatch(Match match, string finder)
+    {
+        if (!_matches.ContainsKey(match)) return null;
+        var matches = _matches[match];
+        if (matches.Count == 0) return null;
+
+        var player = matches.First!.Value;
+        if (player == finder) return null;
+
+        matches.RemoveFirst();
+        return player;
+    }
+
+
     public async ValueTask FindMatch(PlayerInfo playerInfo, List<MatchableBoardSize> boardSizes, List<TimeControlDto> timeStandards)
     {
+        var finderId = playerInfo.Id;
+        var finderRating = playerInfo.Rating;
         var wantedGameType = playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated);
 
-        var matchingMatches = boardSizes.Select(b => timeStandards.Select(t => _matchesByBoardAndTime.GetOrNull((int)b)?.GetOrNull(t.SimpleRepr()))).SelectMany(m => m).SelectMany(m => m ?? []).Where(m => m.GameType.IsAllowedPlayerType(playerInfo.PlayerType)).ToList();
-
-        Match? match;
-        if (wantedGameType == GameType.Rated)
+        var lookedMatches = boardSizes.SelectMany(b => timeStandards.Select(t =>
         {
-            if (playerInfo.Rating == null) throw new InvalidOperationException("Unrated Player can't play a rated game");
+            var variant = new ConcreteGameVariant(b.ToBoardSize(), t.GetStandard());
+            var wantedGameTypeRating = playerInfo.Rating?.GetRatingData(variant);
+            var wantedRatingRange = wantedGameTypeRating?.GetRatingRange();
+            return new Match(b, t, wantedGameType, wantedRatingRange);
+        }));
 
-            match = matchingMatches.FirstOrDefault();
-            // match = matchingMatches.FirstOrDefault(m =>
-            // {
-            //     var variant = new VariantType(m.BoardSize.ToBoardSize(), m.TimeControl.GetStandard());
-            //     return m.CreatorRating!.RatingRangeOverlap(playerInfo.Rating!.GetRatingData(variant));
-            // });
+        Match? match = null;
+        string? matchingPlayer = null;
+
+        foreach (var m in lookedMatches)
+        {
+            matchingPlayer = lookupMatch(m, finderId);
+            if (matchingPlayer != null)
+            {
+                match = m;
+                break;
+            }
+        }
+
+        if (!match.HasValue || matchingPlayer == null)
+        {
+            List<(Match, LinkedListNode<string>)> playerMatches = new List<(Match, LinkedListNode<string>)>();
+            foreach (var m in lookedMatches)
+            {
+                if (!_matches.ContainsKey(m))
+                {
+                    _matches[m] = new LinkedList<string>();
+                }
+                var refr = _matches[m].AddLast(playerInfo.Id);
+                playerMatches.Add((m, refr));
+            }
+            _players[finderId] = playerMatches;
+            return;
         }
         else
         {
-            match = matchingMatches.FirstOrDefault();
+            await StartGame(finderId, match.GetValueOrDefault(), matchingPlayer);
         }
+    }
 
-        var finderId = playerInfo.Id;
-        var finderRating = playerInfo.Rating;
-
-        if (match == null)
-        {
-            boardSizes.ForEach(b => timeStandards.ForEach(t => _matchesByBoardAndTime[(int)b][t.SimpleRepr()].Add(new Match(
-                finderId,
-                finderRating?.GetRatingData(new ConcreteGameVariant(b.ToBoardSize(), t.GetStandard())),
-                b,
-                t,
-                playerInfo.PlayerType.GetGameType(RankedOrCasual.Rated)
-            ))));
-
-            return;
-        }
-
-        if (match.CreatorId == finderId)
-        {
-            // What to do here?? 
-            return;
-        }
-
-        _matchesByBoardAndTime[(int)match.BoardSize.ToBoardSize()][match.TimeControl.SimpleRepr()].Remove(match);
-
+    private async Task StartGame(string finderId, Match match, string matchingPlayer)
+    {
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
 
         // REVIEW: Getting match creator info using finder type, i'm assuming that the creator is the same type as finder
-        var publicInfos = (await Task.WhenAll(new List<string>([match.CreatorId, finderId]).Select(async p => await _publicUserInfoService.GetPublicUserInfoForPlayer(p, playerInfo.PlayerType) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
+        var publicInfos = (await Task.WhenAll(new List<string>([matchingPlayer, finderId]).Select(async p => await _publicUserInfoService.GetPublicUserInfoForPlayer(p, match.GameType.AllowedPlayerType()) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
 
         var game = await gameGrain.StartMatch(match, publicInfos);
 
+        await InformGameStart(publicInfos, game);
+    }
+
+    private async Task InformGameStart(List<PlayerInfo> publicInfos, Game game)
+    {
         foreach (var player in publicInfos)
         {
             var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player.Id);
-            await playerGrain.InformMyJoin(game, publicInfos, _dateTimeService.Now());
+            await playerGrain.InformMyJoin(game, publicInfos, _dateTimeService.Now(), PlayerJoinMethod.Match);
         }
+    }
+
+
+    public Task CancelFind(string player)
+    {
+        if (!_players.ContainsKey(player)) return Task.CompletedTask;
+
+        var matches = _players[player];
+        foreach (var match in matches)
+        {
+            _matches[match.Item1].Remove(match.Item2);
+        }
+        _players.Remove(player);
+
+        return Task.CompletedTask;
     }
 }
 
 [Immutable, GenerateSerializer]
 [Alias("Match")]
-public class Match
+public struct Match
 {
     [Id(0)]
-    public string CreatorId { get; set; }
-    [Id(1)]
-    public PlayerRatingsData? CreatorRating { get; set; }
-    [Id(2)]
     public MatchableBoardSize BoardSize { get; set; }
-    [Id(3)]
+    [Id(1)]
     public TimeControlDto TimeControl { get; set; }
-    [Id(4)]
+    [Id(2)]
     public GameType GameType { get; set; }
-    public StoneSelectionType StoneType => StoneSelectionType.Auto;
+    [Id(3)]
+    public RatingRange? Range { get; set; }
 
-    public Match(string creatorId, PlayerRatingsData? creatorRating, MatchableBoardSize boardSizes, TimeControlDto timeControl, GameType gameType)
+    public Match(MatchableBoardSize boardSize, TimeControlDto timeControl, GameType gameType, RatingRange? range)
     {
-        CreatorId = creatorId;
-        CreatorRating = creatorRating;
-        BoardSize = boardSizes;
+        BoardSize = boardSize;
         TimeControl = timeControl;
         GameType = gameType;
+        Range = range;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+
+        var other = (Match)obj;
+        return BoardSize == other.BoardSize && TimeControl.IncrementSeconds == other.TimeControl.IncrementSeconds && TimeControl.MainTimeSeconds == other.TimeControl.MainTimeSeconds && TimeControl.ByoYomiTime?.ByoYomis == other.TimeControl.ByoYomiTime?.ByoYomis && other.TimeControl.ByoYomiTime?.ByoYomiSeconds == other.TimeControl.ByoYomiTime?.ByoYomiSeconds && GameType == other.GameType && Range?.LowerBound == other.Range?.LowerBound && Range?.HigherBound == other.Range?.HigherBound;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(BoardSize, TimeControl.MainTimeSeconds, TimeControl.IncrementSeconds, TimeControl.ByoYomiTime?.ByoYomis, TimeControl.ByoYomiTime?.ByoYomiSeconds, GameType, Range?.HigherBound, Range?.HigherBound);
     }
 }
 
@@ -189,18 +226,50 @@ public enum MatchableBoardSize
     Nineteen = 2,
 }
 
+[Immutable, GenerateSerializer]
+[Alias("RatingRange")]
+public class RatingRange
+{
+    [Id(0)]
+    public int LowerBound { get; set; }
+    [Id(1)]
+    public int HigherBound { get; set; }
 
-// public static class MatchableTimeStandardExt
-// {
-//     public static TimeStandard ToTimeStandard(this MatchableTimeStandard standard) => (TimeStandard)standard;
-// }
+    public RatingRange(int lowerBound, int higherBound)
+    {
+        Debug.Assert(lowerBound <= higherBound);
+        Debug.Assert(higherBound - lowerBound <= 200);
+        LowerBound = lowerBound;
+        HigherBound = higherBound;
+    }
 
+    public RatingRange(PlayerRatingsData data)
+    {
+        LowerBound = (int)MathF.Round(((float)data.Glicko.Rating - 100) / 100) * 100;
+        HigherBound = (int)MathF.Round(((float)data.Glicko.Rating + 100) / 100) * 100;
+    }
 
-// [GenerateSerializer]
-// public enum MatchableTimeStandard
-// {
-//     Blitz = 0,
-//     Rapid = 1,
-//     Classical = 2,
-//     Correspondence = 3,
-// }
+    public override bool Equals(object? obj)
+    {
+        if (obj == null || GetType() != obj.GetType())
+        {
+            return false;
+        }
+
+        var other = (RatingRange)obj;
+        return LowerBound == other.LowerBound && HigherBound == other.HigherBound;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(LowerBound, HigherBound);
+    }
+}
+
+public static class PlayerRatingDataMatchExt
+{
+    public static RatingRange GetRatingRange(this PlayerRatingsData playerRatingData)
+    {
+        return new RatingRange(playerRatingData);
+    }
+}

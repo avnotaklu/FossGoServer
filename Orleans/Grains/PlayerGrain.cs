@@ -108,7 +108,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         if (justJoined && otherPlayerData != null)
         {
-            await InformMyJoin(game, new List<PlayerInfo> { publicUserInfo, otherPlayerData }, time);
+            await InformMyJoin(game, new List<PlayerInfo> { publicUserInfo, otherPlayerData }, time, PlayerJoinMethod.Join);
         }
 
         _activeGameId = gameId;
@@ -116,7 +116,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         return (game, otherPlayerData);
     }
 
-    public async Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time)
+    public async Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time, PlayerJoinMethod joinMethod)
     {
         var userId = this.GetPrimaryKeyString(); // our player id
 
@@ -136,7 +136,7 @@ public class PlayerGrain : Grain, IPlayerGrain
             var pushG = GrainFactory.GetGrain<IPushNotifierGrain>(otherConId);
             await pushG.SendMessageToMe(
                 new SignalRMessage(
-                    SignalRMessageType.gameJoin,
+                    joinMethod.SignalRMethod(),
                     new GameJoinResult(
                         game,
                         publicUserInfo,
@@ -165,4 +165,24 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         return Task.CompletedTask;
     }
+}
+
+public static class PlayerJoinMethodExt
+{
+    public static string SignalRMethod(this PlayerJoinMethod method)
+    {
+        return method switch
+        {
+            PlayerJoinMethod.Join => SignalRMessageType.gameJoin,
+            PlayerJoinMethod.Match => SignalRMessageType.matchFound,
+            _ => throw new Exception("Invalid join method")
+        };
+    }
+}
+
+[GenerateSerializer]
+public enum PlayerJoinMethod
+{
+    Join,
+    Match
 }

@@ -13,7 +13,7 @@ public interface IPlayerGrain : IGrainWithStringKey
     // join an existing game
     Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, DateTime time);
 
-    Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time);
+    Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time, PlayerJoinMethod joinMethod);
     Task LeaveGame(string gameId);
 
     public Task<string?> GetConnectionId();

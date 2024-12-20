@@ -71,4 +71,22 @@ public sealed class MainHub : Hub
             return new();
         }
     }
+
+    public async Task CancelFind()
+    {
+        try
+        {
+            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+
+            var playerType = PlayerTypeExt.FromString(userType);
+            var matchGrain = _grainFactory.GetGrain<IMatchMakingGrain>(0);
+            await matchGrain.CancelFind(playerId);
+        }
+        catch (System.Exception e)
+        {
+            _logger.LogError(e, "Error cancelling match");
+            return;
+        }
+    }
 }

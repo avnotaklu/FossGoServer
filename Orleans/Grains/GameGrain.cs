@@ -575,7 +575,7 @@ public class GameGrain : Grain, IGameGrain
                 rows: match.BoardSize.ToBoardSizeData().Rows,
                 columns: match.BoardSize.ToBoardSizeData().Columns,
                 timeControl: match.TimeControl,
-                firstPlayerStone: match.StoneType
+                firstPlayerStone: StoneSelectionType.Auto
             ),
             gameCreatorData: null,
             match.GameType
