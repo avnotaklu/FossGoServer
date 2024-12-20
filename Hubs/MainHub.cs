@@ -71,24 +71,4 @@ public sealed class MainHub : Hub
             return new();
         }
     }
-
-    public ValueTask AcknowledgeGameEntry(String gameId)
-    {
-        try
-        {
-            _logger.LogInformation("User {user} acknowledged game {gameId}", Context.ConnectionId, gameId);
-
-            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
-            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
-
-            var gameGrain = _grainFactory.GetGrain<IGameGrain>(gameId);
-            return new();
-
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error entring game");
-            return new();
-        }
-    }
 }

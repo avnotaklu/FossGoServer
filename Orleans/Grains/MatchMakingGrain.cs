@@ -86,6 +86,7 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         }
 
         _matchesByBoardAndTime[(int)match.BoardSize.ToBoardSize()][match.TimeControl.SimpleRepr()].Remove(match);
+
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
 
         // REVIEW: Getting match creator info using finder type, i'm assuming that the creator is the same type as finder
