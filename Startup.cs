@@ -147,6 +147,7 @@ public class Startup
             app.UseSwagger();
             app.UseSwaggerUI();
         }
+		app.UseStaticFiles();
 
         app.UseCors(MyAllowSpecificOrigins);
         app.UseAuthentication();
