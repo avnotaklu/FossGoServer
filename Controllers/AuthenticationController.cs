@@ -9,6 +9,7 @@ using MongoDB.Bson;
 using System.Diagnostics;
 using BadukServer;
 using Microsoft.AspNetCore.Identity.Data;
+using System.Security.Claims;
 
 [ApiController]
 [Authorize]
@@ -33,7 +34,7 @@ public class AuthenticationController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("GoogleSignIn")]
-    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignIn([FromBody] GoogleSignInTokenBody body)
+    public async Task<ActionResult<GoogleSignInResponse>> GoogleSignIn([FromBody] GoogleSignInBody body)
     {
         var token = body.Token;
         if (token == null)
@@ -51,28 +52,49 @@ public class AuthenticationController : ControllerBase
 
             if (user == null)
             {
-                return await SignUp(new UserDetailsDto(
-                    email: email,
-                    username: email,
-                    googleSignIn: true,
-                    fullName: null,
-                    bio: null,
-                    avatar: null,
-                    nationalilty: null,
-                    password: null
-                ));
+                var authToken = await _authenticationService.GenerateJSONWebTokenNewOAuthUser(email);
+                _logger.LogInformation("Issued new OAuth token {token}", authToken);
+                return Ok(new GoogleSignInResponse(false, authToken, null));
             }
             else
             {
-                return await Login(new LoginDto(
-                    email: email,
-                    password: null,
-                    googleToken: body.Token,
-                    username: email
-                ));
+                var authToken = await _authenticationService.GenerateJSONWebTokenForNormalUser(user);
+                var userAuth = new UserAuthenticationModel(user, authToken);
+                return Ok(new GoogleSignInResponse(true, null, userAuth));
             }
         }
-        catch (System.Exception e)
+        catch (Exception e)
+        {
+            return BadRequest(e.ToString());
+        }
+    }
+
+    [HttpPost("GoogleSignUp")]
+    public async Task<ActionResult<UserAuthenticationModel>> GoogleSignUp([FromBody] GoogleSignUpBody body)
+    {
+        var role = User.Claims.First(a => a.Type == ClaimTypes.Role).Value;
+
+        if (role == null) return Unauthorized("Incorrect token");
+        if (role != "new_oauth") return Unauthorized("Incorrect user");
+
+        var email = User.Claims.First(a => a.Type == ClaimTypes.Email).Value;
+        if (email == null) return Unauthorized("Incorrect user email");
+
+        try
+        {
+
+            return await SignUp(new UserDetailsDto(
+                email: email,
+                username: body.Username,
+                googleSignIn: true,
+                fullName: null,
+                bio: null,
+                avatar: null,
+                nationalilty: null,
+                password: null
+            ));
+        }
+        catch (Exception e)
         {
             return BadRequest(e.ToString());
         }
@@ -86,12 +108,11 @@ public class AuthenticationController : ControllerBase
         {
             return await Login(userDetails);
         }
-        catch (System.Exception e)
+        catch (Exception e)
         {
             return BadRequest(e.ToString());
         }
     }
-
 
     [AllowAnonymous]
     [HttpPost("PasswordSignUp")]
@@ -123,11 +144,9 @@ public class AuthenticationController : ControllerBase
         }
     }
 
-
     private async Task<ActionResult<UserAuthenticationModel>> Login(LoginDto request)
     {
         Debug.Assert(request.Username != null || request.Email != null);
-        Debug.Assert(request.GoogleToken != null || request.Password != null);
 
         User? user = null;
         if (request.Username != null)
@@ -145,15 +164,12 @@ public class AuthenticationController : ControllerBase
             return Unauthorized("User credentials don't match");
         }
 
-        if (request.GoogleToken == null)
-        {
-            bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+        bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
-            if (!validPassword)
-            {
-                _logger.LogInformation("Incorrect password provided {password}", request.Password);
-                return Unauthorized("User credentials don't match");
-            }
+        if (!validPassword)
+        {
+            _logger.LogInformation("Incorrect password provided {password}", request.Password);
+            return Unauthorized("User credentials don't match");
         }
 
         _logger.LogInformation("Signup successful {email}", request.Email);
@@ -184,12 +200,11 @@ public class AuthenticationController : ControllerBase
         }
 
         var newUser = await _usersService.CreateUser(request, password);
-        var newRatings = await _userRatingService.CreateUserRatings(newUser!.Id!);
-        var newStats = await _userStatService.CreateUserStat(newUser!.Id!);
+        await _userRatingService.CreateUserRatings(newUser!.Id!);
+        await _userStatService.CreateUserStat(newUser!.Id!);
 
         if (newUser == null)
         {
-
             _logger.LogInformation("Couldn't create user");
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create user");
         }
@@ -197,7 +212,6 @@ public class AuthenticationController : ControllerBase
         _logger.LogInformation("Signup successful {email}", newUser.Email);
         return Ok(new UserAuthenticationModel(newUser, await _authenticationService.GenerateJSONWebTokenForNormalUser(newUser)));
     }
-
 
     [HttpGet("GetUser")]
     public async Task<ActionResult<UserAuthenticationModel>> GetUser()

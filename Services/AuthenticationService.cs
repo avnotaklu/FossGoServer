@@ -24,7 +24,7 @@ public class AuthenticationService
         var claims = new ClaimsIdentity(new[] {
             new Claim("user_id", user.GetUserId()),
             new Claim("user_type", "normal_user"),
-            new Claim("role", "player")
+            new Claim(ClaimTypes.Role,"player"),
         });
 
         return _GenerateJSONWeb(claims);
@@ -36,11 +36,22 @@ public class AuthenticationService
         var claims = new ClaimsIdentity([
             new Claim("user_id", user.Id),
             new Claim("user_type", "guest_user"),
-            new Claim("role", "player")
+            new Claim(ClaimTypes.Role,"player"),
         ]);
 
         return _GenerateJSONWeb(claims);
     }
+
+    public Task<string> GenerateJSONWebTokenNewOAuthUser(string email)
+    {
+        var claims = new ClaimsIdentity([
+            new Claim(ClaimTypes.Role, "new_oauth"),
+            new Claim(ClaimTypes.Email ,email),
+        ]);
+
+        return _GenerateJSONWeb(claims);
+    }
+
 
     public Task<string> _GenerateJSONWeb(ClaimsIdentity claims)
     {

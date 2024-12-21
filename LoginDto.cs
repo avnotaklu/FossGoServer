@@ -6,15 +6,13 @@ public class LoginDto
     public string? Username { get; set; }
     [EmailAddress]
     public string? Email { get; set; }
-    public string? GoogleToken { get; set; }
     [MinLength(6)]
-    public string? Password { get; set; }
+    public string Password { get; set; }
 
-    public LoginDto(string? username, string? email, string? password, string? googleToken)
+    public LoginDto(string? username, string? email, string password)
     {
         Username = username;
         Email = email;
         Password = password;
-        GoogleToken = googleToken;
     }
 }
