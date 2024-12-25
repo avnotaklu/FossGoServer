@@ -49,7 +49,7 @@ public class PlayerController : ControllerBase
 
 
     [HttpGet("MyGameHistory/{page}")]
-    public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory(int page, [FromQuery] BoardSize? boardSize = null, [FromQuery] TimeStandard? timeStandard = null, [FromQuery] PlayerResult? result = null, [FromQuery] DateTime? time = null)
+    public async Task<ActionResult<GameHistoryBatch>> GetMyGameHistory(int page, [FromQuery] BoardSize? boardSize = null, [FromQuery] TimeStandard? timeStandard = null, [FromQuery] PlayerResult? result = null, [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
@@ -60,7 +60,7 @@ public class PlayerController : ControllerBase
         var playerType = PlayerTypeExt.FromString(userType);
         if (playerType != PlayerType.Normal) return Unauthorized("The account is invalid");
 
-        var games = await _gameService.GetGamesForPlayers(userId, page, boardSize, timeStandard, result, time);
+        var games = await _gameService.GetGamesForPlayers(userId, page, boardSize, timeStandard, result, from, to);
 
         return Ok(new GameHistoryBatch(games));
     }

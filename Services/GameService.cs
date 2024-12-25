@@ -9,7 +9,7 @@ using MongoDB.Driver;
 public interface IGameService
 {
     public Task<List<GameAndOpponent>> GetGamesWithOpponent(string player);
-    public Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? time = null);
+    public Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? from = null, DateTime? to = null);
     public Task<Game?> GetGame(string gameId);
     public Task<Game?> SaveGame(Game game);
 }
@@ -18,6 +18,7 @@ public class GameService : IGameService
     private readonly IMongoCollection<Game> _gameCollection;
     private readonly IMongoOperationLogger _mongoOperation;
     private readonly ILogger<IGameService> _logger;
+    private static readonly int historyPageSize = 12;
 
     public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation, ILogger<IGameService> logger)
     {
@@ -34,11 +35,10 @@ public class GameService : IGameService
     }
 
 
-    public async Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? time = null)
+    public async Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? from = null, DateTime? to = null)
     {
         _logger.LogInformation("Finding games for player {player} {page}", player, page);
 
-        var pageSize = 12;
 
         List<FilterDefinition<Game>> filters = [];
 
@@ -100,16 +100,24 @@ public class GameService : IGameService
             filter = Builders<Game>.Filter.And(filter, whiteFilter);
         }
 
-        if (time != null)
+        if (from != null)
         {
-            _logger.LogInformation("FilteredTime {time}", time);
+            _logger.LogInformation("FilteredTime {time}", from);
             filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Where(
-                a => a.CreationTime >= time
+                a => a.CreationTime >= from
+            ));
+        }
+
+        if (to != null)
+        {
+            _logger.LogInformation("FilteredTime {time}", to);
+            filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Where(
+                a => a.CreationTime <= to
             ));
         }
 
         var sort = Builders<Game>.Sort.Descending(a => a.CreationTime);
-        var games = await _gameCollection.Find(filter).Sort(sort).Skip(page * pageSize).Limit(pageSize).ToListAsync();
+        var games = await _gameCollection.Find(filter).Sort(sort).Skip(page * historyPageSize).Limit(historyPageSize).ToListAsync();
         return games;
     }
 
