@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BadukServer;
 using BadukServer.Models;
 using Microsoft.Extensions.Options;
@@ -8,7 +9,7 @@ using MongoDB.Driver;
 public interface IGameService
 {
     public Task<List<GameAndOpponent>> GetGamesWithOpponent(string player);
-    public Task<List<Game>> GetGamesForPlayers(string player, int page);
+    public Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? time = null);
     public Task<Game?> GetGame(string gameId);
     public Task<Game?> SaveGame(Game game);
 }
@@ -16,8 +17,9 @@ public class GameService : IGameService
 {
     private readonly IMongoCollection<Game> _gameCollection;
     private readonly IMongoOperationLogger _mongoOperation;
+    private readonly ILogger<IGameService> _logger;
 
-    public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation)
+    public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation, ILogger<IGameService> logger)
     {
         var mongoClient = new MongoClient(
             gameDatabaseSettings.Value.ConnectionString);
@@ -28,13 +30,84 @@ public class GameService : IGameService
         _gameCollection = mongoDatabase.GetCollection<Game>(
             gameCollection.Value.Name);
         _mongoOperation = mongoOperation;
+        _logger = logger;
     }
 
 
-    public async Task<List<Game>> GetGamesForPlayers(string player, int page)
+    public async Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? time = null)
     {
+        _logger.LogInformation("Finding games for player {player} {page}", player, page);
+
         var pageSize = 12;
+
+        List<FilterDefinition<Game>> filters = [];
+
         var filter = Builders<Game>.Filter.Where(a => a.Players.Contains(player));
+
+        if (boardSize != null)
+        {
+            var bSize = (BoardSize)boardSize!;
+            int? dims = bSize.MatchingDims();
+            var nonMatchingIfOther = BoardSizeExtensions.NonDimsMatchingToOther();
+
+            _logger.LogInformation("FilteredBoardSize {boardSize} {rows}", bSize, dims);
+
+            if (boardSize == BoardSize.Other)
+            {
+                filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Nin(
+                    (a) => a.Rows, nonMatchingIfOther
+                ));
+
+                filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Nin(
+                    (a) => a.Columns, nonMatchingIfOther
+                ));
+            }
+            else
+            {
+                filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Eq(
+                    a => a.Rows, dims
+                ));
+
+                filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Eq(
+                    a => a.Columns, dims
+                ));
+            }
+
+        }
+
+        if (timeStandard != null)
+        {
+            _logger.LogInformation("FilteredTimeStandard {timeStandard}", timeStandard);
+            filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Where(
+                a => a.TimeControl.TimeStandard == timeStandard
+            ));
+        }
+
+        if (result != null)
+        {
+            _logger.LogInformation("FilteredResult {result}", result);
+
+            var res = (PlayerResult)result!;
+
+            var blackFilter = Builders<Game>.Filter.Where(
+                a => a.Result == res.WhenBlack() && a.Players[0] == player
+            );
+
+            var whiteFilter = Builders<Game>.Filter.Or(blackFilter, Builders<Game>.Filter.Where(
+                a => a.Result == res.WhenWhite() && a.Players[1] == player
+            ));
+
+            filter = Builders<Game>.Filter.And(filter, whiteFilter);
+        }
+
+        if (time != null)
+        {
+            _logger.LogInformation("FilteredTime {time}", time);
+            filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Where(
+                a => a.CreationTime >= time
+            ));
+        }
+
         var sort = Builders<Game>.Sort.Descending(a => a.CreationTime);
         var games = await _gameCollection.Find(filter).Sort(sort).Skip(page * pageSize).Limit(pageSize).ToListAsync();
         return games;

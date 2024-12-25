@@ -42,6 +42,28 @@ public static class BoardSizeExtensions
             _ => throw new UnreachableException("Board size not supported")
         };
     }
+
+
+    public static List<int?> NonDimsMatchingToOther()
+    {
+        return new List<int?> { 9, 13, 19 };
+    }
+
+    public static int? MatchingDims(this BoardSize board)
+    {
+        switch (board)
+        {
+            case BoardSize.Nine:
+                return 9;
+            case BoardSize.Thirteen:
+                return 13;
+            case BoardSize.Nineteen:
+                return 19;
+            default:
+                return null;
+                // throw new Exception("cannot match rows");
+        }
+    }
 }
 
 [GenerateSerializer]
