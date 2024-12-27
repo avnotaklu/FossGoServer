@@ -23,5 +23,7 @@ public interface IGameGrain : IGrainWithStringKey
     /// <returns></returns>
     Task<Game> ResetGame(Game game);
 
+    Task PlayerRejoin(string playerId, String connectionId);
+
     Task<(Game, DateTime)> StartMatch(Match match, List<PlayerInfo> playerInfos);
 }

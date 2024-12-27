@@ -200,7 +200,6 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<(Game game, DateTime joinTime, bool justJoined)> JoinGame(PlayerInfo playerData)
     {
-        Debug.Assert(_gameCreator != null);
 
         var player = playerData.Id;
 
@@ -219,6 +218,7 @@ public class GameGrain : Grain, IGameGrain
             throw new InvalidOperationException("Creator can't join their own game");
         }
 
+        Debug.Assert(_gameCreator != null); // Both players in the game or only game creator is in the game, no other scenario
 
         _playerInfos[player] = playerData;
 
@@ -465,6 +465,15 @@ public class GameGrain : Grain, IGameGrain
         return curPlayerTime;
     }
 
+    public async Task PlayerRejoin(string playerId, string connectionId)
+    {
+        if (_players.Contains(playerId))
+        {
+            await _hubService.AddToGroup(connectionId, gameId, CancellationToken.None);
+            await SendContinueGameMessage(playerId);
+        }
+    }
+
     // Grain methods ---/
 
     private int startDelay = 10;
@@ -665,12 +674,12 @@ public class GameGrain : Grain, IGameGrain
     {
         try
         {
-            var connectionId = await GrainFactory.GetGrain<IPlayerGrain>(player).GetConnectionId();
-            if (connectionId != null)
-            {
-                _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
-                await _hubService.SendToClient(connectionId, "gameUpdate", message, CancellationToken.None);
-            }
+            // var connectionId = await GrainFactory.GetGrain<IPlayerGrain>(player).GetConnectionId();
+            // if (connectionId != null)
+            // {
+            _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
+            await _hubService.SendToGroup("gameUpdate", gameId, message, CancellationToken.None);
+            // }
         }
         catch (Exception ex)
         {
@@ -1056,30 +1065,6 @@ public class GameGrain : Grain, IGameGrain
             playground
         );
     }
-
-    // Push Messages
-    // private async Task JoinPlayersToPushGroup()
-    // {
-    //     foreach (var player in _players.Keys)
-    //     {
-    //         _logger.LogInformation("Player <player>{player}<player> joined push group <gameId>{gameId}<gameId>", player, gameId);
-    //         var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
-    //         var conId = await playerGrain.GetConnectionId();
-    //     }
-    // }
-
-    // private async Task SendJoinMessage(string toPlayer, DateTime time, PlayerInfo otherPlayerData)
-    // {
-    //     var game = _GetGame();
-    //     await SendMessageToClient(new SignalRMessage(
-    //         SignalRMessageType.gameJoin,
-    //         new GameJoinResult(
-    //             game,
-    //             otherPlayerData,
-    //             time.SerializedDate()
-    //         )
-    //     ), toPlayer);
-    // }
 
     private async Task SendGameStartMessageToPlayers()
     {

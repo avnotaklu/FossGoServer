@@ -285,7 +285,6 @@ public class StatCalculatorTest
             startTime: _1980Jan1_1_30PM,
             creationTime: _1980Jan1_1_30PM,
 
-
             timeControl: new TimeControl(null, null, 1, TimeStandard.Blitz), // doesn't matter
             moves: [], // doesn't matter
             playgroundMap: [], // doesn't matter

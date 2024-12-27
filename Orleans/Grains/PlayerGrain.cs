@@ -39,7 +39,8 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         foreach (var game in activeGames)
         {
-            await _hubService.AddToGroup(connectionId, game, CancellationToken.None);
+            var gameGrain = GrainFactory.GetGrain<IGameGrain>(game);
+            await gameGrain.PlayerRejoin(PlayerId, connectionId);
         }
     }
 
