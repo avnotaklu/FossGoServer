@@ -147,15 +147,22 @@ public class PlayerController : ControllerBase
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        var res = await player.JoinGame(gameId);
+        try
+        {
+            var res = await player.JoinGame(gameId);
 
-        var joinRes = new GameEntranceData(
-            game: res.game,
-            otherPlayerData: res.otherPlayerData,
-            time: res.joinTime
-        );
+            var joinRes = new GameEntranceData(
+                game: res.game,
+                otherPlayerData: res.otherPlayerData,
+                time: res.joinTime
+            );
 
-        return Ok(joinRes);
+            return Ok(joinRes);
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 
 

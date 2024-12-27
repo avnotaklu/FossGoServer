@@ -83,9 +83,16 @@ public class GameController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        var game = await gameGrain.ContinueGame(userId);
 
-        return Ok(game);
+        try
+        {
+            var game = await gameGrain.ContinueGame(userId);
+            return Ok(game);
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 
     [HttpPost("{gameId}/AcceptScores")]
@@ -95,9 +102,17 @@ public class GameController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        var game = await gameGrain.AcceptScores(userId);
 
-        return Ok(game);
+
+        try
+        {
+            var game = await gameGrain.AcceptScores(userId);
+            return Ok(game);
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 
     [HttpPost("{gameId}/ResignGame")]
@@ -107,9 +122,16 @@ public class GameController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        var game = await gameGrain.ResignGame(userId);
 
-        return Ok(game);
+        try
+        {
+            var game = await gameGrain.ResignGame(userId);
+            return Ok(game);
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 
     [HttpPost("{gameId}/EditDeadStoneCluster")]
@@ -119,8 +141,15 @@ public class GameController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var gameGrain = _grainFactory.GetGrain<IGameGrain>(GameId);
-        var game = await gameGrain.EditDeadStone(data.Position, data.State, userId);
 
-        return Ok(game);
+        try
+        {
+            var game = await gameGrain.EditDeadStone(data.Position, data.State, userId);
+            return Ok(game);
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 }

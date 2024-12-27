@@ -240,8 +240,10 @@ public class GameGrain : Grain, IGameGrain
             await StartDelayTimeout(0);
         }
 
-
-        Debug.Assert(_players.Contains(playerId));
+        if (!_players.Contains(playerId))
+        {
+            throw new InvalidOperationException("Player not in game");
+        }
 
         if (_gameState != GameState.Playing)
         {
@@ -322,7 +324,11 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ContinueGame(string playerId)
     {
-        Debug.Assert(_players.Contains(playerId));
+        if (!_players.Contains(playerId))
+        {
+            throw new InvalidOperationException("Player not in game");
+        }
+
         if (_gameState != GameState.ScoreCalculation)
         {
             throw new InvalidOperationException("Game is not in score calculation state");
@@ -345,7 +351,11 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> AcceptScores(string playerId)
     {
-        Debug.Assert(_players.Contains(playerId));
+        if (!_players.Contains(playerId))
+        {
+            throw new InvalidOperationException("Player not in game");
+        }
+
         if (_gameState != GameState.ScoreCalculation)
         {
             throw new InvalidOperationException("Game is not in score calculation state");
@@ -373,7 +383,10 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> EditDeadStone(RawPosition rawPosition, DeadStoneState state, string editorPlayer)
     {
-        Debug.Assert(_players.Contains(editorPlayer));
+        if (!_players.Contains(editorPlayer))
+        {
+            throw new InvalidOperationException("Player not in game");
+        }
 
         if (_gameState != GameState.ScoreCalculation)
         {
@@ -401,10 +414,14 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<Game> ResignGame(string playerId)
     {
-
         if (!DidStart())
         {
             throw new InvalidOperationException("Game hasn't started yet");
+        }
+
+        if (!_players.Contains(playerId))
+        {
+            throw new InvalidOperationException("Player not in game");
         }
 
         Debug.Assert(_players.Contains(playerId));

@@ -136,7 +136,7 @@ public class PlayerGrain : Grain, IPlayerGrain
             }
             else
             {
-                throw new InvalidOperationException("Can't join this game");
+                throw;
             }
         }
     }
