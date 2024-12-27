@@ -13,6 +13,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private PlayerType? _playerType = null!;
     private readonly ISignalRHubService _hubService;
     private bool _isInitialized = false;
+    private ConnectionStrength connectionStrength;
 
     public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRHubService hub)
     {
@@ -23,7 +24,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-
+        connectionStrength = new ConnectionStrength(0);
         await base.OnActivateAsync(cancellationToken);
     }
 
@@ -95,5 +96,16 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
             _logger.LogError(ex, "Error broadcasting to host");
             return new();
         }
+    }
+
+    public Task<ConnectionStrength> GetConnectionStrength()
+    {
+        return Task.FromResult(connectionStrength);
+    }
+
+    public Task SetConnectionStrength(ConnectionStrength strength)
+    {
+        connectionStrength = strength;
+        return Task.CompletedTask;
     }
 }

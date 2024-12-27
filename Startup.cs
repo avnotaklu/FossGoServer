@@ -14,10 +14,6 @@ using Microsoft.OpenApi.Models;
 public class Startup
 {
     private string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
-    // var builder = WebApplication.CreateBuilder(args);
-    // var services = builder.Services;
-    // var config = builder.Configuration;
-    // Console.WriteLine("Startup: ");
     public Startup(IConfiguration configuration)
     {
         Configuration = configuration;
@@ -60,7 +56,7 @@ public class Startup
         services.AddSingleton<IDateTimeService, DateTimeService>();
         services.AddSingleton<ITimeCalculator, TimeCalculator>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();
-        services.AddSingleton<IMongoOperationLogger, MongoOperationLogger>();
+        services.AddSingleton<IMongoOperationLogger, MongoOperationHandler>();
 
         services.AddEndpointsApiExplorer();
 
@@ -90,8 +86,6 @@ public class Startup
         }).AddJwtBearer(x =>
             x.TokenValidationParameters = new TokenValidationParameters
             {
-                // ValidIssuer = config["JwtSettings:Issuer"],
-                // ValidAudience = config["JwtSettings:Audience"],
                 IssuerSigningKey = new SymmetricSecurityKey
         (Encoding.UTF8.GetBytes(Configuration["JwtSettings:Key"]!)),
                 ValidateIssuer = false,
@@ -100,54 +94,21 @@ public class Startup
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true
             });
-        // services.AddHostedService<HubReference>();
-        services.AddSignalR().AddJsonProtocol();
+
+        services.AddSignalR().AddJsonProtocol().AddHubOptions<MainHub>(options =>
+        {
+            options.EnableDetailedErrors = true;
+        });
     }
-
-    // Add services to the container.
-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-    // Add services to the container.
-
-    // builder.Services.AddSwaggerGen(c =>
-    // {
-    //     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Example API", Version = "v1" });
-
-    //     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    //     {
-    //         Type = SecuritySchemeType.Http,
-    //         BearerFormat = "JWT",
-    //         In = ParameterLocation.Header,
-    //         Scheme = "bearer",
-    //         Description = "Please insert JWT token into field"
-    //     });
-
-    //     c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    // {
-    //     {
-    //         new OpenApiSecurityScheme
-    //         {
-    //             Reference = new OpenApiReference
-    //             {
-    //                 Type = ReferenceType.SecurityScheme,
-    //                 Id = "Bearer"
-    //             }
-    //         },
-    //         new string[] { }
-    //     }
-    // });
-    // });
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
-        // var app = builder.Build();
-
-        // Configure the HTTP request pipeline.
         if (env.IsDevelopment())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
         }
-		app.UseStaticFiles();
+        app.UseStaticFiles();
 
         app.UseCors(MyAllowSpecificOrigins);
         app.UseAuthentication();

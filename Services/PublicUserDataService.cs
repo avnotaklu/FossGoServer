@@ -3,7 +3,7 @@ using BadukServer.Services;
 
 public interface IPlayerInfoService
 {
-    public Task<PlayerInfo?> GetPublicUserInfoForPlayer(string userId, PlayerType playerType);
+    public Task<PlayerInfo> GetPublicUserInfoForPlayer(string userId, PlayerType playerType);
     public Task<PlayerInfo?> GetPublicUserInfoForNormalUser(string userId);
     public Task<PlayerInfo> GetPublicUserInfoForGuest(string userId);
 }
@@ -34,11 +34,11 @@ public class PublicUserInfoService : IPlayerInfoService
     }
 
 
-    public async Task<PlayerInfo?> GetPublicUserInfoForPlayer(string userId, PlayerType playerType)
+    public async Task<PlayerInfo> GetPublicUserInfoForPlayer(string userId, PlayerType playerType)
     {
         return playerType switch
         {
-            PlayerType.Normal => await GetPublicUserInfoForNormalUser(userId),
+            PlayerType.Normal => await GetPublicUserInfoForNormalUser(userId) ?? await GetPublicUserInfoForGuest(userId),
             PlayerType.Guest => await GetPublicUserInfoForGuest(userId),
             _ => throw new Exception("Invalid player type")
         };

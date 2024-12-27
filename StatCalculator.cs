@@ -6,14 +6,13 @@ using MongoDB.Bson.Serialization.Conventions;
 
 public interface IStatCalculator
 {
-    public UserStat CalculateUserStat(UserStat oldUserStats, GamePlayersAggregate data);
+    public UserStat CalculateUserStat(UserStat oldUserStats, Game game);
 }
 public class StatCalculator : IStatCalculator
 {
 
-    public UserStat CalculateUserStat(UserStat oldUserStats, GamePlayersAggregate data)
+    public UserStat CalculateUserStat(UserStat oldUserStats, Game game)
     {
-        var game = data.Game;
         Debug.Assert(game.DidEnd(), "Can't calculate user stat for ongoing game");
         Debug.Assert(game.Players.Contains(oldUserStats.UserId), "User not in game");
 
@@ -27,7 +26,7 @@ public class StatCalculator : IStatCalculator
             lowestRating: GetLowestRating(userStat, game, key, uid),
             resultStreakData: GetResultStreakData(userStat, game, key, uid),
             playTime: GetPlayTime(userStat, game),
-            greatestWins: GetGreatestWinningResult(userStat, data, uid),
+            greatestWins: GetGreatestWinningResult(userStat, game, uid),
             statCounts: GetUpdatedTotalStatCounts(userStat, game, uid)
         );
 
@@ -48,14 +47,13 @@ public class StatCalculator : IStatCalculator
         );
     }
 
-    private GameResultStatList? GetGreatestWinningResult(UserStatForVariant? userStat, GamePlayersAggregate data, string userId)
+    private GameResultStatList? GetGreatestWinningResult(UserStatForVariant? userStat, Game game, string userId)
     {
-        var game = data.Game;
         var currentWinningResult = userStat?.GreatestWins;
 
         if (game.DidIWin(userId))
         {
-            var newResultStat = GameResultStatExt.New(data, userId)!;
+            var newResultStat = GameResultStatExt.New(game, userId)!;
             if (newResultStat == null) return currentWinningResult;
 
             return currentWinningResult?.TryAdd(newResultStat) ?? [newResultStat];

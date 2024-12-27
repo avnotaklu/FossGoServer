@@ -4,7 +4,7 @@ using BadukServer.Orleans.Grains;
 public interface IGameGrain : IGrainWithStringKey
 {
     Task CreateGame(GameCreationData creationData, PlayerInfo? gameCreator, GameType gameType);
-    Task<(Game game, PlayerInfo? otherPlayerInfo, bool justJoined)> JoinGame(PlayerInfo player, DateTime time);
+    Task<(Game game, DateTime joinTime, bool justJoined)> JoinGame(PlayerInfo player);
     Task<Game> GetGame();
     // Task<Dictionary<string, StoneType>> GetPlayers();
     // Task<GameState> GetState();
@@ -23,5 +23,5 @@ public interface IGameGrain : IGrainWithStringKey
     /// <returns></returns>
     Task<Game> ResetGame(Game game);
 
-    Task<Game> StartMatch(Match match, List<PlayerInfo> playerInfos);
+    Task<(Game, DateTime)> StartMatch(Match match, List<PlayerInfo> playerInfos);
 }

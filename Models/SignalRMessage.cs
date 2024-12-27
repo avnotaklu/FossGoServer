@@ -27,6 +27,7 @@ static class SignalRMessageType
     public const string timeout = "Timeout";
     public const string matchFound = "MatchFound";
     public const string statUpdate = "StatUpdate";
+    public const string opponentConnection = "OpponentConnection";
 }
 
 [Immutable, GenerateSerializer]

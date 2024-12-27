@@ -166,6 +166,7 @@ public static class GameExt
             GameResult.BlackWon => game.Players.GetStoneFromPlayerId(myId) == StoneType.Black ? 1 : -1,
             GameResult.WhiteWon => game.Players.GetStoneFromPlayerId(myId) == StoneType.White ? 1 : -1,
             GameResult.Draw => 0,
+            GameResult.NoResult => 0,
             _ => throw new UnreachableException("Invalid game result")
         };
     }
@@ -208,6 +209,7 @@ public static class GameExt
             GameResult.BlackWon => game.Players.GetPlayerIdFromStoneType(StoneType.Black),
             GameResult.WhiteWon => game.Players.GetPlayerIdFromStoneType(StoneType.White),
             GameResult.Draw => null,
+            GameResult.NoResult => null,
             _ => throw new UnreachableException("Invalid game result")
         };
     }
@@ -275,6 +277,7 @@ public static class GameResultExt
             GameResult.BlackWon => StoneType.Black,
             GameResult.WhiteWon => StoneType.White,
             GameResult.Draw => null,
+            GameResult.NoResult => null,
             _ => throw new UnreachableException("Invalid game result")
         };
     }
@@ -289,7 +292,8 @@ public enum GameResult
 {
     BlackWon,
     WhiteWon,
-    Draw
+    Draw,
+    NoResult
 }
 
 public static class MinimalRatingExt
@@ -559,11 +563,10 @@ public enum StoneType
 public enum GameState
 {
     WaitingForStart = 0,
-    // Started,
     Playing = 1,
     ScoreCalculation = 2,
     Paused = 3,
-    Ended = 4
+    Ended = 4,
 }
 
 [Immutable, GenerateSerializer]

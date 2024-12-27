@@ -26,13 +26,27 @@ public sealed class MainHub : Hub
         _userInfoService = userInfoService;
     }
 
-    public override Task OnConnectedAsync()
+
+    public async override Task OnConnectedAsync()
     {
         var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
 
+        var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+
         _logger.LogInformation("User connected : {id} of type {type}", Context.ConnectionId, userType);
-        Groups.AddToGroupAsync(Context.ConnectionId, "Users");
-        return base.OnConnectedAsync();
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, "Users");
+
+        var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+
+        var playerType = PlayerTypeExt.FromString(userType);
+
+        await playerGrain.ConnectPlayer(Context.ConnectionId, playerType);
+
+        var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
+        await playerPoolGrain.AddActivePlayer(playerId);
+
+        await base.OnConnectedAsync();
     }
 
     public ValueTask FindMatch(FindMatchDto findMatchDto)
@@ -88,5 +102,16 @@ public sealed class MainHub : Hub
             _logger.LogError(e, "Error cancelling match");
             return;
         }
+    }
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        _logger.LogInformation("user disconnected {user}", Context.ConnectionId);
+        _logger.LogDebug("user disconnected {exception}", exception);
+        var pushG = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
+
+        pushG.SetConnectionStrength(new ConnectionStrength(10_000));
+
+        return base.OnDisconnectedAsync(exception);
     }
 }

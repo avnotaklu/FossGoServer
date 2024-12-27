@@ -10,6 +10,7 @@ public static class PlayerResultExtensions
             PlayerResult.Won => GameResult.BlackWon,
             PlayerResult.Lost => GameResult.WhiteWon,
             PlayerResult.Draw => GameResult.Draw,
+            PlayerResult.NoResult => GameResult.NoResult,
             _ => throw new UnreachableException("Player result not supported")
         };
     }
@@ -21,6 +22,7 @@ public static class PlayerResultExtensions
             PlayerResult.Won => GameResult.WhiteWon,
             PlayerResult.Lost => GameResult.BlackWon,
             PlayerResult.Draw => GameResult.Draw,
+            PlayerResult.NoResult => GameResult.NoResult,
             _ => throw new UnreachableException("Player result not supported")
         };
     }
@@ -32,5 +34,6 @@ public enum PlayerResult
 {
     Won,
     Lost,
-    Draw
+    Draw,
+    NoResult
 }

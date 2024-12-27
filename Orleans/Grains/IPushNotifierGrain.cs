@@ -8,5 +8,7 @@ public interface IPushNotifierGrain : IGrainWithStringKey
     public ValueTask SendMessageToAllUsers(SignalRMessage message);
     public Task<string> GetConnectionId();
     public Task<string> GetPlayerId();
+    public Task SetConnectionStrength(ConnectionStrength strength);
+    public Task<ConnectionStrength> GetConnectionStrength();
     ValueTask InitializeNotifier(string playerId, PlayerType playerType);
 }

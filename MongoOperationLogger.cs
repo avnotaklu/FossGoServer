@@ -6,11 +6,11 @@ public interface IMongoOperationLogger
 }
 
 // REVIEW: For now this handles all exceptions
-public class MongoOperationLogger : IMongoOperationLogger
+public class MongoOperationHandler : IMongoOperationLogger
 {
-    private readonly ILogger<MongoOperationLogger> _logger;
+    private readonly ILogger<MongoOperationHandler> _logger;
 
-    public MongoOperationLogger(ILogger<MongoOperationLogger> logger)
+    public MongoOperationHandler(ILogger<MongoOperationHandler> logger)
     {
         _logger = logger;
     }
@@ -28,7 +28,7 @@ public class MongoOperationLogger : IMongoOperationLogger
         try
         {
             var res = await func();
-            _logger.LogInformation("Mongo Operation Successful, [{T}] Result: {res}", typeof(T), res);
+            // _logger.LogInformation("Mongo Operation Successful, [{T}] Result: {res}", typeof(T), res);
             return res;
         }
         catch (MongoException e)

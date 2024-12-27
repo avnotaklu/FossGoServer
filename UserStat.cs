@@ -415,20 +415,21 @@ public static class GameResultStatListExt
 
 public static class GameResultStatExt
 {
-    public static GameResultStat? New(GamePlayersAggregate data, string userId)
+    public static GameResultStat? New(Game game, string userId)
     {
-        if (!data.Game.DidEnd())
+        if (!game.DidEnd())
         {
             return null;
         }
 
-        var otherP = (int)data.Game.Players.GetOtherStoneFromPlayerId(userId)!;
-        var otherPAfterRat = MinimalRatingExt.FromString(data.Game.PlayersRatingsAfter[otherP])!;
-        var otherPRatDiff = data.Game.PlayersRatingsDiff[otherP];
+        var otherP = (int)game.Players.GetOtherStoneFromPlayerId(userId)!;
+        var otherPAfterRat = MinimalRatingExt.FromString(game.PlayersRatingsAfter[otherP])!;
+        var otherPRatDiff = game.PlayersRatingsDiff[otherP];
 
         var otherPBeforeRat = new MinimalRating(otherPAfterRat.Rating - otherPRatDiff, otherPAfterRat.Provisional);
 
-        var otherPData = data.Players[otherP];
+        var otherPId = game.Players[otherP];
+        var otherPUsername = game.Usernames[otherP];
 
         if (otherPBeforeRat == null)
         {
@@ -441,11 +442,11 @@ public static class GameResultStatExt
         }
 
         return new GameResultStat(
-            gameId: data.Game.GameId,
-            opponentId: otherPData.Id,
+            gameId: game.GameId,
+            opponentId: otherPId,
             opponentRating: otherPBeforeRat.Rating,
-            opponentName: otherPData.Username!,
-            resultAt: (DateTime)data.Game.EndTime!
+            opponentName: otherPUsername,
+            resultAt: (DateTime)game.EndTime!
         );
     }
 }

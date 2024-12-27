@@ -97,17 +97,18 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         // REVIEW: Getting match creator info using finder type, i'm assuming that the creator is the same type as finder
         var publicInfos = (await Task.WhenAll(new List<string>([matchingPlayer, finderId]).Select(async p => await _publicUserInfoService.GetPublicUserInfoForPlayer(p, match.GameType.AllowedPlayerType()) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
 
-        var game = await gameGrain.StartMatch(match, publicInfos);
+        var (game, time) = await gameGrain.StartMatch(match, publicInfos);
 
-        await InformGameStart(publicInfos, game);
+        await InformGameStart(publicInfos, game, time);
     }
 
-    private async Task InformGameStart(List<PlayerInfo> publicInfos, Game game)
+    private async Task InformGameStart(List<PlayerInfo> publicInfos, Game game, DateTime time)
     {
         foreach (var player in publicInfos)
         {
             var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player.Id);
-            await playerGrain.InformMyJoin(game, publicInfos, _dateTimeService.Now(), PlayerJoinMethod.Match);
+            await playerGrain.InformMyJoin(game, publicInfos, time, PlayerJoinMethod.Match);
+            await playerGrain.AddActiveGame(game.GameId);
         }
     }
 

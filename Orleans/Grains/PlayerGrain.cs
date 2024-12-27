@@ -18,7 +18,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     private string PlayerId => this.GetPrimaryKeyString();
     private PlayerType PlayerType;
     private ILogger<PlayerGrain> _logger;
-    public List<string> games = [];
+    public HashSet<string> activeGames = [];
 
     public PlayerGrain(IPlayerInfoService publicUserInfoService, ISignalRHubService hubService, ILogger<PlayerGrain> logger)
     {
@@ -28,9 +28,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     }
 
 
-    private string? _activeGameId;
-
-    public async Task InitializePlayer(string connectionId, PlayerType playerType)
+    public async Task ConnectPlayer(string connectionId, PlayerType playerType)
     {
         PlayerType = playerType;
         _connectionId = connectionId;
@@ -38,6 +36,11 @@ public class PlayerGrain : Grain, IPlayerGrain
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
 
         await notifierGrain.InitializeNotifier(PlayerId, playerType);
+
+        foreach (var game in activeGames)
+        {
+            await _hubService.AddToGroup(connectionId, game, CancellationToken.None);
+        }
     }
 
     // public async Task<bool> IsInitializedByOtherDevice(string connectionId)
@@ -45,9 +48,9 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return _isInitialized && connectionId != _connectionId;
     // }
 
-    public Task<List<string>> GetCreatedGames()
+    public Task<HashSet<string>> GetActiveGames()
     {
-        return Task.FromResult(games);
+        return Task.FromResult(activeGames);
     }
 
 
@@ -75,8 +78,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         await _hubService.AddToGroup(_connectionId!, gameId, CancellationToken.None);
 
-        _activeGameId = gameId;
-        games.Add(gameId);
+        activeGames.Add(gameId);
 
         return gameId;
     }
@@ -87,7 +89,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     //     return (await grain.GetGames()).Where(x => _activeGameId != x.GameId).ToArray();
     // }
 
-    public async Task<(Game game, PlayerInfo? otherPlayerData)> JoinGame(string gameId, DateTime time)
+    public async Task<(Game game, DateTime? joinTime, PlayerInfo? otherPlayerData)> JoinGame(string gameId)
     {
         Debug.Assert(_isInitialized, "Can't create game if not initialized");
         _logger.LogInformation("Trying to join game");
@@ -104,16 +106,39 @@ public class PlayerGrain : Grain, IPlayerGrain
             throw new Exception("Player not found");
         }
 
-        var (game, otherPlayerData, justJoined) = await gameGrain.JoinGame(publicUserInfo, time);
+        var game = await gameGrain.GetGame();
 
-        if (justJoined && otherPlayerData != null)
+        try
         {
-            await InformMyJoin(game, new List<PlayerInfo> { publicUserInfo, otherPlayerData }, time, PlayerJoinMethod.Join);
+            var (gameAfterJoin, joinTime, justJoined) = await gameGrain.JoinGame(publicUserInfo);
+
+            var otherPlayerData = await _publicUserInfoService.GetPublicUserInfoForPlayer(gameAfterJoin.Players.GetOtherPlayerIdFromPlayerId(userId)!, PlayerType);
+
+            // REVIEW: assuming other player same type as me
+
+            if (otherPlayerData == null)
+            {
+                throw new Exception("Other player not found");
+            }
+            if (justJoined)
+            {
+                await InformMyJoin(gameAfterJoin, new List<PlayerInfo> { publicUserInfo, otherPlayerData }, joinTime, PlayerJoinMethod.Join);
+                activeGames.Add(gameId);
+            }
+
+            return (gameAfterJoin, joinTime, otherPlayerData);
         }
-
-        _activeGameId = gameId;
-
-        return (game, otherPlayerData);
+        catch (InvalidOperationException)
+        {
+            if (!game.DidEnd())
+            {
+                return (game, null, null);
+            }
+            else
+            {
+                throw new InvalidOperationException("Can't join this game");
+            }
+        }
     }
 
     public async Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time, PlayerJoinMethod joinMethod)
@@ -137,7 +162,7 @@ public class PlayerGrain : Grain, IPlayerGrain
             await pushG.SendMessageToMe(
                 new SignalRMessage(
                     joinMethod.SignalRMethod(),
-                    new GameJoinResult(
+                    new GameJoinMessage(
                         game,
                         publicUserInfo,
                         time
@@ -145,6 +170,12 @@ public class PlayerGrain : Grain, IPlayerGrain
                 )
             );
         }
+    }
+
+    public Task AddActiveGame(string gameId)
+    {
+        activeGames.Add(gameId);
+        return Task.CompletedTask;
     }
 
     public Task<string?> GetConnectionId()
@@ -161,8 +192,6 @@ public class PlayerGrain : Grain, IPlayerGrain
 
     public Task LeaveGame(string gameId)
     {
-        _activeGameId = null;
-
         return Task.CompletedTask;
     }
 }

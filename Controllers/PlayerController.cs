@@ -65,29 +65,29 @@ public class PlayerController : ControllerBase
         return Ok(new GameHistoryBatch(games));
     }
 
-    [HttpPost("RegisterPlayer")]
-    public async Task<ActionResult<RegisterPlayerResult>> RegisterPlayer([FromBody] RegisterPlayerDto data)
-    {
-        var userId = User.FindFirst("user_id")?.Value;
-        if (userId == null) return Unauthorized();
+    // [HttpPost("RegisterPlayer")]
+    // public async Task<ActionResult<RegisterPlayerResult>> RegisterPlayer([FromBody] RegisterPlayerDto data)
+    // {
+    //     var userId = User.FindFirst("user_id")?.Value;
+    //     if (userId == null) return Unauthorized();
 
-        var userType = User.FindFirst("user_type")?.Value;
-        if (userType == null) return Unauthorized();
+    //     var userType = User.FindFirst("user_type")?.Value;
+    //     if (userType == null) return Unauthorized();
 
-        var playerType = PlayerTypeExt.FromString(userType);
+    //     var playerType = PlayerTypeExt.FromString(userType);
 
-        var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
+    //     var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        // var publicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType);
+    //     // var publicData = await _playerInfoService.GetPublicUserInfoForPlayer(userId, playerType);
 
-        await playerGrain.InitializePlayer(data.ConnectionId, playerType);
+    //     await playerGrain.InitializePlayer(data.ConnectionId, playerType);
 
-        var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
-        await playerPoolGrain.AddActivePlayer(userId);
+    //     var playerPoolGrain = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
+    //     await playerPoolGrain.AddActivePlayer(userId);
 
-        // return Ok(new RegisterPlayerResult(publicData));
-        return Ok(new RegisterPlayerResult());
-    }
+    //     // return Ok(new RegisterPlayerResult(publicData));
+    //     return Ok(new RegisterPlayerResult());
+    // }
 
     [HttpPost("CreateGame")]
     public async Task<ActionResult<Game>> CreateGame([FromBody] GameCreationDto gameParams)
@@ -135,7 +135,7 @@ public class PlayerController : ControllerBase
     }
 
     [HttpPost("JoinGame")]
-    public async Task<ActionResult<GameJoinResult>> JoinGame([FromBody] GameJoinDto gameParams)
+    public async Task<ActionResult<GameEntranceData>> JoinGame([FromBody] GameJoinDto gameParams)
     {
         var userId = User.FindFirst("user_id")?.Value;
         if (userId == null) return Unauthorized();
@@ -147,14 +147,12 @@ public class PlayerController : ControllerBase
 
         var player = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        var time = DateTime.Now;
+        var res = await player.JoinGame(gameId);
 
-        var res = await player.JoinGame(gameId, time);
-
-        var joinRes = new GameJoinResult(
+        var joinRes = new GameEntranceData(
             game: res.game,
             otherPlayerData: res.otherPlayerData,
-            time: time
+            time: res.joinTime
         );
 
         return Ok(joinRes);
@@ -181,7 +179,8 @@ public class PlayerController : ControllerBase
 
         players.RemoveWhere(a => a == userId);
 
-        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetCreatedGames()))).SelectMany(x => x) ?? [];
+        // FIXME: This is a very inefficient way to get all the games
+        HashSet<string> gamesIds = ((await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetActiveGames()))).SelectMany(x => x) ?? []).ToHashSet();
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
@@ -215,7 +214,7 @@ public class PlayerController : ControllerBase
         var playerPool = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
         var players = await playerPool.GetActivePlayers();
 
-        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetCreatedGames()))).SelectMany(x => x) ?? [];
+        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetActiveGames()))).SelectMany(x => x) ?? [];
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 

@@ -42,7 +42,12 @@ public class GameService : IGameService
 
         List<FilterDefinition<Game>> filters = [];
 
-        var filter = Builders<Game>.Filter.Where(a => a.Players.Contains(player));
+        var filter = Builders<Game>.Filter.Eq(
+            (a) => a.GameState, GameState.Ended
+        );
+
+        filter = Builders<Game>.Filter.And(filter, Builders<Game>.Filter.Where(a => a.Players.Contains(player)));
+
 
         if (boardSize != null)
         {

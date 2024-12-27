@@ -119,7 +119,7 @@ public class StatCalculatorTest
         Assert.IsNotNull(result.Stats[gameKey].ResultStreakData);
         Assert.AreEqual(6, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
         Assert.AreEqual(curS.StreakFrom, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
-        Assert.AreEqual(game.Game.EndTime!, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
+        Assert.AreEqual(game.EndTime!, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
     }
 
     [TestMethod]
@@ -224,37 +224,34 @@ public class StatCalculatorTest
         Assert.AreEqual(1445, result.Stats[gameKey].LowestRating);
     }
 
-    private static GamePlayersAggregate BlackWonAgainst1550Player()
+    private static Game BlackWonAgainst1550Player()
     {
         return MasterGame1();
     }
 
-    private static GamePlayersAggregate BlackWonGame9x9BlitzGameOnlyCountsShouldChange()
-    {
-        return MasterGame0();
-    }
+    private static Game BlackWonGame9x9BlitzGameOnlyCountsShouldChange() => MasterGame0();
 
 
-    private static (UserStat, GamePlayersAggregate) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
+    private static (UserStat, Game) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
     {
         var oldUserStats = GetProgressedUserStatForLosingPlayer(null, null);
         return (oldUserStats, MasterGame0());
     }
 
 
-    private static (UserStat, GamePlayersAggregate) BlackWonGame9x9BlitzGameAlsoHisGreatestWin()
+    private static (UserStat, Game) BlackWonGame9x9BlitzGameAlsoHisGreatestWin()
     {
         var oldUserStats = GetProgressedUserStat(null, null);
         return (oldUserStats, MasterGame2());
     }
 
 
-    private static GamePlayersAggregate WinAgainstProvisiona1550Playero()
+    private static Game WinAgainstProvisiona1550Playero()
     {
         return MasterGame2();
     }
 
-    private static GamePlayersAggregate MasterGame2()
+    private static Game MasterGame2()
     {
         var game = new Game(
             players: ["p1", "p2"],
@@ -292,15 +289,12 @@ public class StatCalculatorTest
             GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
         ];
 
-        return new GamePlayersAggregate(
-            game: game,
-            players: players
-        );
+        return game;
     }
 
 
 
-    private static GamePlayersAggregate MasterGame0()
+    private static Game MasterGame0()
     {
         var game = new Game(
             players: ["p1", "p2"],
@@ -338,15 +332,12 @@ public class StatCalculatorTest
             GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
         ];
 
-        return new GamePlayersAggregate(
-            game: game,
-            players: players
-        );
+        return game;
     }
 
 
 
-    private static GamePlayersAggregate MasterGame1()
+    private static Game MasterGame1()
     {
         var game = new Game(
             players: ["p1", "p2"],
@@ -385,10 +376,7 @@ public class StatCalculatorTest
             GetSamplePlayerInfo(2, game.GetTopLevelVariant(), game.PlayersRatingsAfter[1]),
         ];
 
-        return new GamePlayersAggregate(
-            game: game,
-            players: players
-        );
+        return game;
     }
 
     List<GameResultStat> GetBasicGreatestWins()
