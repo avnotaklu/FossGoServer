@@ -366,7 +366,6 @@ public class GameGrain : Grain, IGameGrain
         var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
         if (_scoresAcceptedBy.Count == 2)
         {
-            // Game is over
             await EndGame(GameOverMethod.Score);
             await SendGameOverMessage(GameOverMethod.Score);
         }

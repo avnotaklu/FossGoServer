@@ -16,7 +16,7 @@ public class StatCalculatorTest
 
         var oldUserStats = GetEmptyUserStat();
 
-        var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
+        var game = BlackWonGame9x9BlitzGameMidRatingForBothPlayers();
 
         var statCalculator = new StatCalculator();
 
@@ -46,7 +46,7 @@ public class StatCalculatorTest
         var oldHR = oldUserStats.Stats[gameKey].HighestRating;
         var oldLR = oldUserStats.Stats[gameKey].LowestRating;
 
-        var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
+        var game = BlackWonGame9x9BlitzGameMidRatingForBothPlayers();
 
         var statCalculator = new StatCalculator();
 
@@ -79,7 +79,7 @@ public class StatCalculatorTest
 
         var oldUserStats = GetProgressedUserStat(new ResultStreakData(winningStreaks: new StreakData(currentStreak: Get2To0MonthOldStreakLen5(), greatestStreak: null), losingStreaks: null), null);
 
-        var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
+        var game = BlackWonGame9x9BlitzGameMidRatingForBothPlayers();
 
         var statCalculator = new StatCalculator();
 
@@ -105,19 +105,41 @@ public class StatCalculatorTest
 
         var oldUserStats = GetProgressedUserStat(new ResultStreakData(winningStreaks: new StreakData(currentStreak: curS, greatestStreak: Get12To10MonthOldStreakLen5()), losingStreaks: null), null);
 
-        var game = BlackWonGame9x9BlitzGameOnlyCountsShouldChange();
+        var game = BlackWonGame9x9BlitzGameMidRatingForBothPlayers();
+        var lostGame = BlackLostGame9x9BlitzGameMidRatingForBothPlayers();
 
         var statCalculator = new StatCalculator();
 
         // Act
+        // 5 + 3 wins
         var result = statCalculator.CalculateUserStat(oldUserStats, game);
+        result = statCalculator.CalculateUserStat(oldUserStats, game);
+        result = statCalculator.CalculateUserStat(oldUserStats, game);
+
+        // 3 losses
+        result = statCalculator.CalculateUserStat(oldUserStats, lostGame);
+        result = statCalculator.CalculateUserStat(oldUserStats, lostGame);
+        result = statCalculator.CalculateUserStat(oldUserStats, lostGame);
+
+        // break losing, no changes in greatest winnings
+        result = statCalculator.CalculateUserStat(oldUserStats, game);
+        result = statCalculator.CalculateUserStat(oldUserStats, game);
 
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Stats.ContainsKey(gameKey));
 
         Assert.IsNotNull(result.Stats[gameKey].ResultStreakData);
-        Assert.AreEqual(6, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
+
+
+        Assert.AreEqual(8, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakLength);
+        Assert.AreEqual(2, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.CurrentStreak!.StreakLength);
+
+        Assert.AreEqual(3, result.Stats[gameKey].ResultStreakData!.LosingStreaks!.GreatestStreak!.StreakLength);
+        Assert.AreEqual(null, result.Stats[gameKey].ResultStreakData!.LosingStreaks!.CurrentStreak);
+
+
+
         Assert.AreEqual(curS.StreakFrom, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakFrom);
         Assert.AreEqual(game.EndTime!, result.Stats[gameKey].ResultStreakData!.WinningStreaks!.GreatestStreak!.StreakTo);
     }
@@ -229,7 +251,8 @@ public class StatCalculatorTest
         return MasterGame1();
     }
 
-    private static Game BlackWonGame9x9BlitzGameOnlyCountsShouldChange() => MasterGame0();
+    private static Game BlackWonGame9x9BlitzGameMidRatingForBothPlayers() => MasterGame0();
+    private static Game BlackLostGame9x9BlitzGameMidRatingForBothPlayers() => MasterGame0(GameResult.WhiteWon);
 
 
     private static (UserStat, Game) WhiteLostGame9x9BlitzGameAlsoHisGreatestLoss()
@@ -244,6 +267,7 @@ public class StatCalculatorTest
         var oldUserStats = GetProgressedUserStat(null, null);
         return (oldUserStats, MasterGame2());
     }
+
 
 
     private static Game WinAgainstProvisiona1550Playero()
@@ -294,12 +318,12 @@ public class StatCalculatorTest
 
 
 
-    private static Game MasterGame0()
+    private static Game MasterGame0(GameResult result = GameResult.BlackWon)
     {
         var game = new Game(
             players: ["p1", "p2"],
             usernames: ["u1", "u2"],
-            result: GameResult.BlackWon,
+            result: result,
             endTime: _1980Jan1_1_30PM.AddMinutes(30),
             startTime: _1980Jan1_1_30PM,
             creationTime: _1980Jan1_1_30PM,

@@ -237,26 +237,31 @@ public static class StreakDataExt
 
         return new StreakData(streak, streak);
     }
-    public static StreakData? Increment(this StreakData me, Game game)
+
+    public static StreakData Increment(this StreakData me, Game game)
     {
         if (!game.DidEnd())
         {
-            return null;
+            return me;
         }
 
-        var streak = me.CurrentStreak?.Increment(game);
+        Streak current;
 
-        if (streak == null)
+        if (me.CurrentStreak == null)
         {
-            return null;
+            current = StreakExt.New(game)!;
+        }
+        else
+        {
+            current = me.CurrentStreak.Increment(game);
         }
 
-        var greatest = (me.GreatestStreak ?? streak).StreakLength > streak.StreakLength ? me.GreatestStreak : streak!;
+        var greatest = me.GreatestStreak!.StreakLength > current.StreakLength ? me.GreatestStreak : current;
 
-        return new StreakData(greatest, streak);
+        return new StreakData(greatest, current);
     }
 
-    public static StreakData? Break(this StreakData me)
+    public static StreakData Break(this StreakData me)
     {
         return new StreakData(me.GreatestStreak, null);
     }
@@ -299,11 +304,11 @@ public static class StreakExt
         return streak;
     }
 
-    public static Streak? Increment(this Streak me, Game game)
+    public static Streak Increment(this Streak me, Game game)
     {
         if (!game.DidEnd())
         {
-            return null;
+            return me;
         }
 
         var endTime = (DateTime)game.EndTime!;
