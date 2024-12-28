@@ -95,7 +95,7 @@ public static class TimeControlDtoExt
         { TimeStandard.Blitz, (TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(5)) },
         { TimeStandard.Rapid, (TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(20)) },
         { TimeStandard.Classical, (TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(120)) },
-        { TimeStandard.Correspondence, (TimeSpan.FromDays(1), TimeSpan.FromDays(7)) },
+        { TimeStandard.Correspondence, (TimeSpan.FromDays(14), TimeSpan.FromDays(28)) },
     };
 
     public static TimeStandard GetStandard(this TimeControlDto data)
@@ -190,9 +190,4 @@ public enum StoneSelectionType
     Black = 0,
     White = 1,
     Auto = 1,
-}
-
-public static class TimeStandards
-{
-
 }

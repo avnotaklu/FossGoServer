@@ -670,16 +670,24 @@ public class GameGrain : Grain, IGameGrain
         return (_GetGame(), time);
     }
 
+    /// <summary>
+    /// Send message to a specific player
+    /// This method is reserved for events originating inside the grain, as this calls player grain, which is not renterant
+    /// </summary>
+    /// <param name="message"></param>
+    /// <param name="player"></param>
+    /// <returns></returns>
     private async Task SendMessageToClient(SignalRMessage message, string player)
     {
         try
         {
-            // var connectionId = await GrainFactory.GetGrain<IPlayerGrain>(player).GetConnectionId();
-            // if (connectionId != null)
-            // {
-            _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
-            await _hubService.SendToGroup("gameUpdate", gameId, message, CancellationToken.None);
-            // }
+            var connectionId = await GrainFactory.GetGrain<IPlayerGrain>(player).GetConnectionId();
+
+            if (connectionId != null)
+            {
+                _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
+                await _hubService.SendToClient("gameUpdate", connectionId, message, CancellationToken.None);
+            }
         }
         catch (Exception ex)
         {
@@ -971,7 +979,6 @@ public class GameGrain : Grain, IGameGrain
         return userStat;
     }
 
-
     private async void SetScoreCalculationState(GameMove lastMove)
     {
         Debug.Assert(HasPassedTwice());
@@ -1078,43 +1085,43 @@ public class GameGrain : Grain, IGameGrain
     private async Task SendNewMoveMessage(string toPlayer)
     {
         var game = _GetGame();
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.newMove,
             new NewMoveMessage(game)
-        ), toPlayer);
+        ));
     }
 
     private async Task SendScoreCalculationStartedMessage(string toPlayer)
     {
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.scoreCaculationStarted,
             null
-        ), toPlayer);
+        ));
     }
 
     private async Task SendEditDeadStoneMessage(string toPlayer, RawPosition position, DeadStoneState state)
     {
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.editDeadStone,
             new EditDeadStoneMessage(position, state, _GetGame())
-        ), toPlayer);
+        ));
     }
 
     private async Task SendContinueGameMessage(string toPlayer)
     {
         var game = _GetGame();
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.continueGame,
             new ContinueGameMessage(game)
-        ), toPlayer);
+        ));
     }
 
     private async Task SendAcceptedScoresMessage(string toPlayer)
     {
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.acceptedScores,
             null
-        ), toPlayer);
+        ));
     }
 
     private async Task SendGameOverMessage(GameOverMethod method)
@@ -1129,13 +1136,13 @@ public class GameGrain : Grain, IGameGrain
     private async Task SendGameTimerUpdateMessage(string toPlayer, PlayerTimeSnapshot playerTime)
     {
         var playerWithTurn = GetPlayerIdWithTurn();
-        await SendMessageToClient(new SignalRMessage(
+        await SendMessageToAll(new SignalRMessage(
             SignalRMessageType.gameTimerUpdate,
             new GameTimerUpdateMessage(
                 playerTime,
                 GetStoneFromPlayerId(playerWithTurn)
             )
-        ), toPlayer);
+        ));
     }
 
     private async Task SendOpponentConnectionUpdates()
@@ -1148,12 +1155,12 @@ public class GameGrain : Grain, IGameGrain
 
             var opPushG = GrainFactory.GetGrain<IPushNotifierGrain>(await opG.GetConnectionId());
 
-            // var myPushG = GrainFactory.GetGrain<IPushNotifierGrain>(await plG.GetConnectionId());
+            var plG = GrainFactory.GetGrain<IPushNotifierGrain>(player);
 
             await SendMessageToClient(new SignalRMessage(
                 SignalRMessageType.opponentConnection,
                 await opPushG.GetConnectionStrength()
-            ), player);
+            ), await plG.GetConnectionId());
         }
     }
 

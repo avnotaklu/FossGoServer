@@ -60,7 +60,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         try
         {
             _logger.LogInformation("Notification sent to <user>{user}<user>, <message>{message}<message>", ConnectionId, message);
-            return _hubService.SendToClient(ConnectionId, "userUpdate", message, CancellationToken.None);
+            return _hubService.SendToClient("userUpdate", ConnectionId, message, CancellationToken.None);
         }
         catch (Exception ex)
         {

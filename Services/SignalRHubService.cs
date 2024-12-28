@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 
 public interface ISignalRHubService
 {
-    public ValueTask SendToClient(string connectionId, string methodName, object data, CancellationToken cancellationToken);
+    public ValueTask SendToClient(string methodName, string connectionId, object data, CancellationToken cancellationToken);
     public ValueTask SendToAll(string methodName, object data, CancellationToken cancellationToken);
     public ValueTask SendToGroup(string methodName, string group, object data, CancellationToken cancellationToken);
     public ValueTask AddToGroup(string connectionId, string group, CancellationToken cancellationToken);
@@ -20,7 +20,7 @@ public class SignalRHubService : ISignalRHubService
         _logger = logger;
     }
 
-    public ValueTask SendToClient(string connectionId, string methodName, object data, CancellationToken cancellationToken)
+    public ValueTask SendToClient(string methodName, string connectionId,  object data, CancellationToken cancellationToken)
     {
         return new(_hubContext.Clients.Client(connectionId).SendAsync(methodName, data, cancellationToken));
     }
