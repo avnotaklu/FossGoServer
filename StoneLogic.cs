@@ -103,10 +103,12 @@ namespace BadukServer
     public class StoneLogic
     {
         public BoardState board;
+        private List<Dictionary<Position, StoneType>> _prevBoardStates = [];
 
         public StoneLogic(BoardState board)
         {
             this.board = board;
+            _prevBoardStates.Add(board.playgroundMap.ToDictionary(e => e.Key, e => (StoneType)e.Value.player));
         }
 
         Stone? stoneAt(Position pos)
@@ -166,8 +168,12 @@ namespace BadukServer
         }
 
         // Hack
-        bool checkInsertable(Position position)
+        bool checkInsertable(Position position, StoneType stone)
         {
+            if (stoneAt(position) != null)
+            {
+                return false;
+            }
             if (board.koDelete?.Equals(position) ?? false)
             {
                 return false;
@@ -181,7 +187,7 @@ namespace BadukServer
                     {
                         if (!insertable)
                         {
-                            if (stoneAt(neighbor)!.player == stoneAt(curpos)!.player)
+                            if (stoneAt(neighbor)!.player == (int)stone)
                             {
                                 insertable = !(getClusterFromPosition(neighbor)?.freedoms == 1);
                             }
@@ -338,17 +344,18 @@ namespace BadukServer
 
             var current_cluster = new Cluster([position], [], 0, player);
 
-            board.playgroundMap[thisCurrentCell] = new Stone(
-              position: position,
-              player: player,
-              cluster: current_cluster
-            );
-
             // StoneWidget(gameStateBloc?.getPlayerWithTurn.mColor, position);
 
-            if (checkInsertable(position))
+            if (checkInsertable(position, (StoneType)player))
             {
                 Dictionary<Position, List<Cluster>> traversed = [];
+
+                board.playgroundMap[thisCurrentCell] = new Stone(
+                             position: position,
+                             player: player,
+                             cluster: current_cluster
+                           );
+
                 // if stone can be inserted at this position
                 board.koDelete = null;
                 DoActionOnNeighbors(position, addMatchingNeighborsToCluster);
@@ -356,11 +363,42 @@ namespace BadukServer
                 DoActionOnNeighbors(position, (a, b) => deleteStonesInDeletableCluster(a, b, traversed));
                 CalculateFreedomForCluster(current_cluster, traversed);
                 UpdateFreedomsFromNewlyInsertedStone(position, traversed);
+
+                if (PositionIsSuperKo(board))
+                {
+                    board.playgroundMap.Remove(thisCurrentCell);
+                    return (false, board);
+                }
+
+                _prevBoardStates.Add(board.playgroundMap.ToDictionary(e => e.Key, e => (StoneType)e.Value.player));
+
                 return (true, board);
             }
 
-            board.playgroundMap.Remove(thisCurrentCell);
             return (false, board);
+        }
+
+        private bool PositionIsSuperKo(BoardState newBoardState)
+        {
+            var newBoardStateMap = newBoardState.playgroundMap;
+            foreach (var prevBoardState in _prevBoardStates)
+            {
+                if (prevBoardState.Count != newBoardStateMap.Count)
+                {
+                    continue;
+                }
+                bool isSame = true;
+                foreach (var pos in prevBoardState.Keys)
+                {
+                    if (!newBoardStateMap.ContainsKey(pos) || (StoneType)newBoardStateMap[pos].player != prevBoardState[pos])
+                    {
+                        isSame = false;
+                        break;
+                    }
+                }
+                return isSame;
+            }
+            return false;
         }
 
         public static void DoActionOnNeighbors(Position thisCell,
@@ -382,175 +420,6 @@ namespace BadukServer
     }
 
 
-    public class ScoreCalculation
-    {
-        public Dictionary<Position, Area> AreaMap = [];
-        List<int> _territoryScores = [];
-        public ReadOnlyCollection<int> TerritoryScores => _territoryScores.AsReadOnly();
-        Dictionary<Position, Stone> VirtualPlaygroundMap = [];
-        HashSet<Cluster> DeadClusters = [];
-        // public Game Game;
-        public List<int> Prisoners;
-        public List<Position> DeadStones;
-        public int Rows;
-        public int Cols;
-        public float Komi;
-
-        public GameResult GetResult()
-        {
-            var blackScore = _territoryScores[0] + Prisoners[0];
-            var whiteScore = _territoryScores[1] + Prisoners[1] + Komi;
-
-            if(blackScore == whiteScore) return GameResult.Draw;
-
-            return (blackScore > whiteScore) ? GameResult.BlackWon : GameResult.WhiteWon;
-        }
-
-        // GETTERS
-        // List<int> scores()
-        // {
-        //     if (_territoryScores.isNotEmpty) return _territoryScores;
-        //     calculateScore();
-        //     return _territoryScores;
-        // }
-
-        public ScoreCalculation(
-            int rows,
-            int cols,
-            float komi,
-            List<int> prisoners,
-            List<Position> deadStones,
-Dictionary<Position, Stone> playground
-    )
-        {
-            VirtualPlaygroundMap = playground;
-            DeadClusters = [];
-
-            Rows = rows;
-            Cols = cols;
-            Komi = komi;
-            Prisoners = prisoners;
-            DeadStones = deadStones;
-
-            foreach (var pos in DeadStones)
-            {
-                DeadClusters.Add(playground[pos]!.cluster);
-            }
-
-            _CalculateScore();
-        }
-
-        private void _CalculateScore()
-        {
-            var rows = Rows;
-            var cols = Cols;
-
-            foreach (Cluster cluster in DeadClusters)
-            {
-                foreach (var pos in cluster.data)
-                {
-                    VirtualPlaygroundMap.Remove(pos);
-                }
-            }
-
-            for (int i = 0; i < rows; i++)
-            {
-                for (int j = 0; j < cols; j++)
-                {
-                    if (!AreaMap.ContainsKey(new Position(i, j)) &&
-                        !VirtualPlaygroundMap.ContainsKey(new Position(i, j)))
-                    {
-                        var pos = new Position(i, j);
-                        ForEachEmptyPosition(pos, [pos], null, false, []);
-                    }
-                }
-            }
-            _territoryScores = [0, 0];
-
-            foreach (var area in AreaMap.Values)
-            {
-                if (area.Owner != null)
-                {
-                    // _territoryScores[Constants.playerColors
-                    //     .indexWhere((element) => element == value.value?.owner)] += 1;
-
-                    _territoryScores[(int)area.Owner] += 1;
-                }
-            }
-        }
-        bool checkIfInsideBounds(Position pos)
-        {
-            var rows = Rows;
-            var cols = Cols;
-            return pos.X > -1 && pos.X < rows && pos.Y < cols && pos.Y > -1;
-        }
-
-
-        (HashSet<Position> positionsSeenSoFar, int? owner, bool isDame, List<Cluster> clusterEncountered) ForEachEmptyPosition(Position startPos, HashSet<Position> positionsSeenSoFar, int? owner, bool isDame, List<Cluster> clusterEncountered)
-        {
-            if (checkIfInsideBounds(startPos))
-            {
-                if (VirtualPlaygroundMap.ContainsKey(startPos))
-                {
-                    if (!clusterEncountered
-                        .Contains(VirtualPlaygroundMap[startPos]!.cluster))
-                    {
-                        // TODO: idk if it is possible to visit a stone at curpos without having it in cluster
-                        // so maybe this can be removed only cases i can think of is the first stone in which it maybe doesn't matter if we include it's cluster
-                        clusterEncountered.Add(VirtualPlaygroundMap[startPos]!.cluster);
-                        return (positionsSeenSoFar, owner, isDame, clusterEncountered);
-                    }
-                }
-                StoneLogic.DoActionOnNeighbors(startPos, (curPos, neighbor) =>
-                {
-                    if (checkIfInsideBounds(neighbor))
-                    {
-                        if (!VirtualPlaygroundMap.ContainsKey(neighbor))
-                        {
-                            if (!positionsSeenSoFar.Contains(neighbor))
-                            {
-                                var res = ForEachEmptyPosition(neighbor, [.. positionsSeenSoFar, neighbor], owner, isDame, clusterEncountered);
-
-                                positionsSeenSoFar = res.positionsSeenSoFar;
-                                owner = res.owner;
-                                isDame = res.isDame;
-                                clusterEncountered = res.clusterEncountered;
-
-                                return;
-                            }
-                        }
-                        if (VirtualPlaygroundMap.ContainsKey(neighbor))
-                        {
-                            if (!clusterEncountered.Contains(VirtualPlaygroundMap[neighbor]!.cluster))
-                            {
-                                clusterEncountered.Add(VirtualPlaygroundMap[neighbor]!.cluster);
-                            }
-
-                            if (owner == null && !isDame)
-                            {
-                                owner = VirtualPlaygroundMap[neighbor]?.player;
-                            }
-                            else if (owner != null &&
-                                VirtualPlaygroundMap[neighbor]!.player != owner)
-                            {
-                                owner = null;
-                                isDame = true;
-                            }
-                            return;
-                        }
-                    }
-                });
-
-
-                foreach (var pos in positionsSeenSoFar)
-                {
-                    AreaMap[pos] = new Area(owner, positionsSeenSoFar);
-                }
-
-            }
-            return (positionsSeenSoFar, owner, isDame, clusterEncountered);
-        }
-    }
 
     public class Area
     {
@@ -600,6 +469,7 @@ Dictionary<Position, Stone> playground
 
             return board;
         }
+
 
         public List<Cluster> GetClusters(int[,] board, BoardSizeParams boardSize)
         {

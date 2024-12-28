@@ -22,7 +22,7 @@ public class GameGrain : Grain, IGameGrain
     private List<PlayerTimeSnapshot> _playerTimeSnapshots { get; set; } = [];
     private Dictionary<Position, StoneType> _board = [];
     private List<int> _prisoners = [];
-    private ReadOnlyCollection<int> _finalTerritoryScores = new ReadOnlyCollection<int>([]);
+    private ReadOnlyCollection<int> _finalScores = new ReadOnlyCollection<int>([]);
     private DateTime? _startTime;
     private DateTime _creationTime;
     private Position? _koPositionInLastMove;
@@ -44,12 +44,12 @@ public class GameGrain : Grain, IGameGrain
     private float _komi = 6.5f;
     private DateTime now => _dateTimeService.Now();
 
-    // External stuff
+    // External stuff, implied or retrieved stuff not in database
+
     // Only used for getting usernames
     private Dictionary<string, PlayerInfo> _playerInfos = [];
     // Time when both players have entered and game is ready to start
     private DateTime _joinTime;
-
 
     // Own Timer stuff (Used for acknowledging game starts)
     private IDisposable _timerHandle = null!;
@@ -147,7 +147,7 @@ public class GameGrain : Grain, IGameGrain
         _koPositionInLastMove = koPositionInLastMove == null ? null : new Position(koPositionInLastMove);
         _stoneStates = deadStones.Select(a => new Position(a)).ToDictionary(a => a, a => DeadStoneState.Dead);
         _gameResult = gameResult;
-        _finalTerritoryScores = new ReadOnlyCollection<int>(finalTerritoryScores);
+        _finalScores = new ReadOnlyCollection<int>(finalTerritoryScores);
         _komi = komi;
         _gameOverMethod = gameOverMethod;
         _endTime = endTime;
@@ -262,9 +262,11 @@ public class GameGrain : Grain, IGameGrain
             var y = (int)move.Y!;
 
             var position = new Position(x, y);
+
             var board = _boardStateUtilities.BoardStateFromGame(_GetGame());
 
             var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
+
             _koPositionInLastMove = updateResult.board.koDelete;
 
             _prisoners[0] += updateResult.board.prisoners[0];
@@ -273,6 +275,7 @@ public class GameGrain : Grain, IGameGrain
             if (updateResult.result)
             {
                 var map = _boardStateUtilities.MakeHighLevelBoardRepresentationFromBoardState(updateResult.board);
+
                 _board = map;
             }
             else
@@ -391,6 +394,7 @@ public class GameGrain : Grain, IGameGrain
         {
             throw new InvalidOperationException("Game is not in score calculation state");
         }
+
         _scoresAcceptedBy.Clear();
 
         var position = rawPosition.ToGamePosition();
@@ -434,7 +438,6 @@ public class GameGrain : Grain, IGameGrain
         var game = await GetGame();
 
         await SendGameOverMessage(GameOverMethod.Resign);
-
 
         await TrySaveGame();
         return game;
@@ -569,8 +572,8 @@ public class GameGrain : Grain, IGameGrain
         if (method == GameOverMethod.Score)
         {
             var scoreCalculator = _GetScoreCalculator();
-            _gameResult = scoreCalculator.GetResult();
-            _finalTerritoryScores = scoreCalculator.TerritoryScores;
+            _gameResult = scoreCalculator.finalResult;
+            _finalScores = scoreCalculator.Score;
         }
 
         _endTime = now;
@@ -615,7 +618,7 @@ public class GameGrain : Grain, IGameGrain
             koPositionInLastMove: game.KoPositionInLastMove,
             deadStones: game.DeadStones,
             gameResult: game.Result,
-            finalTerritoryScores: game.FinalTerritoryScores.ToList(),
+            finalTerritoryScores: game.FinalScore.ToList(),
             komi: game.Komi,
             gameOverMethod: game.GameOverMethod,
             endTime: game.EndTime,
@@ -740,7 +743,7 @@ public class GameGrain : Grain, IGameGrain
             koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
             result: _gameResult,
-            finalTerritoryScores: _finalTerritoryScores.ToList(),
+            finalTerritoryScores: _finalScores.ToList(),
             komi: _komi,
             gameOverMethod: _gameOverMethod,
             endTime: _endTime,

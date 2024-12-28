@@ -28,7 +28,7 @@ public class GameFieldNames
     public const string GameState = "gs";
     public const string DeadStones = "ds";
     public const string Result = "res";
-    public const string FinalTerritoryScores = "fts";
+    public const string FinalScore = "fts"; // TODO RENAME with fs
     public const string Komi = "k";
     public const string GameOverMethod = "gom";
     public const string StoneSelectionType = "sst";
@@ -398,7 +398,7 @@ public class Game
         GameState = gameState;
         DeadStones = deadStones;
         Result = result;
-        FinalTerritoryScores = finalTerritoryScores;
+        FinalScore = finalTerritoryScores;
         Komi = komi;
         GameOverMethod = gameOverMethod;
         EndTime = endTime;
@@ -437,9 +437,9 @@ public class Game
     [BsonRepresentation(BsonType.ObjectId)]
     [Id(8)]
     public List<string> Players { get; set; }
-    [BsonElement(GameFieldNames.Prisoners)]
+    [BsonElement(GameFieldNames.Prisoners)] 
     [Id(9)]
-    public List<int> Prisoners { get; set; }
+    public List<int> Prisoners { get; set; } // REVIEW: chinese system doens't even require prisoners, should i keep it
     [BsonElement(GameFieldNames.StartTime)]
     [Id(10)]
     public DateTime? StartTime { get; set; }
@@ -455,9 +455,9 @@ public class Game
     [BsonElement(GameFieldNames.Result)]
     [Id(14)]
     public GameResult? Result { get; set; }
-    [BsonElement(GameFieldNames.FinalTerritoryScores)]
+    [BsonElement(GameFieldNames.FinalScore)]
     [Id(15)]
-    public List<int> FinalTerritoryScores { get; set; }
+    public List<int> FinalScore { get; set; }
     [BsonElement(GameFieldNames.Komi)]
     [Id(16)]
     public float Komi { get; set; }

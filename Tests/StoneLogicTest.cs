@@ -45,6 +45,21 @@ public class StoneLogicTest
         return board;
     }
 
+    // Position from https://senseis.xmp.net/?Cycles
+    int[,] _3_move_cycle_6x6_DeathBoard()
+    {
+        int[,] board = {
+            { 0, 1, 0, 2, 1, 0 },
+            { 2, 1, 2, 2, 1, 0 },
+            { 0, 2, 2, 1, 1, 0 },
+            { 2, 2, 1, 0, 0, 0 },
+            { 1, 1, 1, 0, 1, 0 },
+            { 0, 0, 0, 0, 0, 0 },
+        };
+        return board;
+    }
+
+
     [TestMethod]
     public void TestGetClusters()
     {
@@ -172,6 +187,32 @@ public class StoneLogicTest
         var result = boardCons.SimpleBoardRepresentation(highLevelBoard, new BoardSizeParams(5, 5));    
 
         Assert.IsTrue(_2DArrayEqual(result, _5x5BasicBoard()));
+    }
+
+    [TestMethod]
+    public void TestThreeMoveCycle() {
+        var pos = _3_move_cycle_6x6_DeathBoard();
+
+        var boardCons = new BoardStateUtilities();
+        var clusters = boardCons.GetClusters(pos, new BoardSizeParams(6, 6));
+        var stones = boardCons.GetStones(clusters);
+        var stoneLogic = new StoneLogic(boardCons.ConstructBoard(6, 6, stones));
+
+        var m1 = new Position(0, 0);
+        var m2 = new Position(2, 0);
+        var m3 = new Position(1, 0);
+
+        var r1 = stoneLogic.HandleStoneUpdate(m1, 1);
+
+        Assert.IsTrue(r1.result);
+
+        var r2 = stoneLogic.HandleStoneUpdate(m2, 0);
+
+        Assert.IsTrue(r2.result);
+
+        var r3 = stoneLogic.HandleStoneUpdate(m3, 1);
+
+        Assert.IsFalse(r3.result);
     }
 
     private bool _2DArrayEqual<T>(T[,] array1, T[,] array2)
