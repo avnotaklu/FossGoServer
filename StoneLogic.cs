@@ -2,10 +2,40 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using ZstdSharp.Unsafe;
 
+using LowLevelBoardRepresentation = int[,];
 using HighLevelBoardRepresentation = System.Collections.Generic.Dictionary<BadukServer.Position, BadukServer.StoneType>;
+using DetailedBoardRepresentation = System.Collections.Generic.Dictionary<BadukServer.Position, BadukServer.Stone>;
+
 
 namespace BadukServer
 {
+    public static class DetailedBoardRepresentationExt
+    {
+        public static HighLevelBoardRepresentation ToHighLevelBoardRepresentation(this DetailedBoardRepresentation detailedBoardRepresentation)
+        {
+            return detailedBoardRepresentation.ToDictionary(e => e.Key, e => (StoneType)e.Value.player);
+        }
+    }
+
+    public static class HighLevelBoardRepresentationExt
+    {
+        public static LowLevelBoardRepresentation ToLowLevelBoardRepresentation(this HighLevelBoardRepresentation highLevelBoardRepresentation, BoardSizeParams boardSize)
+        {
+            var rows = boardSize.Rows;
+            var cols = boardSize.Columns;
+
+            var board = new int[rows, cols];
+
+            foreach (var item in highLevelBoardRepresentation)
+            {
+                var position = item.Key;
+                board[position.X, position.Y] = (int)item.Value + 1;
+            }
+
+            return board;
+        }
+    }
+
     public class Cluster
     {
         public HashSet<Position> data;
@@ -103,7 +133,7 @@ namespace BadukServer
     public class StoneLogic
     {
         public BoardState board;
-        private List<Dictionary<Position, StoneType>> _prevBoardStates = [];
+        private List<HighLevelBoardRepresentation> _prevBoardStates = [];
 
         public StoneLogic(BoardState board)
         {
@@ -340,6 +370,9 @@ namespace BadukServer
             {
                 return (true, board);
             }
+
+            BoardState lastValid = new BoardState(6, 6, null, board.playgroundMap.ToDictionary(), []);
+
             Position? thisCurrentCell = position;
 
             var current_cluster = new Cluster([position], [], 0, player);
@@ -366,7 +399,7 @@ namespace BadukServer
 
                 if (PositionIsSuperKo(board))
                 {
-                    board.playgroundMap.Remove(thisCurrentCell);
+                    board = lastValid;
                     return (false, board);
                 }
 

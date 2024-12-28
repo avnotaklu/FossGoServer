@@ -184,17 +184,19 @@ public class StoneLogicTest
     {
         var highLevelBoard = _5x5BasicBoardHighLevelRepr();
         var boardCons = new BoardStateUtilities();
-        var result = boardCons.SimpleBoardRepresentation(highLevelBoard, new BoardSizeParams(5, 5));    
+        var result = boardCons.SimpleBoardRepresentation(highLevelBoard, new BoardSizeParams(5, 5));
 
         Assert.IsTrue(_2DArrayEqual(result, _5x5BasicBoard()));
     }
 
     [TestMethod]
-    public void TestThreeMoveCycle() {
+    public void TestThreeMoveCycle()
+    {
         var pos = _3_move_cycle_6x6_DeathBoard();
 
         var boardCons = new BoardStateUtilities();
-        var clusters = boardCons.GetClusters(pos, new BoardSizeParams(6, 6));
+        var boardSize = new BoardSizeParams(6, 6);
+        var clusters = boardCons.GetClusters(pos, boardSize);
         var stones = boardCons.GetStones(clusters);
         var stoneLogic = new StoneLogic(boardCons.ConstructBoard(6, 6, stones));
 
@@ -208,11 +210,15 @@ public class StoneLogicTest
 
         var r2 = stoneLogic.HandleStoneUpdate(m2, 0);
 
+
         Assert.IsTrue(r2.result);
+
+        BoardState lastValid = new BoardState(6, 6, null, r2.board.playgroundMap.ToDictionary(), []);
 
         var r3 = stoneLogic.HandleStoneUpdate(m3, 1);
 
         Assert.IsFalse(r3.result);
+        Assert.IsTrue(_2DArrayEqual(r3.board.playgroundMap.ToHighLevelBoardRepresentation().ToLowLevelBoardRepresentation(boardSize), lastValid.playgroundMap.ToHighLevelBoardRepresentation().ToLowLevelBoardRepresentation(boardSize)));
     }
 
     private bool _2DArrayEqual<T>(T[,] array1, T[,] array2)
