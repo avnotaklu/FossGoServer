@@ -115,4 +115,28 @@ public sealed class MainHub : Hub
 
         return base.OnDisconnectedAsync(exception);
     }
+
+    public async Task Ping(int ping)
+    {
+        try
+        {
+            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+
+            var pushG = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
+            await pushG.SetConnectionStrength(new ConnectionStrength(ping));
+            await pushG.SendMessageToMe(
+                new SignalRMessage(
+                    SignalRMessageType.pong,
+                    null
+                )
+            );
+        }
+        catch (System.Exception e)
+        {
+            _logger.LogError(e, "Error cancelling match");
+            return;
+        }
+    }
+
 }

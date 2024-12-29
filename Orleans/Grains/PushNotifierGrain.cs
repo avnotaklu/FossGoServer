@@ -14,11 +14,14 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private readonly ISignalRHubService _hubService;
     private bool _isInitialized = false;
     private ConnectionStrength connectionStrength;
+    private IDisposable _timerHandle = null!;
+    private bool _isTimerActive;
 
     public PushNotifierGrain(ILogger<PushNotifierGrain> logger, ISignalRHubService hub)
     {
         _logger = logger;
         _hubService = hub;
+        connectionStrength = new ConnectionStrength(0);
     }
 
 
@@ -59,7 +62,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     {
         try
         {
-            _logger.LogInformation("Notification sent to <user>{user}<user>, <message>{message}<message>", ConnectionId, message);
+            // _logger.LogInformation("Notification sent to <user>{user}<user>, <message>{message}<message>", ConnectionId, message);
             return _hubService.SendToClient("userUpdate", ConnectionId, message, CancellationToken.None);
         }
         catch (Exception ex)
@@ -106,6 +109,26 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     public Task SetConnectionStrength(ConnectionStrength strength)
     {
         connectionStrength = strength;
+        SetupTimerForStrengthDecay();
+        return Task.CompletedTask;
+    }
+
+    private Task SetupTimerForStrengthDecay()
+    {
+        _timerHandle?.Dispose();
+        _timerHandle = this.RegisterGrainTimer(
+            DecayStrength,
+            this,
+            TimeSpan.FromSeconds(3),
+            TimeSpan.FromSeconds(3)
+        );
+        return Task.CompletedTask;
+    }
+
+    private Task DecayStrength(object? _)
+    {
+        connectionStrength = new ConnectionStrength((int)MathF.Min(connectionStrength.Ping * 2, 10_000)); // TODO: doubling the ping is a temporary solution
+        SetupTimerForStrengthDecay();
         return Task.CompletedTask;
     }
 }

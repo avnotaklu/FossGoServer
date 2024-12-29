@@ -28,6 +28,7 @@ static class SignalRMessageType
     public const string matchFound = "MatchFound";
     public const string statUpdate = "StatUpdate";
     public const string opponentConnection = "OpponentConnection";
+    public const string pong = "Pong";
 }
 
 [Immutable, GenerateSerializer]
