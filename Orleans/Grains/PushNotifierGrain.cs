@@ -15,7 +15,6 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private readonly ISignalRHubService _hubService;
     private bool _isInitialized = false;
     private ConnectionStrength connectionStrength;
-    private IAsyncStream<ConnectionStrength> connectionStream;
     private IDisposable _timerHandle = null!;
     private bool _isTimerActive;
 
@@ -39,10 +38,6 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         _playerType = playerType;
         _hubService.AddToGroup(ConnectionId, playerType.ToTypeString(), CancellationToken.None);
         _isInitialized = true;
-
-        IStreamProvider streamProvider = this.GetStreamProvider("StreamProvider");
-        StreamId streamId = StreamId.Create("BadukServer", playerId);
-        connectionStream = streamProvider.GetStream<ConnectionStrength>(streamId);
 
         return new ValueTask();
     }
@@ -112,15 +107,9 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return Task.FromResult(connectionStrength);
     }
 
-    public Task<IAsyncStream<ConnectionStrength>> ConnectionStrengthStream()
-    {
-        return Task.FromResult(connectionStream);
-    }
-
     public Task SetConnectionStrength(ConnectionStrength strength)
     {
         connectionStrength = strength;
-        connectionStream.OnNextAsync(strength);
         SetupTimerForStrengthDecay();
         return Task.CompletedTask;
     }

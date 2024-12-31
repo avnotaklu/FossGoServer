@@ -36,13 +36,6 @@ public class PlayerGrain : Grain, IPlayerGrain
         {
             var grain = GrainFactory.GetGrain<IPushNotifierGrain>(_connectionId);
 
-            var handles = await (await grain.ConnectionStrengthStream()).GetAllSubscriptionHandles();
-
-            foreach (var handle in handles)
-            {
-                await handle.UnsubscribeAsync();
-            }
-
             await grain.PlayerConnectionChanged();
         }
 

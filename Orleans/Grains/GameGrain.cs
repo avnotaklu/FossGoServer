@@ -514,35 +514,60 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    // private Task OpponentConnectionUpdateTimer()
-    // {
-    //     if (_isTimerActive)
-    //     {
-    //         return Task.CompletedTask; // Timer already active
-    //     }
+    private Task OpponentConnectionUpdateTimer()
+    {
+        if (_isTimerActive)
+        {
+            return Task.CompletedTask; // Timer already active
+        }
 
-    //     _isTimerActive = true;
-    //     _timerHandle = this.RegisterGrainTimer(
-    //         OpponentConnectionTimeout,
-    //         this,
-    //         TimeSpan.FromSeconds(10),
-    //         TimeSpan.FromMilliseconds(-1));
+        _isTimerActive = true;
+        _timerHandle = this.RegisterGrainTimer(
+            OpponentConnectionTimeout,
+            this,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromMilliseconds(-1));
 
-    //     return Task.CompletedTask;
-    // }
+        return Task.CompletedTask;
+    }
 
-    // private async Task OpponentConnectionTimeout(object state)
-    // {
-    //     await StopActiveTimer();
-    //     await SendOpponentConnectionUpdates();
-    //     await OpponentConnectionUpdateTimer();
-    // }
+    private async Task OpponentConnectionTimeout(object state)
+    {
+        await StopActiveTimer();
+        if (BothPlayersIn())
+        {
+            foreach (var playerId in _players)
+            {
+                var plG = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+                
+                var myPushG = GrainFactory.GetGrain<IPushNotifierGrain>(await plG.GetConnectionId());
+
+                var con = await myPushG.GetConnectionStrength();
+
+                _logger.LogInformation("Connection Strength <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+
+                var myStone = GetStoneFromPlayerId(playerId);
+
+                var prevCon = ConnectionStrengths[(int)myStone];
+
+                var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
+
+                if (MathF.Abs(prevCon.Ping - con.Ping) > 100)
+                {
+                    _logger.LogInformation("Updated Connection strength message <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+                    ConnectionStrengths[(int)myStone] = con;
+                    await SendOpponentConnectionUpdates(playerId, con);
+                }
+            }
+        }
+        await OpponentConnectionUpdateTimer();
+    }
 
     private async Task StartDelayTimeout(object state)
     {
         await StopActiveTimer();
         await StartGame(now);
-        // await OpponentConnectionUpdateTimer();
+        await OpponentConnectionUpdateTimer();
     }
 
     public ValueTask StopActiveTimer()
@@ -743,30 +768,28 @@ public class GameGrain : Grain, IGameGrain
     {
         await _hubService.AddToGroup(connectionId, gameId, CancellationToken.None);
 
-        var pushG = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
+        // var conStream = await pushG.ConnectionStrengthStream();
 
-        var conStream = await pushG.ConnectionStrengthStream();
+        // var subscriptionHandle = await conStream.SubscribeAsync(async (con, token) =>
+        // {
+        //     if (BothPlayersIn())
+        //     {
+        //         _logger.LogInformation("Connection Strength <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
 
-        var subscriptionHandle = await conStream.SubscribeAsync(async (con, token) =>
-        {
-            if (BothPlayersIn())
-            {
-                _logger.LogInformation("Connection Strength <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+        //         var myStone = GetStoneFromPlayerId(playerId);
 
-                var myStone = GetStoneFromPlayerId(playerId);
+        //         var prevCon = ConnectionStrengths[(int)myStone];
 
-                var prevCon = ConnectionStrengths[(int)myStone];
+        //         var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
 
-                var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
-
-                if (MathF.Abs(prevCon.Ping - con.Ping) > 100)
-                {
-                    _logger.LogInformation("Updated Connection strength message <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
-                    ConnectionStrengths[(int)myStone] = con;
-                    await SendOpponentConnectionUpdates(playerId, con);
-                }
-            }
-        });
+        //         if (MathF.Abs(prevCon.Ping - con.Ping) > 100)
+        //         {
+        //             _logger.LogInformation("Updated Connection strength message <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+        //             ConnectionStrengths[(int)myStone] = con;
+        //             await SendOpponentConnectionUpdates(playerId, con);
+        //         }
+        //     }
+        // });
     }
 
 

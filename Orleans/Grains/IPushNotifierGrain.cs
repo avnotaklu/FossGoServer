@@ -12,7 +12,6 @@ public interface IPushNotifierGrain : IGrainWithStringKey
     public Task<string> GetPlayerId();
     public Task SetConnectionStrength(ConnectionStrength strength);
     public Task<ConnectionStrength> GetConnectionStrength();
-    public Task<IAsyncStream<ConnectionStrength>> ConnectionStrengthStream();
     ValueTask InitializeNotifier(string playerId, PlayerType playerType);
 
     Task PlayerConnectionChanged();
