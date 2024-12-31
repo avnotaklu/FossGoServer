@@ -112,7 +112,6 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         }
     }
 
-
     public Task CancelFind(string player)
     {
         if (!_players.ContainsKey(player)) return Task.CompletedTask;

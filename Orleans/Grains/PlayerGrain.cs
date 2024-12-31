@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using MongoDB.Bson;
 using MongoDB.Driver.Core.Clusters.ServerSelectors;
 using Orleans.Concurrency;
+using Orleans.Streams;
 
 namespace BadukServer.Orleans.Grains;
 
@@ -27,20 +28,40 @@ public class PlayerGrain : Grain, IPlayerGrain
         _hubService = hubService;
     }
 
-
     public async Task ConnectPlayer(string connectionId, PlayerType playerType)
     {
         PlayerType = playerType;
+
+        if (_connectionId != null)
+        {
+            var grain = GrainFactory.GetGrain<IPushNotifierGrain>(_connectionId);
+
+            var handles = await (await grain.ConnectionStrengthStream()).GetAllSubscriptionHandles();
+
+            foreach (var handle in handles)
+            {
+                await handle.UnsubscribeAsync();
+            }
+
+            await grain.PlayerConnectionChanged();
+        }
+
         _connectionId = connectionId;
         _isInitialized = true;
         var notifierGrain = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
 
         await notifierGrain.InitializeNotifier(PlayerId, playerType);
 
-        foreach (var game in activeGames)
+        foreach (var gameId in activeGames)
         {
-            var gameGrain = GrainFactory.GetGrain<IGameGrain>(game);
-            await gameGrain.PlayerRejoin(PlayerId, connectionId);
+            var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
+
+            var game = await gameGrain.GetGame();
+
+            if (!game.DidEnd())
+            {
+                await gameGrain.PlayerRejoin(PlayerId, connectionId);
+            }
         }
     }
 
@@ -75,9 +96,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         var gameType = PlayerType.GetGameType(creationData.RankedOrCasual);
 
         // add ourselves to the game
-        await gameGrain.CreateGame(creationData.ToData(), publicUserInfo, gameType);
-
-        await _hubService.AddToGroup(_connectionId!, gameId, CancellationToken.None);
+        await gameGrain.CreateGame(creationData.ToData(), publicUserInfo, gameType, connectionId: _connectionId!);
 
         activeGames.Add(gameId);
 
@@ -111,7 +130,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         try
         {
-            var (gameAfterJoin, joinTime, justJoined) = await gameGrain.JoinGame(publicUserInfo);
+            var (gameAfterJoin, joinTime, justJoined) = await gameGrain.JoinGame(publicUserInfo, connectionId: _connectionId!);
 
             var otherPlayerData = await _publicUserInfoService.GetPublicUserInfoForPlayer(gameAfterJoin.Players.GetOtherPlayerIdFromPlayerId(userId)!, PlayerType);
 
@@ -151,8 +170,6 @@ public class PlayerGrain : Grain, IPlayerGrain
 
         var otherPlayerData = players.FirstOrDefault(p => p.Id != userId);
         var publicUserInfo = players.FirstOrDefault(p => p.Id == userId);
-
-        await _hubService.AddToGroup(_connectionId!, game.GameId, CancellationToken.None);
 
         if (otherPlayerData != null)
         {

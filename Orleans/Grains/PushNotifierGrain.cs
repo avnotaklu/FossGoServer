@@ -1,5 +1,6 @@
 ﻿using BadukServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using Orleans.Streams;
 
 namespace BadukServer.Orleans.Grains;
 
@@ -14,6 +15,7 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     private readonly ISignalRHubService _hubService;
     private bool _isInitialized = false;
     private ConnectionStrength connectionStrength;
+    private IAsyncStream<ConnectionStrength> connectionStream;
     private IDisposable _timerHandle = null!;
     private bool _isTimerActive;
 
@@ -27,8 +29,8 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        connectionStrength = new ConnectionStrength(0);
         await base.OnActivateAsync(cancellationToken);
+
     }
 
     public ValueTask InitializeNotifier(string playerId, PlayerType playerType)
@@ -37,6 +39,10 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         _playerType = playerType;
         _hubService.AddToGroup(ConnectionId, playerType.ToTypeString(), CancellationToken.None);
         _isInitialized = true;
+
+        IStreamProvider streamProvider = this.GetStreamProvider("StreamProvider");
+        StreamId streamId = StreamId.Create("BadukServer", playerId);
+        connectionStream = streamProvider.GetStream<ConnectionStrength>(streamId);
 
         return new ValueTask();
     }
@@ -106,10 +112,23 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return Task.FromResult(connectionStrength);
     }
 
+    public Task<IAsyncStream<ConnectionStrength>> ConnectionStrengthStream()
+    {
+        return Task.FromResult(connectionStream);
+    }
+
     public Task SetConnectionStrength(ConnectionStrength strength)
     {
         connectionStrength = strength;
+        connectionStream.OnNextAsync(strength);
         SetupTimerForStrengthDecay();
+        return Task.CompletedTask;
+    }
+
+    public Task PlayerConnectionChanged()
+    {
+        _timerHandle?.Dispose();
+        DeactivateOnIdle();
         return Task.CompletedTask;
     }
 
@@ -125,10 +144,8 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
         return Task.CompletedTask;
     }
 
-    private Task DecayStrength(object? _)
+    private async Task DecayStrength(object? _)
     {
-        connectionStrength = new ConnectionStrength((int)MathF.Min(connectionStrength.Ping * 2, 10_000)); // TODO: doubling the ping is a temporary solution
-        SetupTimerForStrengthDecay();
-        return Task.CompletedTask;
+        await SetConnectionStrength(new ConnectionStrength((int)MathF.Min(connectionStrength.Ping * 2, 10_000))); // TODO: doubling the ping is a temporary solution
     }
 }

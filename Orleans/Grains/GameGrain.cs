@@ -5,6 +5,8 @@ using BadukServer.Services;
 using Google.Apis.Util;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client.Payloads;
+using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace BadukServer.Orleans.Grains;
 
@@ -54,6 +56,9 @@ public class GameGrain : Grain, IGameGrain
     // Own Timer stuff (Used for acknowledging game starts)
     private IDisposable _timerHandle = null!;
     private bool _isTimerActive;
+
+    // Connections
+    private List<ConnectionStrength> ConnectionStrengths;
 
     // Injected
     private readonly ILogger<GameGrain> _logger;
@@ -161,7 +166,7 @@ public class GameGrain : Grain, IGameGrain
 
     // Grain overrides
 
-    public async Task CreateGame(GameCreationData creationData, PlayerInfo? gameCreatorData, GameType gameType)
+    public async Task CreateGame(GameCreationData creationData, PlayerInfo gameCreatorData, GameType gameType, string connectionId)
     {
         var gameCreator = gameCreatorData?.Id;
 
@@ -169,6 +174,14 @@ public class GameGrain : Grain, IGameGrain
         {
             _playerInfos[gameCreator] = gameCreatorData!;
         }
+
+        await SubscribePlayer(gameCreator!, connectionId);
+
+        await _CreateGame(creationData, gameType, gameCreator);
+    }
+
+    private async Task _CreateGame(GameCreationData creationData, GameType gameType, string? gameCreator)
+    {
         SetState(
             rows: creationData.Rows,
             columns: creationData.Columns,
@@ -198,9 +211,9 @@ public class GameGrain : Grain, IGameGrain
         await TrySaveGame();
     }
 
-    public async Task<(Game game, DateTime joinTime, bool justJoined)> JoinGame(PlayerInfo playerData)
-    {
 
+    public async Task<(Game game, DateTime joinTime, bool justJoined)> JoinGame(PlayerInfo playerData, string connectionId)
+    {
         var player = playerData.Id;
 
         if (DidEnd())
@@ -219,6 +232,8 @@ public class GameGrain : Grain, IGameGrain
         }
 
         Debug.Assert(_gameCreator != null); // Both players in the game or only game creator is in the game, no other scenario
+
+        await SubscribePlayer(playerId: player, connectionId: connectionId);
 
         _playerInfos[player] = playerData;
 
@@ -472,7 +487,7 @@ public class GameGrain : Grain, IGameGrain
     {
         if (_players.Contains(playerId))
         {
-            await _hubService.AddToGroup(connectionId, gameId, CancellationToken.None);
+            await SubscribePlayer(playerId, connectionId);
             await SendContinueGameMessage(playerId);
         }
     }
@@ -499,35 +514,35 @@ public class GameGrain : Grain, IGameGrain
     }
 
 
-    private Task OpponentConnectionUpdateTimer()
-    {
-        if (_isTimerActive)
-        {
-            return Task.CompletedTask; // Timer already active
-        }
+    // private Task OpponentConnectionUpdateTimer()
+    // {
+    //     if (_isTimerActive)
+    //     {
+    //         return Task.CompletedTask; // Timer already active
+    //     }
 
-        _isTimerActive = true;
-        _timerHandle = this.RegisterGrainTimer(
-            OpponentConnectionTimeout,
-            this,
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromMilliseconds(-1));
+    //     _isTimerActive = true;
+    //     _timerHandle = this.RegisterGrainTimer(
+    //         OpponentConnectionTimeout,
+    //         this,
+    //         TimeSpan.FromSeconds(10),
+    //         TimeSpan.FromMilliseconds(-1));
 
-        return Task.CompletedTask;
-    }
+    //     return Task.CompletedTask;
+    // }
 
-    private async Task OpponentConnectionTimeout(object state)
-    {
-        await StopActiveTimer();
-        await SendOpponentConnectionUpdates();
-        await OpponentConnectionUpdateTimer();
-    }
+    // private async Task OpponentConnectionTimeout(object state)
+    // {
+    //     await StopActiveTimer();
+    //     await SendOpponentConnectionUpdates();
+    //     await OpponentConnectionUpdateTimer();
+    // }
 
     private async Task StartDelayTimeout(object state)
     {
         await StopActiveTimer();
         await StartGame(now);
-        await OpponentConnectionUpdateTimer();
+        // await OpponentConnectionUpdateTimer();
     }
 
     public ValueTask StopActiveTimer()
@@ -653,18 +668,26 @@ public class GameGrain : Grain, IGameGrain
 
     public async Task<(Game, DateTime)> StartMatch(Match match, List<PlayerInfo> playerInfos)
     {
-        await CreateGame(
+        await _CreateGame(
                 new GameCreationData(
                 rows: match.BoardSize.ToBoardSizeData().Rows,
                 columns: match.BoardSize.ToBoardSizeData().Columns,
                 timeControl: match.TimeControl,
                 firstPlayerStone: StoneSelectionType.Auto
             ),
-            gameCreatorData: null,
-            match.GameType
+            match.GameType,
+            null
         );
 
         List<string> players = playerInfos.Select(a => a.Id).ToList();
+
+        var connIds = await Task.WhenAll(players.Select(async a => await GrainFactory.GetGrain<IPlayerGrain>(a).GetConnectionId()));
+
+        foreach (var data in players.Zip(connIds))
+        {
+            await SubscribePlayer(data.First, data.Second!);
+        }
+
         _playerInfos = players.Zip(playerInfos).ToDictionary(a => a.First, a => a.Second);
 
         var time = await EnterGameByPlayers(players[0], players[1]);
@@ -672,6 +695,8 @@ public class GameGrain : Grain, IGameGrain
 
         return (_GetGame(), time);
     }
+
+    private string thisGameRoom => gameId + "::GameId";
 
     /// <summary>
     /// Send message to a specific player
@@ -689,7 +714,7 @@ public class GameGrain : Grain, IGameGrain
             if (connectionId != null)
             {
                 _logger.LogInformation("Notification sent to <player>{player}<player>, <message>{message}<message>", player, message);
-                await _hubService.SendToClient("gameUpdate", connectionId, message, CancellationToken.None);
+                await _hubService.SendToClient(thisGameRoom, connectionId, message, CancellationToken.None);
             }
         }
         catch (Exception ex)
@@ -704,7 +729,7 @@ public class GameGrain : Grain, IGameGrain
         try
         {
             _logger.LogInformation("Notification sent to <group>{gameGroup}<group>, <message>{message}<message>", gameId, message);
-            await _hubService.SendToGroup("gameUpdate", gameId, message, CancellationToken.None);
+            await _hubService.SendToGroup(thisGameRoom, gameId, message, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -713,6 +738,36 @@ public class GameGrain : Grain, IGameGrain
     }
 
     // Grain Overrides //
+
+    private async Task SubscribePlayer(string playerId, string connectionId)
+    {
+        await _hubService.AddToGroup(connectionId, gameId, CancellationToken.None);
+
+        var pushG = GrainFactory.GetGrain<IPushNotifierGrain>(connectionId);
+
+        var conStream = await pushG.ConnectionStrengthStream();
+
+        var subscriptionHandle = await conStream.SubscribeAsync(async (con, token) =>
+        {
+            if (BothPlayersIn())
+            {
+                _logger.LogInformation("Connection Strength <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+
+                var myStone = GetStoneFromPlayerId(playerId);
+
+                var prevCon = ConnectionStrengths[(int)myStone];
+
+                var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
+
+                if (MathF.Abs(prevCon.Ping - con.Ping) > 100)
+                {
+                    _logger.LogInformation("Updated Connection strength message <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
+                    ConnectionStrengths[(int)myStone] = con;
+                    await SendOpponentConnectionUpdates(playerId, con);
+                }
+            }
+        });
+    }
 
 
     private string gameId => this.GetPrimaryKeyString();
@@ -791,7 +846,10 @@ public class GameGrain : Grain, IGameGrain
         firstAndSecondPlayerStones.Sort((a, b) => a.CompareTo(b));
 
         _players = firstAndSecondPlayerStones.Select(a => firstAndSecondPlayer[a]).ToList();
+
         _prisoners = [0, 0];
+
+        ConnectionStrengths = [new ConnectionStrength(-100), new ConnectionStrength(-100)];
 
         _joinTime = now;
 
@@ -1148,23 +1206,14 @@ public class GameGrain : Grain, IGameGrain
         ));
     }
 
-    private async Task SendOpponentConnectionUpdates()
+    private async Task SendOpponentConnectionUpdates(String player, ConnectionStrength con)
     {
-        foreach (var player in _players)
-        {
-            var op = _players.GetOtherPlayerIdFromPlayerId(player);
+        var op = _players.GetOtherPlayerIdFromPlayerId(player);
 
-            var opG = GrainFactory.GetGrain<IPlayerGrain>(op);
-
-            var opPushG = GrainFactory.GetGrain<IPushNotifierGrain>(await opG.GetConnectionId());
-
-            var plG = GrainFactory.GetGrain<IPushNotifierGrain>(player);
-
-            await SendMessageToClient(new SignalRMessage(
-                SignalRMessageType.opponentConnection,
-                await opPushG.GetConnectionStrength()
-            ), await plG.GetConnectionId());
-        }
+        await SendMessageToClient(new SignalRMessage(
+            SignalRMessageType.opponentConnection,
+            con
+        ), op!);
     }
 
     // Helpers
@@ -1186,35 +1235,34 @@ public class GameGrain : Grain, IGameGrain
 
     private string GetPlayerIdWithTurn()
     {
-        Debug.Assert(DidStart());
+        Debug.Assert(BothPlayersIn());
         return _GetGame().GetPlayerIdWithTurn()!;
     }
 
 
     private StoneType GetStoneFromPlayerId(string id)
     {
-        Debug.Assert(DidStart());
+        Debug.Assert(BothPlayersIn());
         return (StoneType)_GetGame().Players.GetStoneFromPlayerId(id)!;
     }
 
 
     private StoneType GetOtherStoneFromPlayerId(string id)
     {
-        Debug.Assert(DidStart());
+        Debug.Assert(BothPlayersIn());
         return (StoneType)_GetGame().Players.GetOtherStoneFromPlayerId(id)!;
     }
 
 
     private string GetPlayerIdFromStoneType(StoneType stone)
     {
-        Debug.Assert(DidStart());
+        Debug.Assert(BothPlayersIn());
         return _GetGame().Players.GetPlayerIdFromStoneType(stone)!;
     }
 
     public string GetOtherPlayerIdFromPlayerId(string id)
     {
-        Debug.Assert(DidStart());
+        Debug.Assert(BothPlayersIn());
         return _GetGame().Players.GetOtherPlayerIdFromPlayerId(id)!;
     }
-
 }

@@ -4,8 +4,6 @@ using BadukServer;
 using BadukServer.Hubs;
 using BadukServer.Models;
 using BadukServer.Services;
-using Microsoft.AspNet.Identity;
-using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
