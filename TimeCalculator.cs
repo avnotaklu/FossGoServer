@@ -22,7 +22,8 @@ public class TimeCalculator : ITimeCalculator
 
         var activePlayerIdx = newTimes.FindIndex((snap) => snap.TimeActive);
 
-        if(activePlayerIdx == -1) {
+        if (activePlayerIdx == -1)
+        {
             return newTimes;
         }
 
@@ -40,7 +41,7 @@ public class TimeCalculator : ITimeCalculator
                     snapshotTimestamp: curTime,
                     mainTimeMilliseconds: activePlayerTimeLeft > 0 ? activePlayerTimeLeft + applicableIncrement : applicableByoYomiTime,
                     byoYomisLeft: (int)MathF.Max(newByoYomi, 0),
-                    byoYomiActive: activePlayerTimeLeft <= 0,
+                    byoYomiActive: newTimes[activePlayerIdx].ByoYomiActive || activePlayerTimeLeft <= 0,
                     timeActive: newTimes[activePlayerIdx].TimeActive
                 );
 
@@ -54,10 +55,9 @@ public class TimeCalculator : ITimeCalculator
 
         newTimes[1 - curTurn] = new PlayerTimeSnapshot(
                     snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: nonTurnPlayerSnap().MainTimeMilliseconds,
-                    // newTimes[1 - curTurn].ByoYomiActive ? (byoYomiMS ?? 0) : nonTurnPlayerSnap().MainTimeMilliseconds,
+                    mainTimeMilliseconds: nonTurnPlayerSnap().ByoYomiActive ? (int)byoYomiMS! : nonTurnPlayerSnap().MainTimeMilliseconds,
                     byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
-                    byoYomiActive: false,
+                    byoYomiActive: nonTurnPlayerSnap().ByoYomiActive,
                     timeActive: false
                 );
         return newTimes.Select((snap) => snap!).ToList();

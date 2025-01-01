@@ -70,7 +70,6 @@ public class TimeCalculatorTest
                 ];
     }
 
-
     [TestMethod]
     public void TestByoYomi()
     {
@@ -135,6 +134,74 @@ public class TimeCalculatorTest
         Assert.AreEqual(0 /* all byo yomi gone */, result[0].MainTimeMilliseconds);
         Assert.AreEqual(true, result[0].ByoYomiActive);
         Assert.AreEqual(0, result[0].ByoYomisLeft);
+    }
+
+    [TestMethod]
+    public void TestByoYomiTurnChangeHalfway()
+    {
+        // Arrange
+        var timeCalculator = new TimeCalculator();
+
+        Setup();
+
+        List<PlayerTimeSnapshot> ReCalc()
+        {
+            var res = timeCalculator.RecalculateTurnPlayerTimeSnapshots(CurTurn(), _playerTimeSnapshots, _timeControl, CurTime());
+            _playerTimeSnapshots = res;
+            return res;
+        }
+
+        // Make one move
+        _curTime = _curTime.AddSeconds(8);
+        _turn += 1;
+        var result = ReCalc();
+
+        // Test One move made after 8 seconds
+
+        Assert.AreEqual(10 * 1000, result[1].MainTimeMilliseconds);
+        Assert.AreEqual(2 * 1000, result[0].MainTimeMilliseconds);
+
+        _curTime = _curTime.AddSeconds(2);
+        _turn += 1;
+        result = ReCalc();
+
+        Assert.AreEqual(8 * 1000, result[1].MainTimeMilliseconds);
+        Assert.AreEqual(2 * 1000, result[0].MainTimeMilliseconds);
+
+        _curTime = _curTime.AddSeconds(2);
+        result = ReCalc();
+
+        Assert.AreEqual(8 * 1000, result[1].MainTimeMilliseconds);
+        Assert.AreEqual(3 * 1000 /* byoYomi Time */ , result[0].MainTimeMilliseconds);
+        Assert.AreEqual(true, result[0].ByoYomiActive);
+        Assert.AreEqual(3, result[0].ByoYomisLeft);
+
+        _curTime = _curTime.AddSeconds(3);
+        result = ReCalc();
+
+        Assert.AreEqual(8 * 1000, result[1].MainTimeMilliseconds);
+        Assert.AreEqual(3 * 1000 /* byoYomi Time */ , result[0].MainTimeMilliseconds);
+        Assert.AreEqual(true, result[0].ByoYomiActive);
+        Assert.AreEqual(2, result[0].ByoYomisLeft);
+
+        _curTime = _curTime.AddSeconds(2);
+        _turn += 1;
+        result = ReCalc();
+
+        Assert.AreEqual(8 * 1000, result[1].MainTimeMilliseconds);
+        Assert.AreEqual(true, result[1].TimeActive);
+        Assert.AreEqual(3 * 1000 /* byoYomi Time */ , result[0].MainTimeMilliseconds);
+        Assert.AreEqual(true, result[0].ByoYomiActive);
+        Assert.AreEqual(false, result[0].TimeActive);
+        Assert.AreEqual(2, result[0].ByoYomisLeft);
+
+        // _curTime = _curTime.AddSeconds(3);
+        // result = ReCalc();
+
+        // Assert.AreEqual(8 * 1000, result[1].MainTimeMilliseconds);
+        // Assert.AreEqual(0 /* all byo yomi gone */, result[0].MainTimeMilliseconds);
+        // Assert.AreEqual(true, result[0].ByoYomiActive);
+        // Assert.AreEqual(0, result[0].ByoYomisLeft);
     }
 
 
