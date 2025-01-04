@@ -55,7 +55,9 @@ public class TimeCalculator : ITimeCalculator
 
         newTimes[1 - curTurn] = new PlayerTimeSnapshot(
                     snapshotTimestamp: curTime,
-                    mainTimeMilliseconds: nonTurnPlayerSnap().ByoYomiActive ? (int)byoYomiMS! : nonTurnPlayerSnap().MainTimeMilliseconds,
+                    mainTimeMilliseconds: nonTurnPlayerSnap().ByoYomiActive
+                        ? (int)byoYomiMS!
+                        : nonTurnPlayerSnap().MainTimeMilliseconds,
                     byoYomisLeft: nonTurnPlayerSnap().ByoYomisLeft,
                     byoYomiActive: nonTurnPlayerSnap().ByoYomiActive,
                     timeActive: false
