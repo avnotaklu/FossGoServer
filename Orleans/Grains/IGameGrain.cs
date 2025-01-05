@@ -25,5 +25,5 @@ public interface IGameGrain : IGrainWithStringKey
 
     Task PlayerRejoin(string playerId, string connectionId);
 
-    Task<(Game, DateTime)> StartMatch(Match match, List<PlayerInfo> playerInfos);
+    Task<(Game, DateTime)?> StartMatch(Match match, List<PlayerInfo> playerInfos);
 }

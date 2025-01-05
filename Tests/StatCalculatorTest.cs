@@ -289,7 +289,6 @@ public class StatCalculatorTest
             moves: [], // doesn't matter
             playgroundMap: [], // doesn't matter
             prisoners: [0, 0], // doesn't matter
-            koPositionInLastMove: null, // doesn't matter
             komi: 0, // doesn't matter
             gameCreator: "p1", // doesn't matter
             gameId: "gameId", // doesn't matter
@@ -331,7 +330,6 @@ public class StatCalculatorTest
             moves: [], // doesn't matter
             playgroundMap: [], // doesn't matter
             prisoners: [0, 0], // doesn't matter
-            koPositionInLastMove: null, // doesn't matter
             komi: 0, // doesn't matter
             gameCreator: "p1", // doesn't matter
             gameId: "gameId", // doesn't matter
@@ -375,7 +373,6 @@ public class StatCalculatorTest
             moves: [], // doesn't matter
             playgroundMap: [], // doesn't matter
             prisoners: [0, 0], // doesn't matter
-            koPositionInLastMove: null, // doesn't matter
             komi: 0, // doesn't matter
             gameCreator: "p1", // doesn't matter
             gameId: "gameId", // doesn't matter

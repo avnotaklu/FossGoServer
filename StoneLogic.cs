@@ -115,16 +115,13 @@ namespace BadukServer
     {
         public int rows;
         public int cols;
-        // koDelete assumes that this position was deleted in the last move by the opposing player
-        public Position? koDelete;
         public List<int> prisoners = [0, 0];
         public Dictionary<Position, Stone> playgroundMap;
 
-        public BoardState(int rows, int cols, Position? koDelete, Dictionary<Position, Stone> playgroundMap, List<int> prisoners)
+        public BoardState(int rows, int cols, Dictionary<Position, Stone> playgroundMap, List<int> prisoners)
         {
             this.rows = rows;
             this.cols = cols;
-            this.koDelete = koDelete;
             this.prisoners = prisoners;
             this.playgroundMap = playgroundMap;
         }
@@ -201,10 +198,6 @@ namespace BadukServer
         bool checkInsertable(Position position, StoneType stone)
         {
             if (stoneAt(position) != null)
-            {
-                return false;
-            }
-            if (board.koDelete?.Equals(position) ?? false)
             {
                 return false;
             }
@@ -305,23 +298,6 @@ namespace BadukServer
             {
                 foreach (var i in getClusterFromPosition(neighbor)!.data)
                 {
-                    // This supposedly works because a
-                    // position where delete occurs in such a way that ko is possible
-                    // the cluster at that position can only have one member because
-                    // all the neighboring ones have to opposite ones for ko to be possible
-
-                    // how do we solve the behaviour when neighboring cells will be null
-
-                    // we store in koDelete The position that was deleted
-                    // we check that against newly entered stone and stone can only be deleted when neighboring cells will be opposite
-                    //
-
-                    if (getClusterFromPosition(i)!.data.Count == 1)
-                    {
-                        Console.WriteLine("Setting ko delete" + neighbor);
-                        board.koDelete = neighbor;
-                    }
-
                     board.prisoners[1 - stoneAt(i)!.player] += 1;
                     board.playgroundMap.Remove(i);
                     // _playgroundMap.remove(i);
@@ -371,7 +347,9 @@ namespace BadukServer
                 return (true, board);
             }
 
-            BoardState lastValid = new BoardState(6, 6, null, board.playgroundMap.ToDictionary(), []);
+            BoardState lastValid = new BoardState(
+                board.rows, board.cols, board.playgroundMap.ToDictionary(e => e.Key, e => e.Value), board.prisoners
+            );
 
             Position? thisCurrentCell = position;
 
@@ -389,8 +367,6 @@ namespace BadukServer
                              cluster: current_cluster
                            );
 
-                // if stone can be inserted at this position
-                board.koDelete = null;
                 DoActionOnNeighbors(position, addMatchingNeighborsToCluster);
                 UpdateAllInTheClusterWithCorrectCluster(current_cluster);
                 DoActionOnNeighbors(position, (a, b) => deleteStonesInDeletableCluster(a, b, traversed));
@@ -483,7 +459,7 @@ namespace BadukServer
             var clusters = GetClusters(simpleB, boardSize);
 
             var stones = GetStones(clusters);
-            var board = ConstructBoard(rows, cols, stones, game.KoPositionInLastMove == null ? null : new Position(game.KoPositionInLastMove!));
+            var board = ConstructBoard(rows, cols, stones);
 
             return board;
         }
@@ -598,12 +574,11 @@ namespace BadukServer
             return stones;
         }
 
-        public BoardState ConstructBoard(int rows, int cols, List<Stone> stones, Position? koDelete = null)
+        public BoardState ConstructBoard(int rows, int cols, List<Stone> stones)
         {
             return new BoardState(
                 rows: rows,
                 cols: cols,
-                koDelete,
                 playgroundMap: stones.ToDictionary(e => e.position, e => e),
                 prisoners: [0, 0]
                 );

@@ -364,7 +364,6 @@ public class Game
         List<string> players,
         List<int> prisoners,
         GameState gameState,
-        string? koPositionInLastMove,
         List<string> deadStones,
         GameResult? result,
         List<int> finalTerritoryScores,
@@ -394,7 +393,6 @@ public class Game
         Players = players;
         Prisoners = prisoners;
         StartTime = startTime;
-        KoPositionInLastMove = koPositionInLastMove;
         GameState = gameState;
         DeadStones = deadStones;
         Result = result;
@@ -437,15 +435,12 @@ public class Game
     [BsonRepresentation(BsonType.ObjectId)]
     [Id(8)]
     public List<string> Players { get; set; }
-    [BsonElement(GameFieldNames.Prisoners)] 
+    [BsonElement(GameFieldNames.Prisoners)]
     [Id(9)]
     public List<int> Prisoners { get; set; } // REVIEW: chinese system doens't even require prisoners, should i keep it
     [BsonElement(GameFieldNames.StartTime)]
     [Id(10)]
     public DateTime? StartTime { get; set; }
-    [BsonElement(GameFieldNames.KoPositionInLastMove)]
-    [Id(11)]
-    public string? KoPositionInLastMove { get; set; }
     [BsonElement(GameFieldNames.GameState)]
     [Id(12)]
     public GameState GameState { get; set; }

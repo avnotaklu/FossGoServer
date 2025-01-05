@@ -27,7 +27,6 @@ public class GameGrain : Grain, IGameGrain
     private ReadOnlyCollection<int> _finalScores = new ReadOnlyCollection<int>([]);
     private DateTime? _startTime;
     private DateTime _creationTime;
-    private Position? _koPositionInLastMove;
     private int turn => _moves.Count;
     private StoneType playerTurn => (StoneType)(turn % 2);
     private HashSet<string> _scoresAcceptedBy = [];
@@ -56,6 +55,7 @@ public class GameGrain : Grain, IGameGrain
     // Own Timer stuff (Used for acknowledging game starts)
     private IDisposable _timerHandle = null!;
     private bool _isTimerActive;
+    private StoneLogic stoneLogic = null!;
 
     // Connections
     private List<ConnectionStrength> ConnectionStrengths;
@@ -123,7 +123,6 @@ public class GameGrain : Grain, IGameGrain
         List<int> prisoners,
         DateTime? startTime,
         GameState gameState,
-        string? koPositionInLastMove,
         List<string> deadStones,
         GameResult? gameResult,
         List<int> finalTerritoryScores,
@@ -149,7 +148,6 @@ public class GameGrain : Grain, IGameGrain
         _prisoners = prisoners;
         _startTime = startTime;
         _gameState = gameState;
-        _koPositionInLastMove = koPositionInLastMove == null ? null : new Position(koPositionInLastMove);
         _stoneStates = deadStones.Select(a => new Position(a)).ToDictionary(a => a, a => DeadStoneState.Dead);
         _gameResult = gameResult;
         _finalScores = new ReadOnlyCollection<int>(finalTerritoryScores);
@@ -193,7 +191,6 @@ public class GameGrain : Grain, IGameGrain
             prisoners: [0, 0],
             startTime: null,
             gameState: GameState.WaitingForStart,
-            koPositionInLastMove: null,
             deadStones: [],
             gameResult: null,
             finalTerritoryScores: [],
@@ -278,11 +275,7 @@ public class GameGrain : Grain, IGameGrain
 
             var position = new Position(x, y);
 
-            var board = _boardStateUtilities.BoardStateFromGame(_GetGame());
-
-            var updateResult = new StoneLogic(board).HandleStoneUpdate(position, (int)player);
-
-            _koPositionInLastMove = updateResult.board.koDelete;
+            var updateResult = stoneLogic.HandleStoneUpdate(position, (int)player);
 
             _prisoners[0] += updateResult.board.prisoners[0];
             _prisoners[1] += updateResult.board.prisoners[1];
@@ -539,7 +532,7 @@ public class GameGrain : Grain, IGameGrain
             foreach (var playerId in _players)
             {
                 var plG = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-                
+
                 var myPushG = GrainFactory.GetGrain<IPushNotifierGrain>(await plG.GetConnectionId());
 
                 var con = await myPushG.GetConnectionStrength();
@@ -570,14 +563,14 @@ public class GameGrain : Grain, IGameGrain
         await OpponentConnectionUpdateTimer();
     }
 
-    public ValueTask StopActiveTimer()
+    public Task StopActiveTimer()
     {
         if (_isTimerActive)
         {
             _timerHandle?.Dispose();
             _isTimerActive = false;
         }
-        return new();
+        return Task.CompletedTask;
     }
 
 
@@ -655,7 +648,6 @@ public class GameGrain : Grain, IGameGrain
             prisoners: game.Prisoners,
             startTime: game.StartTime,
             gameState: game.GameState,
-            koPositionInLastMove: game.KoPositionInLastMove,
             deadStones: game.DeadStones,
             gameResult: game.Result,
             finalTerritoryScores: game.FinalScore.ToList(),
@@ -691,7 +683,7 @@ public class GameGrain : Grain, IGameGrain
         return _GetGame();
     }
 
-    public async Task<(Game, DateTime)> StartMatch(Match match, List<PlayerInfo> playerInfos)
+    public async Task<(Game, DateTime)?> StartMatch(Match match, List<PlayerInfo> playerInfos)
     {
         await _CreateGame(
                 new GameCreationData(
@@ -705,6 +697,18 @@ public class GameGrain : Grain, IGameGrain
         );
 
         List<string> players = playerInfos.Select(a => a.Id).ToList();
+
+        // NOTE: This doesn't renter PlayerGrain 1. either grain timer executes this, or executed by makeMove from game controller
+
+        foreach (var player in players)
+        {
+            var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+            var active = await playerGrain.IsActive();
+            if (!active)
+            {
+                return null;
+            }
+        }
 
         var connIds = await Task.WhenAll(players.Select(async a => await GrainFactory.GetGrain<IPlayerGrain>(a).GetConnectionId()));
 
@@ -818,7 +822,6 @@ public class GameGrain : Grain, IGameGrain
             prisoners: _prisoners,
             startTime: _startTime,
             gameState: _gameState,
-            koPositionInLastMove: _koPositionInLastMove?.ToHighLevelRepr(),
             deadStones: _stoneStates.Where((p) => p.Value == DeadStoneState.Dead).Select((k) => k.Key.ToHighLevelRepr()).ToList(),
             result: _gameResult,
             finalTerritoryScores: _finalScores.ToList(),
@@ -884,7 +887,9 @@ public class GameGrain : Grain, IGameGrain
         Debug.Assert(_playerInfos.Count == 2);
 
         _logger.LogInformation("Game started <gameId>{gameId}<gameId>", gameId);
+
         _gameState = GameState.Playing;
+
         _startTime = time;
 
         _playerTimeSnapshots = [
@@ -903,11 +908,25 @@ public class GameGrain : Grain, IGameGrain
                 timeActive: false
             )];
 
-
         var gameTimer = GrainFactory.GetGrain<IGameTimerGrain>(gameId);
         await gameTimer.StartTurnTimer(_timeControl.MainTimeSeconds * 1000);
 
+        var board = _boardStateUtilities.BoardStateFromGame(_GetGame());
+        stoneLogic = new StoneLogic(board);
+
         await SendGameStartMessageToPlayers();
+
+        // NOTE: This doesn't renter PlayerGrain 1. either grain timer executes this, or executed by makeMove from game controller
+
+        foreach (var player in _players)
+        {
+            var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(player);
+            var active = await playerGrain.IsActive();
+            if (!active)
+            {
+                await EndGame(GameOverMethod.Abandon, GameResult.NoResult);
+            }
+        }
     }
 
     private string MinifiedRating(DateTime time, PlayerRatingsData? ratD)

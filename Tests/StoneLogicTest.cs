@@ -165,14 +165,13 @@ public class StoneLogicTest
         var updateResult = stoneLogic.HandleStoneUpdate(movePos, 0);
 
         Assert.IsTrue(updateResult.result);
-        Assert.AreEqual(killPosition, updateResult.board.koDelete);
         Assert.IsTrue(updateResult.board.playgroundMap.ContainsKey(movePos));
         Assert.IsFalse(updateResult.board.playgroundMap.ContainsKey(killPosition));
 
         var movePos2 = new Position(1, 3);
         var killPosition2 = new Position(1, 2);
 
-        var updateResult2 = new StoneLogic(updateResult.board).HandleStoneUpdate(movePos2, 1);
+        var updateResult2 = stoneLogic.HandleStoneUpdate(movePos2, 1);
 
         Assert.IsFalse(updateResult2.result);
         Assert.IsFalse(updateResult2.board.playgroundMap.ContainsKey(movePos2));
@@ -213,7 +212,7 @@ public class StoneLogicTest
 
         Assert.IsTrue(r2.result);
 
-        BoardState lastValid = new BoardState(6, 6, null, r2.board.playgroundMap.ToDictionary(), []);
+        BoardState lastValid = new BoardState(6, 6, r2.board.playgroundMap.ToDictionary(), []);
 
         var r3 = stoneLogic.HandleStoneUpdate(m3, 1);
 

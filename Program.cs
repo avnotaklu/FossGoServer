@@ -12,11 +12,7 @@ await Host.CreateDefaultBuilder(args)
         siloBuilder.UseLocalhostClustering(
             siloPort: port + instanceId,
             gatewayPort: 30000 + instanceId,
-            primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, port))
-
-
-
-            .AddMemoryStreams("StreamProvider").AddMemoryGrainStorage("PubSubStore");
+            primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, port));
     })
     .ConfigureWebHostDefaults(webBuilder =>
     {

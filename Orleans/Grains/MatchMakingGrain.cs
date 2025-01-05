@@ -37,7 +37,6 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
         var player = matches.First!.Value;
         if (player == finder) return null;
 
-        matches.RemoveFirst();
         return player;
     }
 
@@ -71,35 +70,55 @@ public class MatchMakingGrain : Grain, IMatchMakingGrain
 
         if (!match.HasValue || matchingPlayer == null)
         {
-            List<(Match, LinkedListNode<string>)> playerMatches = new List<(Match, LinkedListNode<string>)>();
-            foreach (var m in lookedMatches)
-            {
-                if (!_matches.ContainsKey(m))
-                {
-                    _matches[m] = new LinkedList<string>();
-                }
-                var refr = _matches[m].AddLast(playerInfo.Id);
-                playerMatches.Add((m, refr));
-            }
-            _players[finderId] = playerMatches;
+            AddFinder(playerInfo, finderId, lookedMatches);
             return;
         }
         else
         {
-            await StartGame(finderId, match.GetValueOrDefault(), matchingPlayer);
+            var game = await StartGame(finderId, match.GetValueOrDefault(), matchingPlayer);
+
+            if (game != null)
+            {
+                await CancelFind(matchingPlayer);
+            }
+            else
+            {
+                AddFinder(playerInfo, finderId, lookedMatches);
+            }
         }
     }
 
-    private async Task StartGame(string finderId, Match match, string matchingPlayer)
+    private void AddFinder(PlayerInfo playerInfo, string finderId, IEnumerable<Match> lookedMatches)
+    {
+        List<(Match, LinkedListNode<string>)> playerMatches = new List<(Match, LinkedListNode<string>)>();
+        foreach (var m in lookedMatches)
+        {
+            if (!_matches.ContainsKey(m))
+            {
+                _matches[m] = new LinkedList<string>();
+            }
+            var refr = _matches[m].AddLast(playerInfo.Id);
+            playerMatches.Add((m, refr));
+        }
+        _players[finderId] = playerMatches;
+    }
+
+    private async Task<Game?> StartGame(string finderId, Match match, string matchingPlayer)
     {
         var gameGrain = GrainFactory.GetGrain<IGameGrain>(ObjectId.GenerateNewId().ToString());
 
         // REVIEW: Getting match creator info using finder type, i'm assuming that the creator is the same type as finder
         var publicInfos = (await Task.WhenAll(new List<string>([matchingPlayer, finderId]).Select(async p => await _publicUserInfoService.GetPublicUserInfoForPlayer(p, match.GameType.AllowedPlayerType()) ?? throw new Exception($"Player info wasn't fetched {p}")))).ToList();
 
-        var (game, time) = await gameGrain.StartMatch(match, publicInfos);
+        var res = await gameGrain.StartMatch(match, publicInfos);
 
-        await InformGameStart(publicInfos, game, time);
+        if (res != null && res.HasValue)
+        {
+            await InformGameStart(publicInfos, res.Value.Item1, res.Value.Item2);
+            return res.Value.Item1;
+        }
+
+        return null;
     }
 
     private async Task InformGameStart(List<PlayerInfo> publicInfos, Game game, DateTime time)

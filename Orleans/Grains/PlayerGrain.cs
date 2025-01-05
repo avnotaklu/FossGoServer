@@ -8,6 +8,8 @@ using Orleans.Streams;
 
 namespace BadukServer.Orleans.Grains;
 
+
+[Reentrant]
 public class PlayerGrain : Grain, IPlayerGrain
 {
     // Injected
@@ -204,6 +206,11 @@ public class PlayerGrain : Grain, IPlayerGrain
     public Task LeaveGame(string gameId)
     {
         return Task.CompletedTask;
+    }
+
+    public Task<bool> IsActive()
+    {
+        return Task.FromResult(_isInitialized);
     }
 }
 

@@ -48,10 +48,6 @@ public class GameGrainTests
         return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
     }
 
-
-
-
-
     [TestMethod]
     public async Task GameGrainTest()
     {

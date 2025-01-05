@@ -10,5 +10,6 @@ public interface IPlayerGrain : IGrainWithStringKey
     Task InformMyJoin(Game game, List<PlayerInfo> players, DateTime time, PlayerJoinMethod joinMethod);
     Task LeaveGame(string gameId);
     Task AddActiveGame(string gameId);
-    public Task<string?> GetConnectionId();
+    Task<string?> GetConnectionId();
+    Task<bool> IsActive();
 }
