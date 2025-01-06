@@ -110,7 +110,12 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
     public Task SetConnectionStrength(ConnectionStrength strength)
     {
         connectionStrength = strength;
-        SetupTimerForStrengthDecay();
+
+        if (connectionStrength.Ping < ConnectionStrength.Worst)
+        {
+            SetupTimerForStrengthDecay();
+        }
+
         return Task.CompletedTask;
     }
 
@@ -135,6 +140,6 @@ public class PushNotifierGrain : Grain, IPushNotifierGrain
 
     private async Task DecayStrength(object? _)
     {
-        await SetConnectionStrength(new ConnectionStrength((int)MathF.Min(connectionStrength.Ping * 2, 10_000))); // TODO: doubling the ping is a temporary solution
+        await SetConnectionStrength(new ConnectionStrength((int)MathF.Min(connectionStrength.Ping * 2, ConnectionStrength.Worst))); // TODO: doubling the ping is a temporary solution
     }
 }

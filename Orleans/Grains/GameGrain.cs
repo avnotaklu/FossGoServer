@@ -5,6 +5,7 @@ using BadukServer.Services;
 using Google.Apis.Util;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client.Payloads;
+using Orleans.Concurrency;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 
@@ -506,7 +507,6 @@ public class GameGrain : Grain, IGameGrain
         return Task.CompletedTask;
     }
 
-
     private Task OpponentConnectionUpdateTimer()
     {
         if (_isTimerActive)
@@ -519,7 +519,7 @@ public class GameGrain : Grain, IGameGrain
             OpponentConnectionTimeout,
             this,
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(-1));
+            TimeSpan.FromSeconds(1));
 
         return Task.CompletedTask;
     }
@@ -553,7 +553,10 @@ public class GameGrain : Grain, IGameGrain
                 }
             }
         }
-        await OpponentConnectionUpdateTimer();
+        if (_gameState != GameState.Ended)
+        {
+            await OpponentConnectionUpdateTimer();
+        }
     }
 
     private async Task StartDelayTimeout(object state)
@@ -573,12 +576,18 @@ public class GameGrain : Grain, IGameGrain
         return Task.CompletedTask;
     }
 
-
     private async Task EndGame(GameOverMethod method, GameResult? _result = null, bool timeStopped = false)
     {
         _logger.LogInformation("Game ended <gameId>{gameId}<gameId> via {method} with {result}", gameId, method, _result);
 
+        if (_gameState == GameState.Ended)
+        {
+            return;
+        }
+
         _gameState = GameState.Ended;
+
+        await StopActiveTimer();
 
         _playerTimeSnapshots = [
             new PlayerTimeSnapshot(
@@ -620,7 +629,11 @@ public class GameGrain : Grain, IGameGrain
             await gameTimerGrain.StopTurnTimer();
         }
 
-        await StopActiveTimer();
+        foreach (var player in _players)
+        {
+            await UnsubscribePlayer(player);
+        }
+
     }
 
     public Task<Game> GetGame()
@@ -771,30 +784,14 @@ public class GameGrain : Grain, IGameGrain
     private async Task SubscribePlayer(string playerId, string connectionId)
     {
         await _hubService.AddToGroup(connectionId, gameId, CancellationToken.None);
-
-        // var conStream = await pushG.ConnectionStrengthStream();
-
-        // var subscriptionHandle = await conStream.SubscribeAsync(async (con, token) =>
-        // {
-        //     if (BothPlayersIn())
-        //     {
-        //         _logger.LogInformation("Connection Strength <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
-
-        //         var myStone = GetStoneFromPlayerId(playerId);
-
-        //         var prevCon = ConnectionStrengths[(int)myStone];
-
-        //         var otherPlayer = GetOtherPlayerIdFromPlayerId(playerId);
-
-        //         if (MathF.Abs(prevCon.Ping - con.Ping) > 100)
-        //         {
-        //             _logger.LogInformation("Updated Connection strength message <player>{player}<player>, <ping>{ping}<ping>", playerId, con.Ping);
-        //             ConnectionStrengths[(int)myStone] = con;
-        //             await SendOpponentConnectionUpdates(playerId, con);
-        //         }
-        //     }
-        // });
     }
+
+    private async Task UnsubscribePlayer(string playerId)
+    {
+        var playerG = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+        await playerG.LeaveGame(gameId);
+    }
+
 
 
     private string gameId => this.GetPrimaryKeyString();

@@ -207,7 +207,7 @@ public class PlayerController : ControllerBase
         return Ok(new AvailableGamesResult(games: [.. (result ?? [])]));
     }
 
-    [HttpGet("MyGames")]
+    [HttpGet("OngoingGames")]
     public async Task<ActionResult<MyGamesResult>> MyGames()
     {
         var userId = User.FindFirst("user_id")?.Value;
@@ -218,17 +218,19 @@ public class PlayerController : ControllerBase
 
         var myType = PlayerTypeExt.FromString(userType);
 
-        var playerPool = _grainFactory.GetGrain<IPlayerPoolGrain>(0);
-        var players = await playerPool.GetActivePlayers();
+        var playerG = _grainFactory.GetGrain<IPlayerGrain>(userId);
 
-        var gamesIds = (await Task.WhenAll(players.Select(async p => await _grainFactory.GetGrain<IPlayerGrain>(p).GetActiveGames()))).SelectMany(x => x) ?? [];
+        if (!await playerG.IsActive())
+        {
+            return Unauthorized("Player not connected");
+        }
+
+        var gamesIds = await playerG.GetActiveGames();
 
         var games = await Task.WhenAll(gamesIds.Select(i => _grainFactory.GetGrain<IGameGrain>(i).GetGame()));
 
-        var myGames = games.Where(a => a.Players.Contains(userId) || a.GameCreator == userId);
-
         var result = (await Task.WhenAll(
-        myGames.Select(async g =>
+        games.Select(async g =>
         {
             PlayerInfo? otherPlayerPublicData = null;
             if (g.DidStart())

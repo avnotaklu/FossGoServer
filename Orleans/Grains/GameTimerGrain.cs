@@ -1,4 +1,8 @@
+using Orleans.Concurrency;
+
 namespace BadukServer.Orleans.Grains;
+
+[Reentrant]
 public class GameTimerGrain : Grain, IGameTimerGrain
 {
     private IDisposable _timerHandle = null!;
@@ -36,7 +40,7 @@ public class GameTimerGrain : Grain, IGameTimerGrain
         await StopTurnTimer();
         var res = await gameGrain.TimeoutCurrentPlayer();
 
-        if (res != null && res.MainTimeMilliseconds > 0)
+        if (res != null && res.MainTimeMilliseconds > 0 && res.TimeActive)
         {
             await StartTurnTimer(res.MainTimeMilliseconds);
         }

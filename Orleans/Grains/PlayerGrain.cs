@@ -14,6 +14,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 {
     // Injected
     private readonly IPlayerInfoService _publicUserInfoService;
+    private readonly IGameService _gameService;
     private readonly ISignalRHubService _hubService;
 
     private string? _connectionId;
@@ -23,11 +24,24 @@ public class PlayerGrain : Grain, IPlayerGrain
     private ILogger<PlayerGrain> _logger;
     public HashSet<string> activeGames = [];
 
-    public PlayerGrain(IPlayerInfoService publicUserInfoService, ISignalRHubService hubService, ILogger<PlayerGrain> logger)
+    public PlayerGrain(IPlayerInfoService publicUserInfoService, IGameService gameService, ISignalRHubService hubService, ILogger<PlayerGrain> logger)
     {
         _publicUserInfoService = publicUserInfoService;
+        _gameService = gameService;
         _logger = logger;
         _hubService = hubService;
+    }
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        var games = await _gameService.GetActiveGamesForPlayer(PlayerId);
+
+        foreach (var game in games)
+        {
+            activeGames.Add(game.GameId);
+        }
+
+        await base.OnActivateAsync(cancellationToken);
     }
 
     public async Task ConnectPlayer(string connectionId, PlayerType playerType)
@@ -205,6 +219,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 
     public Task LeaveGame(string gameId)
     {
+        activeGames.Remove(gameId);
         return Task.CompletedTask;
     }
 

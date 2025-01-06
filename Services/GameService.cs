@@ -10,6 +10,7 @@ public interface IGameService
 {
     public Task<List<GameAndOpponent>> GetGamesWithOpponent(string player);
     public Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? from = null, DateTime? to = null);
+    Task<List<Game>> GetActiveGamesForPlayer(string playerId);
     public Task<Game?> GetGame(string gameId);
     public Task<Game?> SaveGame(Game game);
 }
@@ -34,6 +35,12 @@ public class GameService : IGameService
         _logger = logger;
     }
 
+    public async Task<List<Game>> GetActiveGamesForPlayer(string playerId)
+    {
+        var filter = Builders<Game>.Filter.Where(a => a.Players.Contains(playerId) && a.GameState != GameState.Ended);
+        var games = await _gameCollection.Find(filter).ToListAsync();
+        return games;
+    }
 
     public async Task<List<Game>> GetGamesForPlayers(string player, int page, BoardSize? boardSize = null, TimeStandard? timeStandard = null, PlayerResult? result = null, DateTime? from = null, DateTime? to = null)
     {
