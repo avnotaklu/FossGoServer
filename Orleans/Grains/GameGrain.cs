@@ -222,8 +222,6 @@ public class GameGrain : Grain, IGameGrain
             creationTime: now,
             gameType
         );
-
-        await TrySaveGame();
     }
 
 
@@ -265,7 +263,6 @@ public class GameGrain : Grain, IGameGrain
 
         var game = _GetGame();
 
-        await TrySaveGame();
         return (game, joinTime, true);
     }
 
@@ -948,6 +945,8 @@ public class GameGrain : Grain, IGameGrain
                 await EndGame(GameOverMethod.Abandon, GameResult.NoResult);
             }
         }
+
+        await TrySaveGame();
     }
 
     private string MinifiedRating(DateTime time, PlayerRatingsData? ratD)
