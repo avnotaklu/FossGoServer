@@ -159,7 +159,7 @@ public class PlayerGrain : Grain, IPlayerGrain
         }
         catch (InvalidOperationException)
         {
-            if (!game.DidEnd())
+            if (!game.DidEnd() && game.GameCreator == userId)
             {
                 return (game, null, null);
             }

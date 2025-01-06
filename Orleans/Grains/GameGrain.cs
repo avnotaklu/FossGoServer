@@ -108,6 +108,23 @@ public class GameGrain : Grain, IGameGrain
                 await EndGame(GameOverMethod.Abandon, GameResult.NoResult, true);
                 await TrySaveGame();
             }
+            if (!DidStart() && !DidEnd())
+            {
+                // Setup external state for playable game
+                _joinTime = now;
+
+                if (BothPlayersIn())
+                {
+                    _playerInfos = (await Task.WhenAll(_players.Select(async a => (a, await _playerInfoService.GetPublicUserInfoForPlayer(a, _gameType.AllowedPlayerType()))))).ToDictionary(a => a.Item1, a => a.Item2);
+
+                    await StartGame(_joinTime);
+                    await TrySaveGame();
+                }
+                else
+                {
+                    _playerInfos[_gameCreator!] = await _playerInfoService.GetPublicUserInfoForPlayer(_gameCreator!, _gameType.AllowedPlayerType());
+                }
+            }
         }
 
         await base.OnActivateAsync(cancellationToken);
@@ -221,7 +238,14 @@ public class GameGrain : Grain, IGameGrain
 
         if (BothPlayersIn())
         {
-            return (_GetGame(), _joinTime, false);
+            if (_players.Contains(playerData.Id))
+            {
+                return (_GetGame(), _joinTime, false);
+            }
+            else
+            {
+                throw new InvalidOperationException("Game is full");
+            }
         }
 
         if (_gameCreator == player)
