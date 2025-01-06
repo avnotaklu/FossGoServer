@@ -110,6 +110,10 @@ public class GameGrain : Grain, IGameGrain
             }
             if (!DidStart() && !DidEnd())
             {
+
+                // NOTE: This shouldn't really happen as game is only saved after start
+                // But keeping just for reference/later if needed
+
                 // Setup external state for playable game
                 _joinTime = now;
 
