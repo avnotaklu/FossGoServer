@@ -122,7 +122,6 @@ public class GameGrain : Grain, IGameGrain
                     _playerInfos = (await Task.WhenAll(_players.Select(async a => (a, await _playerInfoService.GetPublicUserInfoForPlayer(a, _gameType.AllowedPlayerType()))))).ToDictionary(a => a.Item1, a => a.Item2);
 
                     await StartGame(_joinTime);
-                    await TrySaveGame();
                 }
                 else
                 {
@@ -303,8 +302,8 @@ public class GameGrain : Grain, IGameGrain
 
             var updateResult = stoneLogic.HandleStoneUpdate(position, (int)player);
 
-            _prisoners[0] += updateResult.board.prisoners[0];
-            _prisoners[1] += updateResult.board.prisoners[1];
+            _prisoners[0] = updateResult.board.prisoners[0];
+            _prisoners[1] = updateResult.board.prisoners[1];
 
             if (updateResult.result)
             {
