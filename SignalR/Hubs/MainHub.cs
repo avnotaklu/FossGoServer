@@ -1,10 +1,14 @@
 using System.Configuration;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using BadukServer.Orleans.Grains;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
+using MongoDB.Driver.Linq;
 
 namespace BadukServer.Hubs;
 
@@ -30,17 +34,17 @@ public sealed class MainHub : Hub
 
     public async override Task OnConnectedAsync()
     {
-        var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+        // var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
 
-        var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+        // var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
 
-        _logger.LogInformation("User connected : {id} of type {type}", Context.ConnectionId, userType);
+        var (playerId, playerType) = GetPlayerIdAndType(Context);
+
+        _logger.LogInformation("User connected : {id} of type {type}", Context.ConnectionId, playerType.ToString());
 
         await Groups.AddToGroupAsync(Context.ConnectionId, "Users");
 
         var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
-
-        var playerType = PlayerTypeExt.FromString(userType);
 
         await playerGrain.ConnectPlayer(Context.ConnectionId, playerType);
 
@@ -62,10 +66,11 @@ public sealed class MainHub : Hub
             var matchGrain = _grainFactory.GetGrain<IMatchMakingGrain>(0);
             // var pushGrain = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
 
-            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
-            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+            // var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            // var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
 
-            var playerType = PlayerTypeExt.FromString(userType);
+            var (playerId, playerType) = GetPlayerIdAndType(Context);
+
 
             return new(Task.Run(
             async () =>
@@ -91,10 +96,11 @@ public sealed class MainHub : Hub
     {
         try
         {
-            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
-            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+            // var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            // var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
 
-            var playerType = PlayerTypeExt.FromString(userType);
+            var (playerId, playerType) = GetPlayerIdAndType(Context);
+
             var matchGrain = _grainFactory.GetGrain<IMatchMakingGrain>(0);
             await matchGrain.CancelFind(playerId);
         }
@@ -120,8 +126,10 @@ public sealed class MainHub : Hub
     {
         try
         {
-            var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
-            var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+            // var playerId = Context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+            // var userType = Context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+
+            var (playerId, playerType) = GetPlayerIdAndType(Context);
 
             var pushG = _grainFactory.GetGrain<IPushNotifierGrain>(Context.ConnectionId);
             await pushG.SetConnectionStrength(new ConnectionStrength(ping));
@@ -139,4 +147,42 @@ public sealed class MainHub : Hub
         }
     }
 
+    private (String UserId, PlayerType PlayerType) GetPlayerIdAndType(HubCallerContext context)
+    {
+
+        if ((!context.User?.Identity?.IsAuthenticated) ?? false)
+        {
+            var http = context.GetHttpContext();
+            StringValues token = StringValues.Empty;
+            if (http != null)
+            {
+                http.Request.Query.TryGetValue("token", out token);
+
+                if (!token.IsNullOrEmpty())
+                {
+                    var rToken = token.First();
+                    try
+                    {
+                        var sec = new JwtSecurityTokenHandler();
+                        var res = sec.ReadJwtToken(rToken);
+                        var _playerId = res.Claims.First(a => a.Type == "user_id")?.Value ?? throw new Exception("User not found");
+                        var _userType = res.Claims.First(a => a.Type == "user_type")?.Value ?? throw new Exception("User not found");
+
+                        return (_playerId, PlayerTypeExt.FromString(_userType));
+                    }
+                    catch
+                    {
+                        throw new Exception("User not found");
+                    }
+                }
+            }
+
+            throw new Exception("User not found");
+        }
+
+        var playerId = context.User?.FindFirst("user_id")?.Value ?? throw new Exception("User not found");
+        var userType = context.User?.FindFirst("user_type")?.Value ?? throw new Exception("User not found");
+
+        return (playerId, PlayerTypeExt.FromString(userType));
+    }
 }
