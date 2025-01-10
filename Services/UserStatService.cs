@@ -14,15 +14,9 @@ public class UserStatService : IUserStatService
     private readonly IMongoCollection<UserStat> _userStatCollection;
     private readonly IMongoOperationLogger _mongoOperation;
 
-    public UserStatService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<UserStat>> userStatCollection, IMongoOperationLogger mongoOperation)
+    public UserStatService(MongodbService mongodb, IOptions<MongodbCollectionParams<UserStat>> userStatCollection, IMongoOperationLogger mongoOperation)
     {
-        var mongoClient = new MongoClient(
-            userDatabaseSettings.Value.ConnectionString);
-
-        var mongoDatabase = mongoClient.GetDatabase(
-            userDatabaseSettings.Value.DatabaseName);
-
-        _userStatCollection = mongoDatabase.GetCollection<UserStat>(
+        _userStatCollection = mongodb.database.GetCollection<UserStat>(
             userStatCollection.Value.Name);
         _mongoOperation = mongoOperation;
     }

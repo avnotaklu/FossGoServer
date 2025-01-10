@@ -55,6 +55,7 @@ public class Startup
         services.AddSingleton<ITimeCalculator, TimeCalculator>();
         services.AddSingleton<ISignalRHubService, SignalRHubService>();
         services.AddSingleton<IMongoOperationLogger, MongoOperationHandler>();
+        services.AddSingleton<MongodbService>();
 
         services.AddEndpointsApiExplorer();
 

@@ -20,16 +20,10 @@ public class UserRatingService : IUserRatingService
     private readonly IMongoOperationLogger _mongoOperation;
 
 
-    public UserRatingService(IOptions<DatabaseSettings> userDatabaseSettings, IOptions<MongodbCollectionParams<PlayerRatings>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService, IMongoOperationLogger mongoOperation)
+    public UserRatingService(MongodbService mongodb, IOptions<MongodbCollectionParams<PlayerRatings>> ratingsCollection, IRatingEngine ratingEngine, IDateTimeService dateTimeService, IMongoOperationLogger mongoOperation)
 
     {
-        var mongoClient = new MongoClient(
-            userDatabaseSettings.Value.ConnectionString);
-
-        var mongoDatabase = mongoClient.GetDatabase(
-            userDatabaseSettings.Value.DatabaseName);
-
-        _ratingsCollection = mongoDatabase.GetCollection<PlayerRatings>(
+        _ratingsCollection = mongodb.database.GetCollection<PlayerRatings>(
             ratingsCollection.Value.Name);
 
         _ratingEngine = ratingEngine;

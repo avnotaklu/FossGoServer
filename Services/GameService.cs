@@ -21,15 +21,10 @@ public class GameService : IGameService
     private readonly ILogger<IGameService> _logger;
     private static readonly int historyPageSize = 12;
 
-    public GameService(IOptions<DatabaseSettings> gameDatabaseSettings, IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation, ILogger<IGameService> logger)
+    public GameService(MongodbService mongodb,
+     IOptions<MongodbCollectionParams<Game>> gameCollection, IMongoOperationLogger mongoOperation, ILogger<IGameService> logger)
     {
-        var mongoClient = new MongoClient(
-            gameDatabaseSettings.Value.ConnectionString);
-
-        var mongoDatabase = mongoClient.GetDatabase(
-            gameDatabaseSettings.Value.DatabaseName);
-
-        _gameCollection = mongoDatabase.GetCollection<Game>(
+        _gameCollection = mongodb.database.GetCollection<Game>(
             gameCollection.Value.Name);
         _mongoOperation = mongoOperation;
         _logger = logger;

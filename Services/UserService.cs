@@ -28,20 +28,14 @@ public class UsersService : IUsersService
     private readonly IMongoOperationLogger _mongoOperation;
 
     public UsersService(
-        IOptions<DatabaseSettings> userDatabaseSettings,
+        MongodbService mongodb,
         IOptions<MongodbCollectionParams<User>> userCollection,
         IDateTimeService dateTimeService,
         ILogger<UsersService> logger,
         IMongoOperationLogger mongoOperation
         )
     {
-        var mongoClient = new MongoClient(
-            userDatabaseSettings.Value.ConnectionString);
-
-        var mongoDatabase = mongoClient.GetDatabase(
-            userDatabaseSettings.Value.DatabaseName);
-
-        _usersCollection = mongoDatabase.GetCollection<User>(
+        _usersCollection = mongodb.database.GetCollection<User>(
             userCollection.Value.Name);
         _dateTimeService = dateTimeService;
         _logger = logger;
