@@ -295,7 +295,7 @@ public class RatingEngine : IRatingEngine
 
     public static PlayerRatingsData GetInitialRatingData()
     {
-        return new PlayerRatingsData(new GlickoRating(1500, 110, 0.06), nb: 0, recent: [], latest: null);
+        return new PlayerRatingsData(new GlickoRating(1500, 200, 0.06), nb: 0, recent: [], latest: null);
     }
 }
 

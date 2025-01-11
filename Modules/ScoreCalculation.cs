@@ -116,7 +116,7 @@ Dictionary<Position, Stone> playground
                 if (!clusterEncountered
                     .Contains(VirtualPlaygroundMap[startPos]!.cluster))
                 {
-                    // TODO: idk if it is possible to visit a stone at curpos without having it in cluster
+                    // REVIEW: idk if it is possible to visit a stone at curpos without having it in cluster
                     // so maybe this can be removed only cases i can think of is the first stone in which it maybe doesn't matter if we include it's cluster
                     clusterEncountered.Add(VirtualPlaygroundMap[startPos]!.cluster);
                     return (positionsSeenSoFar, owner, isDame, clusterEncountered);

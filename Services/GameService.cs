@@ -130,7 +130,7 @@ public class GameService : IGameService
 
     public async Task<List<GameAndOpponent>> GetGamesWithOpponent(string player)
     {
-        // TODO: pagination
+        // Ignored TODO: pagination
         /*
             [
             {

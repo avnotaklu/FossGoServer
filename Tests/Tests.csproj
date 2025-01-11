@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BadukServer.csproj" />
+    <ProjectReference Include="../BadukServer.csproj" />
   </ItemGroup>
 
 </Project>

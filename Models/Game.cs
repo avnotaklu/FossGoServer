@@ -28,7 +28,7 @@ public class GameFieldNames
     public const string GameState = "gs";
     public const string DeadStones = "ds";
     public const string Result = "res";
-    public const string FinalScore = "fts"; // TODO RENAME with fs
+    public const string FinalScore = "fs";
     public const string Komi = "k";
     public const string GameOverMethod = "gom";
     public const string StoneSelectionType = "sst";
@@ -656,7 +656,6 @@ public class PlayerTimeSnapshot
         TimeActive = timeActive;
     }
 
-    // TODO: maybe this can just be seconds since start of game
     [BsonElement(GameFieldNames.SnapshotTimestamp)]
     [Id(0)]
     public string SnapshotTimestamp { get; set; }
