@@ -10,6 +10,8 @@ using System.Diagnostics;
 using BadukServer;
 using Microsoft.AspNetCore.Identity.Data;
 using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 
 [ApiController]
 [Authorize]
@@ -59,7 +61,16 @@ public class AuthenticationController : ControllerBase
             else
             {
                 var authToken = await _authenticationService.GenerateJSONWebTokenForNormalUser(user);
-                var userAuth = new UserAuthenticationModel(user, authToken);
+
+                var refresh = user.RefreshToken;
+
+                if (refresh == null)
+                {
+                    refresh = await _authenticationService.GenerateRefreshToken();
+                    await _usersService.UpdateRefreshToken(user.Id!, refresh);
+                }
+
+                var userAuth = new UserAuthenticationModel(user, new AuthCreds(authToken, refresh));
                 return Ok(new GoogleSignInResponse(true, null, userAuth));
             }
         }
@@ -93,6 +104,51 @@ public class AuthenticationController : ControllerBase
                 nationalilty: null,
                 password: null
             ));
+        }
+        catch (Exception e)
+        {
+            return BadRequest(e.ToString());
+        }
+    }
+
+
+    [AllowAnonymous]
+    [HttpPost("RefreshToken")]
+
+    public async Task<ActionResult<UserAuthenticationModel>> RefreshToken([FromBody] AuthCreds creds)
+    {
+        try
+        {
+            var principle = _authenticationService.GetPrincipalFromExpiredToken(creds.Token);
+
+            if (principle?.Identity == null)
+            {
+                return Unauthorized("Invalid token");
+            }
+
+            var userId = principle.FindFirstValue("user_id");
+
+            if (userId == null)
+            {
+                return Unauthorized("Invalid token");
+            }
+
+
+            var user = await _usersService.GetByIds([userId]);
+
+            var refreshToken = new JwtSecurityToken(creds.RefreshToken);
+
+            if (user.IsNullOrEmpty() || user.First().RefreshToken != creds.RefreshToken || refreshToken.ValidTo < DateTime.UtcNow)
+            {
+                return BadRequest("Invalid access token or refresh token");
+            }
+
+            var token = await _authenticationService.GenerateJSONWebTokenForNormalUser(user.First());
+
+            var newRefreshToken = await _authenticationService.GenerateRefreshToken();
+            await _usersService.UpdateRefreshToken(userId, newRefreshToken);
+
+            return Ok(new UserAuthenticationModel(user.First(), new AuthCreds(token, newRefreshToken)));
         }
         catch (Exception e)
         {
@@ -136,7 +192,7 @@ public class AuthenticationController : ControllerBase
         {
             var newGuest = new GuestUser(ObjectId.GenerateNewId().ToString());
             var token = await _authenticationService.GenerateJSONWebTokenGuestUser(newGuest);
-            return Ok(new GuestAuthenticationModel(newGuest, token));
+            return Ok(new GuestAuthenticationModel(newGuest, new AuthCreds(token, null)));
         }
         catch (Exception e)
         {
@@ -173,7 +229,17 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", request.Email);
-        return Ok(new UserAuthenticationModel(user, await _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
+
+        var token = await _authenticationService.GenerateJSONWebTokenForNormalUser(user);
+
+        var refresh = user.RefreshToken;
+        if (refresh == null)
+        {
+            refresh = await _authenticationService.GenerateRefreshToken();
+            await _usersService.UpdateRefreshToken(user.Id!, refresh);
+        }
+
+        return Ok(new UserAuthenticationModel(user, new AuthCreds(token, refresh)));
     }
 
     private async Task<ActionResult<UserAuthenticationModel>> SignUp(UserDetailsDto request)
@@ -210,7 +276,13 @@ public class AuthenticationController : ControllerBase
         }
 
         _logger.LogInformation("Signup successful {email}", newUser.Email);
-        return Ok(new UserAuthenticationModel(newUser, await _authenticationService.GenerateJSONWebTokenForNormalUser(newUser)));
+
+        var token = await _authenticationService.GenerateJSONWebTokenForNormalUser(newUser);
+        var refresh = await _authenticationService.GenerateRefreshToken();
+
+        await _usersService.UpdateRefreshToken(newUser.Id!, refresh);
+
+        return Ok(new UserAuthenticationModel(newUser, new AuthCreds(token, refresh)));
     }
 
     [HttpGet("GetUser")]
@@ -232,6 +304,7 @@ public class AuthenticationController : ControllerBase
 
         var user = users.First();
 
-        return Ok(new UserAuthenticationModel(user, await _authenticationService.GenerateJSONWebTokenForNormalUser(user)));
+        var token = await _authenticationService.GenerateJSONWebTokenForNormalUser(user);
+        return Ok(new UserAuthenticationModel(user, new AuthCreds(token, user.RefreshToken)));
     }
 }

@@ -8,10 +8,10 @@ public class DateTimeService : IDateTimeService
 {
     public DateTime Now()
     {
-        return DateTime.Now;
+        return DateTime.UtcNow;
     }
 
     public string NowFormatted() {
-        return DateTime.Now.ToString("o");
+        return DateTime.UtcNow.ToString("o");
     }
 }

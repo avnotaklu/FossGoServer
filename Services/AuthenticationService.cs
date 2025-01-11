@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using BadukServer;
 using BadukServer.Models;
@@ -16,6 +17,27 @@ public class AuthenticationService
     )
     {
         JwtSettings = jwtSettings.Value;
+    }
+
+    public ClaimsPrincipal GetPrincipalFromExpiredToken(String token)
+    {
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = false, //you might want to validate the audience and issuer depending on your use case
+            ValidateIssuer = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key)),
+            ValidateLifetime = false //here we are saying that we don't care about the token's expiration date
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        SecurityToken securityToken;
+        var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out securityToken);
+        var jwtSecurityToken = securityToken as JwtSecurityToken;
+        if (jwtSecurityToken == null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            throw new SecurityTokenException("Invalid token");
+
+        return principal;
     }
 
 
@@ -63,7 +85,24 @@ public class AuthenticationService
             var token = new JwtSecurityToken(JwtSettings.Issuer,
               JwtSettings.Issuer,
               claims.Claims,
-              expires: DateTime.Now.AddMinutes(120),
+              expires: DateTime.UtcNow.AddMinutes(120),
+              signingCredentials: credentials);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        });
+    }
+
+    public Task<string> GenerateRefreshToken()
+    {
+        return Task.Run(() =>
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSettings.Key));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(JwtSettings.Issuer,
+              JwtSettings.Issuer,
+              [],
+              expires: DateTime.UtcNow.AddMonths(1),
               signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

@@ -1,13 +1,15 @@
 using BadukServer;
 
+
+
 public class UserAuthenticationModel
 {
     public User User {get;set;}
-    public string Token {get;set;}
+    public AuthCreds Creds {get;set;}
 
-    public UserAuthenticationModel(User user, string token)
+    public UserAuthenticationModel(User user, AuthCreds creds)
     {
         User = user;
-        Token = token;
+        Creds = creds;
     }
 }

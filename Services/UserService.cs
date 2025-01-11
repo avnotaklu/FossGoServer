@@ -18,6 +18,7 @@ public interface IUsersService
     public Task<User?> GetByUserName(string userName);
     public Task<User?> CreateUser(UserDetailsDto userDetails, string? passwordHash);
     public Task<User> UpdateUserProfile(string userId, UpdateProfileDto userProfile);
+    public Task<User> UpdateRefreshToken(string userId, String token);
 }
 
 public class UsersService : IUsersService
@@ -87,6 +88,24 @@ public class UsersService : IUsersService
                 .Set(user => user.FullName, userProfile.FullName)
                 .Set(user => user.Bio, userProfile.Bio)
                 .Set(user => user.Nationality, userProfile.Nationality));
+
+
+            if (res.IsAcknowledged)
+            {
+                var user = await _usersCollection.Find(user => user.Id == userId).FirstOrDefaultAsync();
+
+                return user;
+            }
+            throw new Exception("Failed to update user profile");
+        });
+    }
+
+    public async Task<User> UpdateRefreshToken(string userId, string token)
+    {
+        return await _mongoOperation.Operation(async () =>
+        {
+            var res = await _usersCollection.UpdateOneAsync((user) => user.Id == userId, Builders<User>.Update
+                .Set(user => user.RefreshToken, token));
 
 
             if (res.IsAcknowledged)

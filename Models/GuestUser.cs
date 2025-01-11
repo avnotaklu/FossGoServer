@@ -12,11 +12,11 @@ public class GuestUser
 public class GuestAuthenticationModel
 {
     public GuestUser User { get; set; }
-    public string Token { get; set; }
+    public AuthCreds Creds { get; set; }
 
-    public GuestAuthenticationModel(GuestUser user, string token)
+    public GuestAuthenticationModel(GuestUser user, AuthCreds creds)
     {
         User = user;
-        Token = token;
+        Creds = creds;
     }
 }
