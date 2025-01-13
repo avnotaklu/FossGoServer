@@ -21,7 +21,8 @@ await Host.CreateDefaultBuilder(args)
         {
             // To avoid port conflicts, each Web server must listen on a different port.
             var instanceId = ctx.Configuration.GetValue<int>("InstanceId");
-            kestrelOptions.ListenAnyIP(8080 + instanceId);
+            var port = ctx.Configuration.GetValue<int>("PORT");
+            kestrelOptions.ListenAnyIP(port + instanceId);
         });
     })
     .RunConsoleAsync();
