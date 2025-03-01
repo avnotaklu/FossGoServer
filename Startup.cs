@@ -122,15 +122,17 @@ public class Startup
         app.UseRouting();
         app.UseAuthorization();
 
+
         app.UseEndpoints(e =>
         {
+            e.MapGet("/", () => "KeepAlive");
             e.MapControllers();
             e.MapHub<MainHub>("/mainHub");
         });
+
     }
 
-    record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-    {
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    }
+
+
+
 }

@@ -128,6 +128,7 @@ public class GameService : IGameService
         return games;
     }
 
+    // NOTE: Unused
     public async Task<List<GameAndOpponent>> GetGamesWithOpponent(string player)
     {
         // Ignored TODO: pagination
