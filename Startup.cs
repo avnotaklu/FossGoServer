@@ -129,10 +129,5 @@ public class Startup
             e.MapControllers();
             e.MapHub<MainHub>("/mainHub");
         });
-
     }
-
-
-
-
 }
